@@ -9,8 +9,14 @@ from .rules import DEFAULT_RULES, RuleConfig, hazards_from_boxes
 
 
 class YoloDetector(HazardDetector):
-    def __init__(self, weights: str | Path, conf: float = 0.35, device: str = "",
-                 rules: RuleConfig = DEFAULT_RULES, imgsz: int = 640):
+    def __init__(
+        self,
+        weights: str | Path,
+        conf: float = 0.35,
+        device: str = "",
+        rules: RuleConfig = DEFAULT_RULES,
+        imgsz: int = 640,
+    ):
         try:
             from ultralytics import YOLO
         except ImportError as exc:  # pragma: no cover - depends on optional extra
@@ -26,12 +32,14 @@ class YoloDetector(HazardDetector):
         self.name = f"yolo:{weights.stem}"
 
     def boxes(self, image_path: Path) -> list[Box]:
-        result = self.model.predict(str(image_path), conf=self.conf, imgsz=self.imgsz,
-                                    device=self.device, verbose=False)[0]
+        result = self.model.predict(
+            str(image_path), conf=self.conf, imgsz=self.imgsz, device=self.device, verbose=False
+        )[0]
         names = result.names
         out = []
-        for xyxyn, conf, cls in zip(result.boxes.xyxyn.tolist(), result.boxes.conf.tolist(),
-                                    result.boxes.cls.tolist()):
+        for xyxyn, conf, cls in zip(
+            result.boxes.xyxyn.tolist(), result.boxes.conf.tolist(), result.boxes.cls.tolist(), strict=True
+        ):
             out.append(Box(names[int(cls)], float(conf), *map(float, xyxyn)))
         return out
 

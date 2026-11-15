@@ -19,8 +19,25 @@ from shms.detection.base import Box
 from shms.detection.rules import hazards_from_boxes
 
 # Class order from sh17.yaml in the official repository (used by the released weights).
-SH17_NAMES = ["person", "ear", "ear-mufs", "face", "face-guard", "face-mask", "foot", "tool", "glasses",
-              "gloves", "helmet", "hands", "head", "medical-suit", "shoes", "safety-suit", "safety-vest"]
+SH17_NAMES = [
+    "person",
+    "ear",
+    "ear-mufs",
+    "face",
+    "face-guard",
+    "face-mask",
+    "foot",
+    "tool",
+    "glasses",
+    "gloves",
+    "helmet",
+    "hands",
+    "head",
+    "medical-suit",
+    "shoes",
+    "safety-suit",
+    "safety-vest",
+]
 HAZARDS = ["no_hard_hat", "no_eye_protection", "no_gloves", "no_hi_vis_vest"]
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -87,3 +104,31 @@ def gt_hazards(boxes: list[Box]) -> dict[str, bool]:
 
 def label_path(layout: Layout, image_name: str) -> Path:
     return layout.labels / (Path(image_name).stem + ".txt")
+
+
+def dhash(path: Path, size: int = 8) -> int:
+    """Difference hash: near-identical photos (resized, re-compressed) get hashes a few bits apart.
+    JPEG draft mode decodes at low resolution, so hashing 8,000 large photos takes seconds, not minutes."""
+    from PIL import Image
+
+    with Image.open(path) as im:
+        im.draft("L", (size * 8, size * 8))
+        small = im.convert("L").resize((size + 1, size))
+        px = list(small.getdata())
+    bits = 0
+    for row in range(size):
+        for col in range(size):
+            bits = (bits << 1) | (px[row * (size + 1) + col] > px[row * (size + 1) + col + 1])
+    return bits
+
+
+def near_duplicates(test: dict[str, int], train: dict[str, int], max_bits: int = 4) -> dict[str, str]:
+    """Map each test image to a train image whose hash differs by <= max_bits (data leakage check)."""
+    out = {}
+    train_items = list(train.items())
+    for name, h in test.items():
+        for tname, th in train_items:
+            if bin(h ^ th).count("1") <= max_bits:
+                out[name] = tname
+                break
+    return out

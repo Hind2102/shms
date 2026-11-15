@@ -41,6 +41,7 @@ class PermissionDenied(PermissionError):
 
 # ---------------------------------------------------------------- helpers
 
+
 def _transition(h: Hazard, new: Status) -> None:
     if new not in ALLOWED_TRANSITIONS[h.status]:
         raise WorkflowError(f"Cannot move hazard #{h.id} from {h.status.value} to {new.value}")
@@ -56,8 +57,7 @@ def can_act_on(user: User, h: Hazard) -> bool:
     return user.role == Role.SUPERVISOR or user.id in {h.assignee_id, h.area.owner_id}
 
 
-def similar_count(db: Session, area_id: int, category_code: str, now: datetime,
-                  exclude_id: int | None = None) -> int:
+def similar_count(db: Session, area_id: int, category_code: str, now: datetime, exclude_id: int | None = None) -> int:
     """Confirmed hazards of the same category in the same area within the look-back window."""
     since = now - timedelta(days=risk.lookback_days())
     q = select(func.count(Hazard.id)).where(
@@ -74,10 +74,43 @@ def similar_count(db: Session, area_id: int, category_code: str, now: datetime,
 
 # ---------------------------------------------------------------- stage 1: report and score
 
-def create_draft(db: Session, reporter: User, area: Area, photo_path: str | None,
-                 result: DetectorResult | None, at: datetime | None = None) -> Hazard:
-    h = Hazard(area=area, reporter_id=reporter.id, status=Status.DRAFT, photo_path=photo_path,
-               created_at=at or utcnow())
+
+class IdempotencyConflict(WorkflowError):
+    """The same idempotency key was reused for a different report."""
+
+
+def find_by_idem_key(db: Session, reporter: User, key: str | None) -> Hazard | None:
+    if not key:
+        return None
+    return db.scalar(select(Hazard).where(Hazard.reporter_id == reporter.id, Hazard.idem_key == key))
+
+
+def replay_or_conflict(db: Session, reporter: User, area: Area, key: str | None) -> Hazard | None:
+    """Idempotency (microservices lab): same key + same request -> the existing report; same key + a
+    different request -> refuse, because one key must never mean two different reports."""
+    existing = find_by_idem_key(db, reporter, key)
+    if existing is not None and existing.area_id != area.id:
+        raise IdempotencyConflict("This idempotency key was already used for a report in another area")
+    return existing
+
+
+def create_draft(
+    db: Session,
+    reporter: User,
+    area: Area,
+    photo_path: str | None,
+    result: DetectorResult | None,
+    at: datetime | None = None,
+    idem_key: str | None = None,
+) -> Hazard:
+    h = Hazard(
+        area=area,
+        reporter_id=reporter.id,
+        status=Status.DRAFT,
+        photo_path=photo_path,
+        created_at=at or utcnow(),
+        idem_key=idem_key,
+    )
     if result is not None:
         # The AI checks the photo against the PPE this area requires; anything else is kept for
         # traceability but marked as not required and never pre-selected.
@@ -90,9 +123,14 @@ def create_draft(db: Session, reporter: User, area: Area, photo_path: str | None
         h.ai_top_code = top.code if top else None
     db.add(h)
     db.flush()
-    _event(db, h, reporter, "reported",
-           f"AI ({h.ai_model}) suggested {h.ai_top_code or 'no PPE hazard'}" if result else "Reported without AI",
-           at=h.created_at)
+    _event(
+        db,
+        h,
+        reporter,
+        "reported",
+        f"AI ({h.ai_model}) suggested {h.ai_top_code or 'no PPE hazard'}" if result else "Reported without AI",
+        at=h.created_at,
+    )
     return h
 
 
@@ -128,8 +166,14 @@ def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime |
     h.consequence, h.risk_score, h.risk_level = r.consequence, r.score, r.level
     h.due_at = now + timedelta(days=r.target_days)
     h.confirmed_at = now
-    _event(db, h, actor, "confirmed",
-           f"{taxonomy.get(c.category_code).name}; C{r.consequence} x L{r.likelihood} = {r.score} ({r.level})", at=now)
+    _event(
+        db,
+        h,
+        actor,
+        "confirmed",
+        f"{taxonomy.get(c.category_code).name}; C{r.consequence} x L{r.likelihood} = {r.score} ({r.level})",
+        at=now,
+    )
 
     if c.fixed_on_spot:
         _transition(h, Status.CLOSED)
@@ -153,14 +197,17 @@ def _alert(db: Session, h: Hazard, actor: User, now: datetime) -> None:
     recipients = list(db.scalars(select(User).where(User.role == Role.SUPERVISOR)))
     if h.area.owner not in recipients:
         recipients.append(h.area.owner)
-    msg = (f"{h.risk_level} risk: {taxonomy.get(h.category_code).name} in {h.area.name} "
-           f"(score {h.risk_score}, status {h.status.value})")
+    msg = (
+        f"{h.risk_level} risk: {taxonomy.get(h.category_code).name} in {h.area.name} "
+        f"(score {h.risk_score}, status {h.status.value})"
+    )
     for u in recipients:
         db.add(Notification(user_id=u.id, hazard=h, message=msg, created_at=now))
     _event(db, h, actor, "alerted", f"Notified {', '.join(u.name for u in recipients)}", at=now)
 
 
 # ---------------------------------------------------------------- stage 2: close and document
+
 
 def plan_action(db: Session, h: Hazard, actor: User, planned_action: str) -> Hazard:
     if h.status != Status.OPEN:
@@ -175,8 +222,9 @@ def plan_action(db: Session, h: Hazard, actor: User, planned_action: str) -> Haz
     return h
 
 
-def close(db: Session, h: Hazard, actor: User, action: str, photo_path: str | None = None,
-          at: datetime | None = None) -> Hazard:
+def close(
+    db: Session, h: Hazard, actor: User, action: str, photo_path: str | None = None, at: datetime | None = None
+) -> Hazard:
     if not can_act_on(actor, h):
         raise PermissionDenied("Only the Area Owner or a supervisor can close this hazard")
     if not action.strip():
@@ -191,6 +239,7 @@ def close(db: Session, h: Hazard, actor: User, action: str, photo_path: str | No
 
 
 # ---------------------------------------------------------------- stage 3: dashboard
+
 
 def _open(db: Session):
     return select(Hazard).where(Hazard.status == Status.OPEN)
@@ -223,22 +272,29 @@ def dashboard(db: Session, now: datetime | None = None) -> dict:
         a_open = [h for h in open_ if h.area_id == a.id]
         heat = sum(h.risk_score or 0 for h in a_open)
         worst = max(a_open, key=lambda h: h.risk_score or 0, default=None)
-        area_rows.append({
-            "area": a, "open": len(a_open), "heat": heat, "heat_ratio": heat / max_heat,
-            "worst_level": worst.risk_level if worst else None,
-            "reported_90d": sum(1 for h in confirmed if h.area_id == a.id and h.created_at >= since90),
-        })
+        area_rows.append(
+            {
+                "area": a,
+                "open": len(a_open),
+                "heat": heat,
+                "heat_ratio": heat / max_heat,
+                "worst_level": worst.risk_level if worst else None,
+                "reported_90d": sum(1 for h in confirmed if h.area_id == a.id and h.created_at >= since90),
+            }
+        )
 
     # Weekly trend (12 weeks): reported vs closed
     weeks = []
     start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     for i in range(11, -1, -1):
         ws, we = start - timedelta(weeks=i), start - timedelta(weeks=i - 1)
-        weeks.append({
-            "label": ws.strftime("%d %b"),
-            "reported": sum(1 for h in confirmed if ws <= h.created_at < we),
-            "closed": sum(1 for h in confirmed if h.closed_at and ws <= h.closed_at < we),
-        })
+        weeks.append(
+            {
+                "label": ws.strftime("%d %b"),
+                "reported": sum(1 for h in confirmed if ws <= h.created_at < we),
+                "closed": sum(1 for h in confirmed if h.closed_at and ws <= h.closed_at < we),
+            }
+        )
 
     by_cat = Counter(h.category_code for h in confirmed if h.created_at >= since90)
     by_level = Counter(h.risk_level for h in open_)
@@ -253,10 +309,10 @@ def dashboard(db: Session, now: datetime | None = None) -> dict:
 
 def area_overview(db: Session, area: Area) -> dict:
     """What a field operator sees before entering an area."""
-    open_ = sorted((h for h in area.hazards if h.status == Status.OPEN),
-                   key=lambda h: h.risk_score or 0, reverse=True)
-    recent_closed = sorted((h for h in area.hazards if h.status == Status.CLOSED),
-                           key=lambda h: h.closed_at, reverse=True)[:5]
+    open_ = sorted((h for h in area.hazards if h.status == Status.OPEN), key=lambda h: h.risk_score or 0, reverse=True)
+    recent_closed = sorted(
+        (h for h in area.hazards if h.status == Status.CLOSED), key=lambda h: h.closed_at, reverse=True
+    )[:5]
     return {"area": area, "open": open_, "recent_closed": recent_closed}
 
 
@@ -268,6 +324,120 @@ def repeat_hotspots(db: Session, now: datetime | None = None, min_count: int = 3
     for h in db.scalars(select(Hazard).where(Hazard.status != Status.DRAFT, Hazard.created_at >= since)):
         counts[(h.area_id, h.category_code)] += 1
     areas = {a.id: a for a in db.scalars(select(Area))}
-    rows = [{"area": areas[a], "category": taxonomy.get(c).name, "count": n}
-            for (a, c), n in counts.items() if n >= min_count]
+    rows = [
+        {"area": areas[a], "category": taxonomy.get(c).name, "count": n}
+        for (a, c), n in counts.items()
+        if n >= min_count
+    ]
     return sorted(rows, key=lambda r: r["count"], reverse=True)
+
+
+# ---------------------------------------------------------------- MLOps: monitoring the AI in production
+
+
+def slo_config() -> dict:
+    from .settings import PACKAGE_DIR
+
+    return json.loads((PACKAGE_DIR / "config" / "slo.json").read_text())
+
+
+def _pct(values: list[float], q: float) -> float | None:
+    if not values:
+        return None
+    s = sorted(values)
+    k = (len(s) - 1) * q / 100
+    lo, hi = int(k), min(int(k) + 1, len(s) - 1)
+    return s[lo] + (s[hi] - s[lo]) * (k - lo)
+
+
+def ai_monitoring(db: Session, now: datetime | None = None) -> dict:
+    """Production signals for the AI: latency, errors, how often reporters accept or correct it, and which
+    corrections they make. A falling acceptance rate is an early warning of drift (new cameras, lighting,
+    PPE models) and a reason to re-evaluate the model before trusting it further."""
+    now = now or utcnow()
+    slo = slo_config()
+    since = now - timedelta(days=slo["window_days"])
+    rows = list(db.scalars(select(Hazard).where(Hazard.ai_model.is_not(None), Hazard.created_at >= since)))
+    confirmed = [h for h in rows if h.status != Status.DRAFT]
+    latencies = [h.ai_latency_ms for h in rows if h.ai_latency_ms is not None and not h.ai_error]
+    errors = sum(1 for h in rows if h.ai_error)
+    judged = [h for h in confirmed if h.ai_accepted is not None]
+    missed = [h for h in confirmed if h.ai_top_code is None]  # AI saw nothing, reporter reported a hazard
+    acceptance = (sum(h.ai_accepted for h in judged) / len(judged)) if judged else None
+
+    corrections = Counter(
+        (h.ai_top_code or "nothing detected", h.category_code) for h in confirmed if h.ai_top_code != h.category_code
+    )
+    by_model: dict[str, dict] = {}
+    for h in rows:
+        m = by_model.setdefault(h.ai_model, {"reports": 0, "accepted": 0, "judged": 0, "lat": []})
+        m["reports"] += 1
+        if h.ai_accepted is not None:
+            m["judged"] += 1
+            m["accepted"] += int(h.ai_accepted)
+        if h.ai_latency_ms is not None and not h.ai_error:
+            m["lat"].append(h.ai_latency_ms)
+    models = [
+        {
+            "model": k,
+            "reports": v["reports"],
+            "acceptance": v["accepted"] / v["judged"] if v["judged"] else None,
+            "p95_ms": _pct(v["lat"], 95),
+        }
+        for k, v in sorted(by_model.items())
+    ]
+
+    weeks = []
+    start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    for i in range(7, -1, -1):
+        ws, we = start - timedelta(weeks=i), start - timedelta(weeks=i - 1)
+        wk = [
+            h
+            for h in db.scalars(
+                select(Hazard).where(Hazard.ai_accepted.is_not(None), Hazard.created_at >= ws, Hazard.created_at < we)
+            )
+        ]
+        weeks.append(
+            {
+                "label": ws.strftime("%d %b"),
+                "n": len(wk),
+                "acceptance": (sum(h.ai_accepted for h in wk) / len(wk)) if wk else None,
+            }
+        )
+
+    p95 = _pct(latencies, 95)
+    err_rate = errors / len(rows) if rows else 0.0
+    enough = len(judged) >= slo["min_reports_for_alert"]
+    checks = [
+        {
+            "name": "AI latency p95",
+            "target": f"≤ {slo['ai_latency_p95_ms'] / 1000:.0f} s",
+            "value": None if p95 is None else f"{p95 / 1000:.2f} s",
+            "ok": None if p95 is None else p95 <= slo["ai_latency_p95_ms"],
+        },
+        {
+            "name": "AI error rate",
+            "target": f"≤ {100 * slo['ai_error_rate_max']:.0f}%",
+            "value": f"{100 * err_rate:.1f}%" if rows else None,
+            "ok": (err_rate <= slo["ai_error_rate_max"]) if rows else None,
+        },
+        {
+            "name": "Reporter acceptance",
+            "target": f"≥ {100 * slo['ai_acceptance_min']:.0f}%",
+            "value": None if acceptance is None else f"{100 * acceptance:.0f}%",
+            "ok": None if acceptance is None or not enough else acceptance >= slo["ai_acceptance_min"],
+        },
+    ]
+    return {
+        "window_days": slo["window_days"],
+        "reports": len(rows),
+        "confirmed": len(confirmed),
+        "errors": errors,
+        "acceptance": acceptance,
+        "missed": len(missed),
+        "latency": {"p50_ms": _pct(latencies, 50), "p95_ms": p95, "n": len(latencies)},
+        "checks": checks,
+        "models": models,
+        "weeks": weeks,
+        "corrections": [{"ai": a, "reporter": b, "n": n} for (a, b), n in corrections.most_common(8)],
+    }

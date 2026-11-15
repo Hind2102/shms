@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}AI monitoring{% endblock %}
+{% block content %}
+<h1>AI monitoring – last {{ m.window_days }} days</h1>
+<p class="muted small" style="max-width:900px">Model quality was measured offline on the labelled SH17 test set (precision / recall).
+This page watches the model <em>in use</em>: speed, failures, and how often reporters keep or correct its suggestion.
+A falling acceptance rate is an early warning of drift – new cameras, lighting or PPE types – and the trigger to re-evaluate.</p>
+
+<div class="grid kpis">
+  {% for c in m.checks %}
+  <div class="kpi {% if c.ok == false %}warn{% endif %}">
+    <div class="v">{{ c.value or '–' }}</div>
+    <div class="l">{{ c.name }} · target {{ c.target }}<br>
+      {% if c.ok is none %}<span class="muted">not enough data</span>{% elif c.ok %}<span style="color:var(--low)">✓ within SLO</span>{% else %}<span style="color:var(--extreme)">✗ SLO breached</span>{% endif %}</div>
+  </div>
+  {% endfor %}
+  <div class="kpi"><div class="v">{{ m.reports }}</div><div class="l">AI-analysed reports</div></div>
+  <div class="kpi"><div class="v">{{ m.missed }}</div><div class="l">AI saw nothing, reporter found PPE breach</div></div>
+</div>
+<br>
+<div class="grid two">
+  <div class="card">
+    <h2>Reporter acceptance by week (last 8 weeks)</h2>
+    {% set target = 80 %}
+    <svg viewBox="0 0 600 190" style="width:100%;height:auto" role="img" aria-label="Weekly acceptance rate">
+      <line x1="20" x2="590" y1="{{ 160 - 1.4*target }}" y2="{{ 160 - 1.4*target }}" stroke="#c62828" stroke-dasharray="5 4"/>
+      <text x="590" y="{{ 154 - 1.4*target }}" font-size="10" text-anchor="end" fill="#c62828">SLO {{ target }}%</text>
+      {% for w in m.weeks %}{% set x = 30 + loop.index0 * 66 %}
+        {% if w.acceptance is not none %}{% set v = 100*w.acceptance %}
+        <rect x="{{ x - 10 }}" y="{{ 160 - 1.4*v }}" width="34" height="{{ 1.4*v }}" rx="3" fill="{{ '#1f3a5f' if v >= target else '#ef6c00' }}"><title>{{ w.label }}: {{ v|round|int }}% of {{ w.n }}</title></rect>
+        <text x="{{ x + 7 }}" y="{{ 155 - 1.4*v }}" font-size="10" text-anchor="middle" fill="#1d2733">{{ v|round|int }}%</text>
+        {% endif %}
+        <text x="{{ x + 7 }}" y="178" font-size="10" text-anchor="middle" fill="#5f6b7a">{{ w.label }}</text>
+      {% endfor %}
+      <line x1="20" x2="590" y1="160" y2="160" stroke="#c5cdd6"/>
+    </svg>
+  </div>
+  <div class="card">
+    <h2>Most common corrections</h2>
+    <p class="muted small">What the AI suggested → what the reporter confirmed. These cases are the best candidates for the next labelled test set.</p>
+    <table>
+      <tr><th>AI said</th><th>Reporter said</th><th>n</th></tr>
+      {% for c in m.corrections %}<tr><td>{{ c.ai | cat if c.ai != 'nothing detected' else 'nothing detected' }}</td><td>{{ c.reporter | cat }}</td><td>{{ c.n }}</td></tr>
+      {% else %}<tr><td colspan="3" class="muted">No corrections in this window.</td></tr>{% endfor %}
+    </table>
+  </div>
+</div>
+<div class="grid two">
+  <div class="card">
+    <h2>By model version</h2>
+    <table><tr><th>Model</th><th>Reports</th><th>Acceptance</th><th>p95 latency</th></tr>
+    {% for r in m.models %}<tr><td>{{ r.model }}</td><td>{{ r.reports }}</td><td>{{ '%d%%' % (100*r.acceptance) if r.acceptance is not none else '–' }}</td><td>{{ '%.2f s' % (r.p95_ms/1000) if r.p95_ms is not none else '–' }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">No AI reports yet.</td></tr>{% endfor %}</table>
+  </div>
+  <div class="card">
+    <h2>Service calls since start</h2>
+    <p class="muted small">From the request-timing middleware; also exported for Prometheus at <a href="/metrics">/metrics</a>.</p>
+    <table><tr><th>Route</th><th>Status</th><th>Calls</th><th>Avg</th></tr>
+    {% for r in calls %}<tr><td><code>{{ r.method }} {{ r.path }}</code></td><td>{{ r.status }}</td><td>{{ r.count }}</td><td>{{ '%.0f ms' % r.avg_ms }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">No calls yet.</td></tr>{% endfor %}</table>
+  </div>
+</div>
+<p class="muted small">History before today is synthesized demo data. Thresholds: <code>shms/config/slo.json</code>.</p>
+{% endblock %}

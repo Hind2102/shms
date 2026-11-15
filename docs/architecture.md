@@ -62,7 +62,8 @@ flowchart LR
 | `detection/` | `HazardDetector.detect(photo) → DetectorResult` (suggestions, boxes, latency, error) | YOLO, Ollama and mock implementations are interchangeable via `SHMS_DETECTOR` |
 | `detection/rules.py` | Converts PPE/body-part boxes to hazards with explicit geometric rules | Same function scores model output and ground truth |
 | `models.py`, `db.py` | SQLAlchemy data model and session handling | SQLite by default; any SQLAlchemy URL |
-| `evaluation/` | Offline, reproducible measurement on SH17's held-out split | CLI scripts writing JSON/CSV/PNG to `evaluation/results/` |
+| `web/telemetry.py` | Request timing middleware and Prometheus `/metrics` | Text exposition format |
+| `evaluation/` | Offline, reproducible measurement on SH17's held-out split, plus robustness and load tests | CLI scripts writing JSON/CSV/PNG to `evaluation/results/` |
 
 ## Key design decisions
 
@@ -82,5 +83,15 @@ flowchart LR
    where vests are required.
 6. **Likelihood is computed, not guessed.** It comes from the number of similar hazards in the same area in the
    last 90 days, which links individual cases (problem 1 in the proposal) and makes repeat hazards rise in risk.
-7. **One process, one file database.** FastAPI + SQLite + server-rendered pages: no front-end build, no database
-   server, so graders can run it with two commands.
+7. **Modular monolith, not microservices.** One team, one database and one deployment; modules have clear
+   interfaces (pages/API → services → risk/taxonomy/detection → models). Microservices would add network hops
+   and distributed-transaction patterns (sagas) that this workflow does not need; the load test measures the
+   real bottleneck, which is model inference, not the web tier. FastAPI + SQLite + server-rendered pages: no
+   front-end build and no database server, so graders can run it with two commands, natively or in Docker.
+8. **Idempotent reporting.** Site Wi-Fi is unreliable and people double-tap. Each report form carries an
+   idempotency key; a retry returns the same report, and reusing a key for a different report is refused (409).
+9. **Integrity in the database, not only in code.** CHECK constraints (levels 1–5, a closed hazard must say how
+   it was closed), foreign keys and indexes that match the likelihood and dashboard queries.
+10. **Evaluate offline, monitor online.** Precision/recall come from the labelled SH17 test set. In use, the
+    app tracks latency, errors and how often reporters accept or correct the AI against SLOs
+    (`config/slo.json`), exported for Prometheus at `/metrics`. A falling acceptance rate triggers re-evaluation.

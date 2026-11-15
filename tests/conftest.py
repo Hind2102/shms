@@ -55,8 +55,12 @@ def empty_db(settings):
     sup = User(name="Sup", role=Role.SUPERVISOR)
     s.add_all([rep, owner, other, sup])
     s.flush()
-    s.add_all([Area(code="DIG", name="Digestion", owner_id=owner.id, required_ppe="Hard hat"),
-               Area(code="CAL", name="Calcination", owner_id=other.id)])
+    s.add_all(
+        [
+            Area(code="DIG", name="Digestion", owner_id=owner.id, required_ppe="Hard hat"),
+            Area(code="CAL", name="Calcination", owner_id=other.id),
+        ]
+    )
     s.commit()
     yield s
     s.close()

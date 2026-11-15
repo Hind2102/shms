@@ -15,8 +15,7 @@ from . import services
 from .db import create_all, init_engine, new_session
 from .seed import seed
 from .settings import PACKAGE_DIR, get_settings
-from .web import api, pages
-
+from .web import api, pages, telemetry
 
 log = logging.getLogger("shms")
 
@@ -60,7 +59,9 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
     app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")
+    app.middleware("http")(telemetry.timing_middleware)
     app.include_router(api.router)
+    app.include_router(telemetry.router)
     app.include_router(pages.router)
 
     @app.exception_handler(pages.LoginRequired)

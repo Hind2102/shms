@@ -20,7 +20,17 @@ from pathlib import Path
 
 from PIL import Image
 
-from .sh17 import HAZARDS, SH17_NAMES, find_layout, gt_hazards, label_path, read_boxes, read_list
+from .sh17 import (
+    HAZARDS,
+    SH17_NAMES,
+    dhash,
+    find_layout,
+    gt_hazards,
+    label_path,
+    near_duplicates,
+    read_boxes,
+    read_list,
+)
 
 OUT_DIR = Path(__file__).resolve().parent / "data"
 
@@ -45,8 +55,10 @@ def main() -> None:
     ap.add_argument("--root", required=True, help="folder where the SH17 Kaggle zip was extracted")
     ap.add_argument("--subset", type=int, default=300, help="size of the fixed random subset for VLMs")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--export-samples", type=int, default=6,
-                    help="copy N downscaled test images to data/samples/ for the demo")
+    ap.add_argument("--no-dup-check", action="store_true", help="skip the near-duplicate (train/test leakage) check")
+    ap.add_argument(
+        "--export-samples", type=int, default=6, help="copy N downscaled test images to data/samples/ for the demo"
+    )
     args = ap.parse_args()
 
     lay = find_layout(args.root)
@@ -56,6 +68,16 @@ def main() -> None:
     train = set(read_list(lay.train_list)) if lay.train_list else set()
     leak = train.intersection(images)
     print(f"Held-out split: {lay.test_list.name} with {len(images)} images; overlap with train list: {len(leak)}")
+
+    # Leakage check (data-engineering lecture): an exact file overlap is not enough; the same photo can be
+    # in both splits under different names or sizes. Compare perceptual hashes of test vs train images.
+    dups: dict[str, str] = {}
+    if not args.no_dup_check and train:
+        print("Hashing images for the near-duplicate check ...", flush=True)
+        th = {n: dhash(lay.images / n) for n in images if (lay.images / n).is_file()}
+        tr = {n: dhash(lay.images / n) for n in train if (lay.images / n).is_file()}
+        dups = near_duplicates(th, tr)
+        print(f"Near-duplicates of training images inside the test split: {len(dups)}")
 
     rng = random.Random(args.seed)
     subset = set(rng.sample(images, min(args.subset, len(images))))
@@ -71,8 +93,18 @@ def main() -> None:
         h, t = helmet_head_overlap_share(boxes)
         helmet_hits, helmet_total = helmet_hits + h, helmet_total + t
         gt = gt_hazards(boxes)
-        row = {"image": name, "in_subset": int(name in subset), "n_boxes": len(boxes)}
-        row.update({f"n_{c}": sum(1 for b in boxes if b.label == c) for c in ("person", "head", "helmet", "face", "glasses", "face-guard", "hands", "gloves", "safety-vest")})
+        row = {
+            "image": name,
+            "in_subset": int(name in subset),
+            "near_dup_train": int(name in dups),
+            "n_boxes": len(boxes),
+        }
+        row.update(
+            {
+                f"n_{c}": sum(1 for b in boxes if b.label == c)
+                for c in ("person", "head", "helmet", "face", "glasses", "face-guard", "hands", "gloves", "safety-vest")
+            }
+        )
         row.update({f"gt_{k}": int(v) for k, v in gt.items()})
         rows.append(row)
 
@@ -85,11 +117,20 @@ def main() -> None:
 
     sub_rows = [r for r in rows if r["in_subset"]]
     stats = {
-        "split_file": lay.test_list.name, "images_listed": len(images), "images_found": len(rows),
-        "images_missing": missing, "train_test_overlap": len(leak), "subset_size": len(sub_rows), "seed": args.seed,
+        "split_file": lay.test_list.name,
+        "images_listed": len(images),
+        "images_found": len(rows),
+        "images_missing": missing,
+        "train_test_overlap": len(leak),
+        "subset_size": len(sub_rows),
+        "seed": args.seed,
+        "near_duplicate_check": "skipped" if args.no_dup_check or not train else "dHash 64-bit, <= 4 bits",
+        "near_duplicates_of_train": len(dups),
         "helmets_overlapping_a_head_pct": round(100 * helmet_hits / helmet_total, 1) if helmet_total else None,
         "prevalence_full": {h: round(sum(r[f"gt_{h}"] for r in rows) / len(rows), 3) for h in HAZARDS},
-        "prevalence_subset": {h: round(sum(r[f"gt_{h}"] for r in sub_rows) / max(1, len(sub_rows)), 3) for h in HAZARDS},
+        "prevalence_subset": {
+            h: round(sum(r[f"gt_{h}"] for r in sub_rows) / max(1, len(sub_rows)), 3) for h in HAZARDS
+        },
         "positives_full": {h: sum(r[f"gt_{h}"] for r in rows) for h in HAZARDS},
         "class_instances": {c: cls_counts.get(c, 0) for c in SH17_NAMES},
     }

@@ -1,35 +1,47 @@
 """ORM data model.
 
-    User ──< Area (owner)            User ──< Hazard (reporter / assignee / closer)
-    Area ──< Hazard ──< HazardEvent  (audit trail of every state change)
-    User ──< Notification >── Hazard (alerts for High / Extreme risk)
+User ──< Area (owner)            User ──< Hazard (reporter / assignee / closer)
+Area ──< Hazard ──< HazardEvent  (audit trail of every state change)
+User ──< Notification >── Hazard (alerts for High / Extreme risk)
 """
 
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Role(str, enum.Enum):
-    REPORTER = "reporter"          # field operator, contractor or visitor
-    AREA_OWNER = "area_owner"      # accountable for closing hazards in their areas
-    SUPERVISOR = "supervisor"      # safety supervisor: alerted on High/Extreme, can act on any hazard
-    MANAGER = "manager"            # read-only site-wide view
+    REPORTER = "reporter"  # field operator, contractor or visitor
+    AREA_OWNER = "area_owner"  # accountable for closing hazards in their areas
+    SUPERVISOR = "supervisor"  # safety supervisor: alerted on High/Extreme, can act on any hazard
+    MANAGER = "manager"  # read-only site-wide view
 
 
 class Status(str, enum.Enum):
-    DRAFT = "draft"    # photo uploaded and AI has run; reporter has not confirmed yet
-    OPEN = "open"      # confirmed and routed to the Area Owner
+    DRAFT = "draft"  # photo uploaded and AI has run; reporter has not confirmed yet
+    OPEN = "open"  # confirmed and routed to the Area Owner
     CLOSED = "closed"  # action taken and documented
 
 
@@ -71,7 +83,21 @@ class Area(Base):
 
 class Hazard(Base):
     __tablename__ = "hazards"
+    # Integrity rules live in the database too, so no program (app, script, import) can store invalid values.
+    __table_args__ = (
+        CheckConstraint("consequence IS NULL OR consequence BETWEEN 1 AND 5", name="ck_consequence_1_5"),
+        CheckConstraint("likelihood IS NULL OR likelihood BETWEEN 1 AND 5", name="ck_likelihood_1_5"),
+        CheckConstraint("risk_score IS NULL OR risk_score BETWEEN 1 AND 25", name="ck_risk_1_25"),
+        CheckConstraint("status != 'CLOSED' OR closure_action IS NOT NULL", name="ck_closed_has_action"),
+        UniqueConstraint("reporter_id", "idem_key", name="uq_reporter_idem_key"),
+        # Indexes match the hot queries: likelihood look-up, dashboard / register filters.
+        Index("ix_hazard_area_cat_time", "area_id", "category_code", "created_at"),
+        Index("ix_hazard_status", "status"),
+        Index("ix_hazard_created", "created_at"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Idempotency key sent by the client: a double-tap or retry on poor site Wi-Fi returns the same report.
+    idem_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     area_id: Mapped[int] = mapped_column(ForeignKey("areas.id"))
     reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     status: Mapped[Status] = mapped_column(Enum(Status), default=Status.DRAFT)

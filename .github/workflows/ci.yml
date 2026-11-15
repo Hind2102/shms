@@ -18,5 +18,30 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install (core app, no GPU / model needed)
         run: python -m pip install -e ".[dev]" matplotlib
+      - name: Lint and format check (ruff)
+        run: |
+          python -m pip install ruff
+          ruff check .
+          ruff format --check .
       - name: Run tests
         run: python -m pytest -v
+
+  docker:
+    # Pipeline from the serving lecture: tests pass -> build the image -> smoke-test the running container.
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t shms:${{ github.sha }} .
+      - name: Smoke test (health check, pages, API)
+        run: |
+          docker run -d --name shms -p 8000:8000 -e SHMS_DETECTOR=mock shms:${{ github.sha }}
+          for i in $(seq 1 30); do curl -fsS http://localhost:8000/api/health && break; sleep 2; done
+          curl -fsS http://localhost:8000/login | grep -q "Sign in"
+          curl -fsS http://localhost:8000/api/dashboard | grep -q kpis
+          curl -fsS http://localhost:8000/metrics | grep -q shms_hazards
+          docker inspect --format '{{.State.Health.Status}}' shms
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs shms || true

@@ -161,7 +161,9 @@ def test_seed_is_deterministic(settings):
         dbmod.create_all()
         with dbmod.new_session() as s:
             seed(s, now=utcnow().replace(year=2026, month=11, day=15, hour=12, minute=0, second=0, microsecond=0))
-            results.append(services.dashboard(s, now=utcnow().replace(year=2026, month=11, day=15, hour=12))["by_level"])
+            results.append(
+                services.dashboard(s, now=utcnow().replace(year=2026, month=11, day=15, hour=12))["by_level"]
+            )
     assert results[0] == results[1]
 
 
@@ -192,3 +194,35 @@ def test_taxonomy_contains_only_ai_detected_hazards():
 
     assert all(c.ai for c in taxonomy.categories().values())
     assert set(taxonomy.categories()) == {"no_hard_hat", "no_eye_protection", "no_gloves", "no_hi_vis_vest"}
+
+
+def test_database_rejects_invalid_values(empty_db):
+    """Integrity rules are enforced by the database itself (DB lecture), not only by the app."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError
+
+    h = report(empty_db)
+    empty_db.commit()
+    for sql in (
+        f"UPDATE hazards SET consequence = 7 WHERE id = {h.id}",
+        f"UPDATE hazards SET risk_score = 40 WHERE id = {h.id}",
+        f"UPDATE hazards SET status = 'CLOSED', closure_action = NULL WHERE id = {h.id}",
+        f"UPDATE hazards SET area_id = 999 WHERE id = {h.id}",
+    ):
+        with pytest.raises(IntegrityError):
+            empty_db.execute(text(sql))
+            empty_db.flush()
+        empty_db.rollback()
+
+
+def test_ai_monitoring_counts_acceptance_and_misses(empty_db):
+    report(empty_db, code="no_hard_hat", ai_code="no_hard_hat")
+    report(empty_db, code="no_gloves", ai_code="no_hard_hat")
+    u = users(empty_db)[Role.REPORTER][0]
+    h = services.create_draft(empty_db, u, area(empty_db), "x.jpg", DetectorResult("mock", [], 3.0))
+    services.confirm(empty_db, h, u, Confirmation("no_gloves", 2))
+    m = services.ai_monitoring(empty_db)
+    assert m["reports"] == 3 and m["acceptance"] == 0.5 and m["missed"] == 1
+    assert {"ai": "no_hard_hat", "reporter": "no_gloves", "n": 1} in m["corrections"]
+    acc = next(c for c in m["checks"] if c["name"] == "Reporter acceptance")
+    assert acc["ok"] is None  # fewer reports than min_reports_for_alert -> no verdict yet

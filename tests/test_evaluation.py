@@ -99,3 +99,24 @@ def test_pipeline_end_to_end_with_mock(tmp_path, monkeypatch):
     r = run("evaluation.compare")
     assert r.returncode == 0, r.stderr
     assert (work / "evaluation" / "results" / "fig_f1.png").is_file()
+
+
+def test_near_duplicate_detection(tmp_path):
+    from evaluation.sh17 import dhash, near_duplicates
+
+    base = Image.radial_gradient("L").convert("RGB").resize((400, 300))
+    base.save(tmp_path / "train.jpg", quality=95)
+    base.resize((200, 150)).save(tmp_path / "test_dup.jpg", quality=40)  # same photo, smaller, recompressed
+    Image.linear_gradient("L").convert("RGB").resize((400, 300)).save(tmp_path / "test_new.jpg")
+    test = {n: dhash(tmp_path / n) for n in ("test_dup.jpg", "test_new.jpg")}
+    dups = near_duplicates(test, {"train.jpg": dhash(tmp_path / "train.jpg")})
+    assert dups == {"test_dup.jpg": "train.jpg"}
+
+
+def test_robustness_perturbations_keep_images_valid():
+    from evaluation.robustness import PERTURBATIONS
+
+    im = Image.new("RGB", (640, 480), (120, 130, 140))
+    for name, (_, fn) in PERTURBATIONS.items():
+        out = fn(im)
+        assert out.mode == "RGB" and min(out.size) >= 32, name

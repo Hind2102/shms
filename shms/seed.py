@@ -39,12 +39,56 @@ AREAS = [
     ("BXH", "Bauxite Handling", 3, "Hi-vis vest, Dust mask, Hearing protection", ALL, 20, 40, 200, 230, 1.0),
     ("GRD", "Grinding & Desilication", 3, "Hi-vis vest, Hearing protection", ALL, 240, 40, 180, 230, 1.0),
     ("DIG", "Digestion", 3, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 440, 40, 200, 230, 2.2),
-    ("CLR", "Clarification (Red Mud)", 4, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 660, 40, 150, 230, 1.4),
-    ("FLT", "Security Filtration", 4, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 830, 40, 150, 230, 1.8),
+    (
+        "CLR",
+        "Clarification (Red Mud)",
+        4,
+        "Face shield over glasses (caustic), Chemical gloves",
+        NO_VEST,
+        660,
+        40,
+        150,
+        230,
+        1.4,
+    ),
+    (
+        "FLT",
+        "Security Filtration",
+        4,
+        "Face shield over glasses (caustic), Chemical gloves",
+        NO_VEST,
+        830,
+        40,
+        150,
+        230,
+        1.8,
+    ),
     ("PRC", "Precipitation", 5, "Chemical gloves", NO_VEST, 660, 300, 320, 250, 1.2),
     ("CAL", "Calcination", 5, "Hi-vis vest, Heat-resistant gloves, Dust mask", ALL, 380, 300, 260, 250, 1.3),
-    ("TNK", "Caustic Tank Farm", 6, "Hi-vis vest, Face shield (caustic transfers), Chemical suit", ALL, 240, 300, 120, 250, 0.9),
-    ("PWR", "Powerhouse & Utilities", 6, "Hearing protection, Arc-rated clothing (switchrooms)", NO_VEST, 20, 300, 200, 250, 0.7),
+    (
+        "TNK",
+        "Caustic Tank Farm",
+        6,
+        "Hi-vis vest, Face shield (caustic transfers), Chemical suit",
+        ALL,
+        240,
+        300,
+        120,
+        250,
+        0.9,
+    ),
+    (
+        "PWR",
+        "Powerhouse & Utilities",
+        6,
+        "Hearing protection, Arc-rated clothing (switchrooms)",
+        NO_VEST,
+        20,
+        300,
+        200,
+        250,
+        0.7,
+    ),
 ]
 
 CATEGORY_WEIGHTS = {"no_hard_hat": 6, "no_eye_protection": 9, "no_gloves": 8, "no_hi_vis_vest": 5}
@@ -57,6 +101,23 @@ ACTIONS = {
 }
 
 
+def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta):
+    """Synthetic AI result for demo history (last 60 days only, as if the AI went live then): mostly right,
+    sometimes another PPE item, sometimes nothing detected. Clearly demo data, not an evaluation."""
+    from .detection.base import DetectorResult, Suggestion
+
+    if age.days > 60:
+        return None
+    r = rng.random()
+    if r < 0.84:
+        code = true_code
+    elif r < 0.93:
+        code = rng.choice([c for c in area.check_codes if c != true_code] or [true_code])
+    else:
+        return DetectorResult("yolo:sh17_yolo8s", [], rng.uniform(250, 900))
+    return DetectorResult("yolo:sh17_yolo8s", [Suggestion(code, rng.uniform(0.45, 0.95))], rng.uniform(250, 900))
+
+
 def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_seed: int = 42) -> None:
     if db.scalar(select(User).limit(1)) is not None:
         return  # already seeded
@@ -66,8 +127,20 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     users = [User(name=n, role=r) for n, r in USERS]
     db.add_all(users)
     db.flush()
-    areas = [Area(code=c, name=nm, owner_id=users[o].id, required_ppe=f"{BASE_PPE}, {extra}", ai_checks=checks,
-                  x=x, y=y, w=w, h=h) for c, nm, o, extra, checks, x, y, w, h, _ in AREAS]
+    areas = [
+        Area(
+            code=c,
+            name=nm,
+            owner_id=users[o].id,
+            required_ppe=f"{BASE_PPE}, {extra}",
+            ai_checks=checks,
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+        )
+        for c, nm, o, extra, checks, x, y, w, h, _ in AREAS
+    ]
     db.add_all(areas)
     db.flush()
 
@@ -80,12 +153,22 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
         cats = area.check_codes
         cat = rng.choices(cats, [CATEGORY_WEIGHTS[c] for c in cats])[0]
         reporter = rng.choice(reporters)
-        h = services.create_draft(db, reporter, area, None, None, at=t)
+        h = services.create_draft(db, reporter, area, None, _synthetic_ai(rng, area, cat, now - t), at=t)
         cons = max(1, min(5, taxonomy.get(cat).default_consequence + rng.choice([-1, 0, 0, 0, 1])))
         on_spot = rng.random() < 0.25 and cons <= 3
-        services.confirm(db, h, reporter, services.Confirmation(
-            category_code=cat, consequence=cons, description=f"Synthetic report: {taxonomy.get(cat).name.lower()}.",
-            fixed_on_spot=on_spot, closure_action=ACTIONS[cat] if on_spot else ""), at=t)
+        services.confirm(
+            db,
+            h,
+            reporter,
+            services.Confirmation(
+                category_code=cat,
+                consequence=cons,
+                description=f"Synthetic report: {taxonomy.get(cat).name.lower()}.",
+                fixed_on_spot=on_spot,
+                closure_action=ACTIONS[cat] if on_spot else "",
+            ),
+            at=t,
+        )
         if not on_spot:
             # Older hazards are mostly closed; recent ones are more likely still open.
             age = (now - t).days

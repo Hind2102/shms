@@ -1,0 +1,27 @@
+# docker compose up --build           -> app on http://localhost:8000 (YOLO detector)
+# docker compose --profile vlm up     -> also starts Ollama; set SHMS_DETECTOR=ollama to use it
+services:
+  app:
+    build: .
+    image: shms:1.0
+    ports:
+      - "8000:8000"
+    environment:
+      SHMS_DETECTOR: ${SHMS_DETECTOR:-yolo}
+      SHMS_OLLAMA_URL: http://ollama:11434
+      SHMS_OLLAMA_MODEL: ${SHMS_OLLAMA_MODEL:-qwen2.5vl:7b}
+    volumes:
+      - ./models:/app/models:ro      # weights mounted, not baked: swap models without rebuilding
+      - shms-data:/data               # database and photos survive container restarts
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["vlm"]
+    volumes:
+      - ollama-models:/root/.ollama
+    # Only reachable by the app on the Compose network (no published port).
+
+volumes:
+  shms-data:
+  ollama-models:

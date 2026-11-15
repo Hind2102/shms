@@ -1,0 +1,8 @@
+{
+  "_source": "Service level objectives for the AI in production (MLOps lecture). Acceptance rate is a monitoring signal for drift and user trust; model quality itself is measured offline with precision/recall on the SH17 held-out test set.",
+  "window_days": 30,
+  "ai_latency_p95_ms": 20000,
+  "ai_error_rate_max": 0.02,
+  "ai_acceptance_min": 0.80,
+  "min_reports_for_alert": 20
+}

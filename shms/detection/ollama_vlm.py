@@ -40,8 +40,15 @@ SCHEMA = {
         "confidence": {"type": "number"},
         "explanation": {"type": "string"},
     },
-    "required": ["people_visible", "worker_without_hard_hat", "worker_without_eye_protection",
-                 "bare_hands_visible", "worker_without_hi_vis_vest", "confidence", "explanation"],
+    "required": [
+        "people_visible",
+        "worker_without_hard_hat",
+        "worker_without_eye_protection",
+        "bare_hands_visible",
+        "worker_without_hi_vis_vest",
+        "confidence",
+        "explanation",
+    ],
 }
 
 FIELD_TO_CODE = {
@@ -74,8 +81,14 @@ def parse_answer(content: str) -> list[Suggestion]:
 
 
 class OllamaDetector(HazardDetector):
-    def __init__(self, model: str, url: str = "http://localhost:11434", timeout_s: float = 120,
-                 max_side: int = 1024, client: httpx.Client | None = None):
+    def __init__(
+        self,
+        model: str,
+        url: str = "http://localhost:11434",
+        timeout_s: float = 120,
+        max_side: int = 1024,
+        client: httpx.Client | None = None,
+    ):
         self.model = model
         self.url = url.rstrip("/")
         self.max_side = max_side

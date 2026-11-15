@@ -35,13 +35,24 @@ from .sh17 import HAZARDS, find_layout, gt_hazards, label_path, read_boxes
 
 DATA = Path(__file__).resolve().parent / "data"
 RESULTS = Path(__file__).resolve().parent / "results"
-SHOW = {"head": "#e8710a", "helmet": "#2e7d32", "person": "#1f3a5f", "safety-vest": "#9c27b0",
-        "safety-suit": "#9c27b0", "hands": "#c62828", "gloves": "#00897b", "face": "#795548",
-        "glasses": "#0277bd", "face-guard": "#0277bd"}
-QUESTION = {"no_hard_hat": "Is any visible person's head without a hard hat?",
-            "no_eye_protection": "Is any visible person's face without safety glasses / goggles / face shield?",
-            "no_hi_vis_vest": "Is any visible person without a hi-vis vest / safety suit?",
-            "no_gloves": "Is any visible hand without a glove?"}
+SHOW = {
+    "head": "#e8710a",
+    "helmet": "#2e7d32",
+    "person": "#1f3a5f",
+    "safety-vest": "#9c27b0",
+    "safety-suit": "#9c27b0",
+    "hands": "#c62828",
+    "gloves": "#00897b",
+    "face": "#795548",
+    "glasses": "#0277bd",
+    "face-guard": "#0277bd",
+}
+QUESTION = {
+    "no_hard_hat": "Is any visible person's head without a hard hat?",
+    "no_eye_protection": "Is any visible person's face without safety glasses / goggles / face shield?",
+    "no_hi_vis_vest": "Is any visible person without a hi-vis vest / safety suit?",
+    "no_gloves": "Is any visible hand without a glove?",
+}
 
 
 def thumb_b64(path: Path, side: int = 640) -> str:
@@ -62,13 +73,24 @@ def build(root: str, n: int, seed: int) -> None:
     items = []
     for name in picks:
         boxes = read_boxes(label_path(lay, name))
-        items.append({
-            "image": name, "src": thumb_b64(lay.images / name), "gt": gt_hazards(boxes),
-            "boxes": [{"l": b.label, "x": b.x1, "y": b.y1, "w": b.x2 - b.x1, "h": b.y2 - b.y1}
-                      for b in boxes if b.label in SHOW],
-        })
-    html = TEMPLATE.replace("__DATA__", json.dumps(items)).replace("__COLORS__", json.dumps(SHOW)) \
-                   .replace("__Q__", json.dumps(QUESTION)).replace("__HAZ__", json.dumps(HAZARDS))
+        items.append(
+            {
+                "image": name,
+                "src": thumb_b64(lay.images / name),
+                "gt": gt_hazards(boxes),
+                "boxes": [
+                    {"l": b.label, "x": b.x1, "y": b.y1, "w": b.x2 - b.x1, "h": b.y2 - b.y1}
+                    for b in boxes
+                    if b.label in SHOW
+                ],
+            }
+        )
+    html = (
+        TEMPLATE.replace("__DATA__", json.dumps(items))
+        .replace("__COLORS__", json.dumps(SHOW))
+        .replace("__Q__", json.dumps(QUESTION))
+        .replace("__HAZ__", json.dumps(HAZARDS))
+    )
     out = DATA / "label_audit.html"
     out.write_text(html)
     print(f"Wrote {out} with {len(items)} images (seed {seed}). Open it in a browser.")
@@ -84,13 +106,19 @@ def score() -> None:
     for h in HAZARDS:
         rs = [r for r in rows if r["hazard"] == h and r["verdict"] in ("agree", "disagree")]
         derived = [r["derived"] == "1" for r in rs]
-        expert = [d if r["verdict"] == "agree" else not d for d, r in zip(derived, rs)]
+        expert = [d if r["verdict"] == "agree" else not d for d, r in zip(derived, rs, strict=True)]
         agree = sum(r["verdict"] == "agree" for r in rs)
-        fp = sum(1 for d, e in zip(derived, expert) if d and not e)   # label says hazard, expert says no
-        fn = sum(1 for d, e in zip(derived, expert) if not d and e)   # label missed a hazard
-        out["hazards"][h] = {"n": len(rs), "agree": agree, "accuracy": agree / len(rs) if rs else None,
-                             "accuracy_ci95": wilson_ci(agree, len(rs)), "kappa": cohen_kappa(derived, expert),
-                             "false_positive_labels": fp, "missed_hazard_labels": fn}
+        fp = sum(1 for d, e in zip(derived, expert, strict=True) if d and not e)  # label says hazard, expert says no
+        fn = sum(1 for d, e in zip(derived, expert, strict=True) if not d and e)  # label missed a hazard
+        out["hazards"][h] = {
+            "n": len(rs),
+            "agree": agree,
+            "accuracy": agree / len(rs) if rs else None,
+            "accuracy_ci95": wilson_ci(agree, len(rs)),
+            "kappa": cohen_kappa(derived, expert),
+            "false_positive_labels": fp,
+            "missed_hazard_labels": fn,
+        }
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / "label_audit.json").write_text(json.dumps(out, indent=2))
     print(json.dumps(out, indent=2))

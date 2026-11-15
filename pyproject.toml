@@ -22,7 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 # YOLO detector (SH17 weights). Pulls in PyTorch, ~1 GB.
 yolo = ["ultralytics>=8.3"]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [tool.setuptools.packages.find]
 include = ["shms*"]
@@ -33,3 +33,17 @@ shms = ["templates/*.html", "static/*", "config/*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+# B008: FastAPI's Depends()/File() in defaults is the intended pattern.
+# E501: line layout is handled by `ruff format`; remaining long lines are strings / HTML.
+# UP042: str+Enum kept for SQLAlchemy Enum compatibility.
+ignore = ["B008", "E501", "UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E731"]

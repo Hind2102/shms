@@ -21,8 +21,11 @@ def build_detector(kind: str, **overrides) -> HazardDetector:
     if kind == "yolo":
         from .yolo import YoloDetector
 
-        return YoloDetector(overrides.get("weights", s.yolo_weights), conf=overrides.get("conf", s.yolo_conf),
-                            device=overrides.get("device", s.yolo_device))
+        return YoloDetector(
+            overrides.get("weights", s.yolo_weights),
+            conf=overrides.get("conf", s.yolo_conf),
+            device=overrides.get("device", s.yolo_device),
+        )
     if kind == "ollama":
         from .ollama_vlm import OllamaDetector
 

@@ -10,9 +10,9 @@ from collections.abc import Sequence
 def binary_counts(y_true: Sequence[bool], y_pred: Sequence[bool]) -> dict[str, int]:
     if len(y_true) != len(y_pred):
         raise ValueError("y_true and y_pred must have the same length")
-    tp = sum(1 for t, p in zip(y_true, y_pred) if t and p)
-    fp = sum(1 for t, p in zip(y_true, y_pred) if not t and p)
-    fn = sum(1 for t, p in zip(y_true, y_pred) if t and not p)
+    tp = sum(1 for t, p in zip(y_true, y_pred, strict=True) if t and p)
+    fp = sum(1 for t, p in zip(y_true, y_pred, strict=True) if not t and p)
+    fn = sum(1 for t, p in zip(y_true, y_pred, strict=True) if t and not p)
     tn = len(y_true) - tp - fp - fn
     return {"tp": tp, "fp": fp, "fn": fn, "tn": tn}
 
@@ -34,8 +34,9 @@ def binary_metrics(y_true: Sequence[bool], y_pred: Sequence[bool]) -> dict:
     return {**c, **prf(c), "support": c["tp"] + c["fn"], "n": len(y_true)}
 
 
-def bootstrap_ci(y_true: Sequence[bool], y_pred: Sequence[bool], metric: str,
-                 n_boot: int = 1000, alpha: float = 0.05, seed: int = 0) -> tuple[float, float] | None:
+def bootstrap_ci(
+    y_true: Sequence[bool], y_pred: Sequence[bool], metric: str, n_boot: int = 1000, alpha: float = 0.05, seed: int = 0
+) -> tuple[float, float] | None:
     """Percentile bootstrap confidence interval for precision / recall / f1 (images resampled)."""
     rng = random.Random(seed)
     n = len(y_true)
@@ -71,7 +72,7 @@ def cohen_kappa(a: Sequence[bool], b: Sequence[bool]) -> float | None:
     n = len(a)
     if n == 0 or n != len(b):
         return None
-    po = sum(1 for x, y in zip(a, b) if x == y) / n
+    po = sum(1 for x, y in zip(a, b, strict=True) if x == y) / n
     pa, pb = sum(a) / n, sum(b) / n
     pe = pa * pb + (1 - pa) * (1 - pb)
     if pe == 1:
@@ -92,5 +93,10 @@ def percentile(values: Sequence[float], q: float) -> float | None:
 def latency_summary(ms: Sequence[float]) -> dict:
     if not ms:
         return {"n": 0}
-    return {"n": len(ms), "mean_ms": sum(ms) / len(ms), "p50_ms": percentile(ms, 50),
-            "p95_ms": percentile(ms, 95), "max_ms": max(ms)}
+    return {
+        "n": len(ms),
+        "mean_ms": sum(ms) / len(ms),
+        "p50_ms": percentile(ms, 50),
+        "p95_ms": percentile(ms, 95),
+        "max_ms": max(ms),
+    }

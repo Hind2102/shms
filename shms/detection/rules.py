@@ -84,18 +84,27 @@ def hazards_from_boxes(boxes: list[Box], cfg: RuleConfig = DEFAULT_RULES) -> lis
 
     if "no_hard_hat" in cfg.enabled:
         bare = [
-            h for h in heads
-            if h.area >= cfg.min_head_area and not _covered(_expand_up(h, cfg.head_expand_up), helmets, cfg.helmet_cover)
+            h
+            for h in heads
+            if h.area >= cfg.min_head_area
+            and not _covered(_expand_up(h, cfg.head_expand_up), helmets, cfg.helmet_cover)
         ]
         if bare:
-            out.append(Suggestion("no_hard_hat", max(b.confidence for b in bare), bare,
-                                  f"{len(bare)} head(s) detected without a hard hat"))
+            out.append(
+                Suggestion(
+                    "no_hard_hat",
+                    max(b.confidence for b in bare),
+                    bare,
+                    f"{len(bare)} head(s) detected without a hard hat",
+                )
+            )
 
     if "no_gloves" in cfg.enabled:
         bare = [h for h in hands if h.area >= cfg.min_hand_area and not _covered(h, gloves, cfg.glove_cover)]
         if bare:
-            out.append(Suggestion("no_gloves", max(b.confidence for b in bare), bare,
-                                  f"{len(bare)} bare hand(s) detected"))
+            out.append(
+                Suggestion("no_gloves", max(b.confidence for b in bare), bare, f"{len(bare)} bare hand(s) detected")
+            )
 
     if "no_hi_vis_vest" in cfg.enabled:
         bare = []
@@ -106,13 +115,25 @@ def hazards_from_boxes(boxes: list[Box], cfg: RuleConfig = DEFAULT_RULES) -> lis
             if not has_vest:
                 bare.append(p)
         if bare:
-            out.append(Suggestion("no_hi_vis_vest", max(b.confidence for b in bare), bare,
-                                  f"{len(bare)} person(s) detected without a high-visibility vest"))
+            out.append(
+                Suggestion(
+                    "no_hi_vis_vest",
+                    max(b.confidence for b in bare),
+                    bare,
+                    f"{len(bare)} person(s) detected without a high-visibility vest",
+                )
+            )
 
     if "no_eye_protection" in cfg.enabled:
         bare = [f for f in faces if f.area >= cfg.min_face_area and not _covered(f, eyewear, cfg.eye_cover)]
         if bare:
-            out.append(Suggestion("no_eye_protection", max(b.confidence for b in bare), bare,
-                                  f"{len(bare)} face(s) detected without safety glasses or face guard"))
+            out.append(
+                Suggestion(
+                    "no_eye_protection",
+                    max(b.confidence for b in bare),
+                    bare,
+                    f"{len(bare)} face(s) detected without safety glasses or face guard",
+                )
+            )
 
     return out

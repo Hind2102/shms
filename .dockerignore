@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+*.egg-info
+.env
+*.db
+uploads
+models
+datasets
+evaluation
+tests
+runs
+.DS_Store

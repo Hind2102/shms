@@ -36,10 +36,19 @@ def test_failing_detector_returns_error_instead_of_raising(photo):
 
 
 def test_parse_vlm_answer():
-    s = parse_answer(json.dumps({"people_visible": True, "worker_without_hard_hat": True,
-                                 "worker_without_eye_protection": True,
-                                 "worker_without_hi_vis_vest": False, "bare_hands_visible": True,
-                                 "confidence": 0.9, "explanation": "man welding, bare head"}))
+    s = parse_answer(
+        json.dumps(
+            {
+                "people_visible": True,
+                "worker_without_hard_hat": True,
+                "worker_without_eye_protection": True,
+                "worker_without_hi_vis_vest": False,
+                "bare_hands_visible": True,
+                "confidence": 0.9,
+                "explanation": "man welding, bare head",
+            }
+        )
+    )
     assert {x.code for x in s} == {"no_hard_hat", "no_eye_protection", "no_gloves"} and s[0].confidence == 0.9
 
 
@@ -54,8 +63,14 @@ def test_ollama_detector_request_and_downscale(photo):
     def handler(request: httpx.Request):
         body = json.loads(request.content)
         seen.update(body)
-        answer = {"people_visible": True, "worker_without_hard_hat": False, "worker_without_hi_vis_vest": True,
-                  "bare_hands_visible": False, "confidence": 0.8, "explanation": "no vest"}
+        answer = {
+            "people_visible": True,
+            "worker_without_hard_hat": False,
+            "worker_without_hi_vis_vest": True,
+            "bare_hands_visible": False,
+            "confidence": 0.8,
+            "explanation": "no vest",
+        }
         return httpx.Response(200, json={"message": {"content": json.dumps(answer)}})
 
     det = OllamaDetector("qwen2.5vl:7b", client=httpx.Client(transport=httpx.MockTransport(handler)))

@@ -19,7 +19,7 @@ import platform
 import sys
 import time
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from shms.detection import build_detector
@@ -34,9 +34,11 @@ MANIFEST = HERE / "data" / "sh17_test_manifest.csv"
 SWEEP = [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.70]
 
 
-def load_manifest(path: Path, subset: bool, limit: int | None) -> list[dict]:
+def load_manifest(path: Path, subset: bool, limit: int | None, drop_near_dups: bool = False) -> list[dict]:
     with path.open() as f:
         rows = list(csv.DictReader(f))
+    if drop_near_dups:
+        rows = [r for r in rows if r.get("near_dup_train", "0") != "1"]
     if subset:
         rows = [r for r in rows if r["in_subset"] == "1"]
     return rows[:limit] if limit else rows
@@ -57,9 +59,15 @@ def score(rows: list[dict], preds: dict[str, dict], key=lambda p: set(p["codes"]
     fn = sum(out[h]["fn"] for h in HAZARDS)
     p = tp / (tp + fp) if tp + fp else None
     r = tp / (tp + fn) if tp + fn else None
-    out["micro"] = {"tp": tp, "fp": fp, "fn": fn, "precision": p, "recall": r,
-                    "f1": 2 * p * r / (p + r) if p and r else None}
-    out["macro_f1"] = (sum(out[h]["f1"] or 0 for h in HAZARDS) / len(HAZARDS))
+    out["micro"] = {
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "precision": p,
+        "recall": r,
+        "f1": 2 * p * r / (p + r) if p and r else None,
+    }
+    out["macro_f1"] = sum(out[h]["f1"] or 0 for h in HAZARDS) / len(HAZARDS)
     return out
 
 
@@ -67,12 +75,19 @@ def yolo_sweep(rows: list[dict], preds: dict[str, dict]) -> list[dict]:
     """Re-apply the rule engine with boxes filtered at each confidence threshold."""
     res = []
     for t in SWEEP:
+
         def codes_at(p, t=t):
             boxes = [Box(**b) for b in p["boxes"] if b["confidence"] >= t]
             return {s.code for s in hazards_from_boxes(boxes)}
+
         m = score(rows, preds, key=codes_at)
-        res.append({"threshold": t, **{h: {k: m[h][k] for k in ("precision", "recall", "f1")} for h in HAZARDS},
-                    "macro_f1": m["macro_f1"]})
+        res.append(
+            {
+                "threshold": t,
+                **{h: {k: m[h][k] for k in ("precision", "recall", "f1")} for h in HAZARDS},
+                "macro_f1": m["macro_f1"],
+            }
+        )
     return res
 
 
@@ -84,11 +99,17 @@ def detection_map(weights: str, root: Path, device: str) -> dict:
     lst = HERE / "data" / "sh17_test_abs.txt"
     lst.write_text("\n".join(str(lay.images / r["image"]) for r in load_manifest(MANIFEST, False, None)))
     yaml = HERE / "data" / "sh17_eval.yaml"
-    yaml.write_text(f"path: {lay.root}\ntrain: {lst}\nval: {lst}\nnames:\n" +
-                    "".join(f"  {i}: {n}\n" for i, n in enumerate(SH17_NAMES)))
+    yaml.write_text(
+        f"path: {lay.root}\ntrain: {lst}\nval: {lst}\nnames:\n"
+        + "".join(f"  {i}: {n}\n" for i, n in enumerate(SH17_NAMES))
+    )
     m = YOLO(weights).val(data=str(yaml), imgsz=640, batch=8, device=device or None, verbose=False, plots=False)
-    return {"mAP50": float(m.box.map50), "mAP50_95": float(m.box.map), "precision": float(m.box.mp),
-            "recall": float(m.box.mr)}
+    return {
+        "mAP50": float(m.box.map50),
+        "mAP50_95": float(m.box.map),
+        "precision": float(m.box.mp),
+        "recall": float(m.box.mr),
+    }
 
 
 def main() -> None:
@@ -103,11 +124,14 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--name", default=None, help="run name (results folder)")
     ap.add_argument("--map", action="store_true", help="also compute YOLO detection mAP")
+    ap.add_argument(
+        "--drop-near-dups", action="store_true", help="exclude test images that are near-duplicates of training images"
+    )
     args = ap.parse_args()
 
     if not MANIFEST.is_file():
         sys.exit("Run `python -m evaluation.prepare_sh17 --root ...` first.")
-    rows = load_manifest(MANIFEST, args.subset, args.limit)
+    rows = load_manifest(MANIFEST, args.subset, args.limit, args.drop_near_dups)
     lay = find_layout(args.root)
 
     if args.detector == "yolo":
@@ -120,7 +144,7 @@ def main() -> None:
     else:
         det = build_detector("mock")
         default_name = "mock"
-    name = (args.name or default_name) + ("_subset" if args.subset else "")
+    name = (args.name or default_name) + ("_nodup" if args.drop_near_dups else "") + ("_subset" if args.subset else "")
     out = HERE / "results" / name
     out.mkdir(parents=True, exist_ok=True)
     pred_file = out / "predictions.jsonl"
@@ -141,9 +165,14 @@ def main() -> None:
                 codes = sorted({s.code for s in hazards_from_boxes(boxes)})
             else:
                 codes = sorted(res.codes())
-            p = {"image": r["image"], "codes": codes, "latency_ms": round(res.latency_ms, 1), "error": res.error,
-                 "suggestions": [s.to_dict() for s in res.suggestions],
-                 "boxes": [asdict(b) for b in res.boxes]}
+            p = {
+                "image": r["image"],
+                "codes": codes,
+                "latency_ms": round(res.latency_ms, 1),
+                "error": res.error,
+                "suggestions": [s.to_dict() for s in res.suggestions],
+                "boxes": [asdict(b) for b in res.boxes],
+            }
             preds[r["image"]] = p
             f.write(json.dumps(p) + "\n")
             f.flush()
@@ -153,14 +182,22 @@ def main() -> None:
     errors = [p for p in (preds[r["image"]] for r in rows) if p["error"]]
     ok_rows = [r for r in rows if not preds[r["image"]]["error"]]
     metrics = {
-        "run": name, "detector": det.name, "operating_threshold": args.conf if args.detector == "yolo" else None,
-        "images": len(rows), "errors": len(errors), "scored_images": len(ok_rows),
+        "run": name,
+        "detector": det.name,
+        "operating_threshold": args.conf if args.detector == "yolo" else None,
+        "images": len(rows),
+        "errors": len(errors),
+        "scored_images": len(ok_rows),
         "hazards": score(ok_rows, preds),
         # first image includes model loading; report steady-state latency separately
         "latency_all": latency_summary([preds[r["image"]]["latency_ms"] for r in rows]),
         "latency_steady": latency_summary([preds[r["image"]]["latency_ms"] for r in rows][1:]),
-        "environment": {"python": platform.python_version(), "platform": platform.platform(),
-                        "machine": platform.machine(), "date": datetime.now(timezone.utc).isoformat(timespec="seconds")},
+        "environment": {
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "date": datetime.now(UTC).isoformat(timespec="seconds"),
+        },
     }
     if args.detector == "yolo":
         metrics["threshold_sweep"] = yolo_sweep(ok_rows, preds)

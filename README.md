@@ -29,7 +29,7 @@ shms/                     the web application (Python package)
   services.py             workflow state machine, routing, alerts, dashboard queries
   risk.py, taxonomy.py    risk matrix and hazard categories (data in shms/config/*.json)
   detection/              HazardDetector interface + YOLO, Ollama and mock implementations, PPE rules
-  web/                    HTML routes (pages.py), JSON API (api.py), shared dependencies
+  web/                    HTML routes (pages.py), JSON API (api.py), telemetry + /metrics, shared dependencies
   templates/, static/     Jinja2 pages and CSS (no JavaScript build)
   seed.py                 synthesized refinery layout, users and 6-month hazard history
 evaluation/               offline evaluation on SH17
@@ -37,12 +37,17 @@ evaluation/               offline evaluation on SH17
   evaluate.py             runs a detector, writes predictions + metrics (P/R/F1, 95% CIs, latency, mAP)
   compare.py              comparison tables and figures
   label_audit.py          expert audit of the ground-truth labels (accuracy, Cohen's kappa)
+  robustness.py           F1 on dark / blurred / compressed / distant versions of the test photos
+  load_test.py            throughput and latency of the running service with concurrent users
   metrics.py, sh17.py     metric functions and dataset reader
   data/                   manifest, dataset stats, audit results (committed)
   results/                metrics.json per run, summary.md, figures (committed)
 scripts/download_models.py  downloads and checksums the SH17 YOLO weights
 tests/                    pytest suite (unit, workflow, API end-to-end, detectors, evaluation pipeline)
 docs/architecture.md      architecture diagram, component responsibilities, design decisions
+docs/course_mapping.md    which course lecture is applied where
+Dockerfile, docker-compose.yml   container build (non-root, health check) and Compose stack (+ optional Ollama)
+AGENTS.md                 rules for coding agents working in this repository
 data/samples/             small sample photos for trying the app
 ```
 
@@ -114,7 +119,19 @@ Main workflow:
    what the AI checks there),
    weekly trend, repeat hotspots and the hazard register with filters.
 
-The JSON API is documented at <http://127.0.0.1:8000/docs>.
+Supervisors and the manager also see **AI monitoring** (latency, errors and reporter acceptance against the SLOs
+in `shms/config/slo.json`). The JSON API is documented at <http://127.0.0.1:8000/docs>; Prometheus metrics are at
+<http://127.0.0.1:8000/metrics>.
+
+### Run with Docker (optional)
+
+```bash
+python scripts/download_models.py          # weights are mounted into the container, not baked in
+docker compose up --build                  # http://localhost:8000
+docker compose --profile vlm up            # also starts Ollama (then: SHMS_DETECTOR=ollama)
+```
+
+The image is built and smoke-tested by CI on every push.
 
 To reset the demo: stop the server and delete `shms.db` and `uploads/`.
 
@@ -124,11 +141,17 @@ To reset the demo: stop the server and delete `shms.db` and `uploads/`.
 pytest                 # or: make test
 ```
 
-105 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
-cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, the workflow state machine and permissions, the HTTP API
+112 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
+constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the
 metric functions against hand-computed values, and the evaluation pipeline on a miniature fake dataset.
-GitHub Actions runs the suite on Ubuntu and macOS with Python 3.11 and 3.12.
+GitHub Actions runs lint (`ruff`) and the suite on Ubuntu and macOS with Python 3.11 and 3.12, then builds the
+Docker image and smoke-tests the running container.
+
+```bash
+ruff check . && ruff format --check .      # lint and formatting
+```
 
 ## Evaluation
 
@@ -161,6 +184,17 @@ python -m evaluation.compare && python -m evaluation.compare --only-subset
 (`make eval-prepare eval-yolo eval-vlm eval-compare SH17=~/datasets/sh17` runs the same.)
 Runs are cached in `predictions.jsonl` and resume if interrupted. The subset is a fixed random sample of 300
 held-out images (seed 42), used to compare all models on identical images because the VLM is slower.
+
+### Non-functional tests
+
+```bash
+python -m evaluation.robustness --root $SH17 --weights models/sh17_yolo8s.pt --device mps   # dark / blur / JPEG / far
+# with the app running (SHMS_DETECTOR=yolo):
+python -m evaluation.load_test --image data/samples/<photo>.jpg --users 1 4 8 --requests 40
+```
+
+`prepare_sh17.py` also checks for **train/test leakage**: exact file overlap and near-duplicate photos
+(perceptual hash); add `--drop-near-dups` to `evaluate.py` to score without them.
 
 ### Label audit
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -52,6 +53,7 @@ def _hazard(db: Session, hazard_id: int) -> Hazard:
 
 # ------------------------------------------------------------------ sign in
 
+
 @router.get("/login")
 def login_form(request: Request, db: Session = Depends(get_session)):
     users = list(db.scalars(select(User).order_by(User.id)))
@@ -74,13 +76,14 @@ def logout():
 
 # ------------------------------------------------------------------ dashboard & areas
 
+
 @router.get("/")
 def dashboard(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
     d = services.dashboard(db)
-    recent = list(db.scalars(select(Hazard).where(Hazard.status != Status.DRAFT)
-                             .order_by(Hazard.created_at.desc()).limit(8)))
-    return render(request, "dashboard.html", user, db, d=d, recent=recent,
-                  hotspots=services.repeat_hotspots(db)[:6])
+    recent = list(
+        db.scalars(select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc()).limit(8))
+    )
+    return render(request, "dashboard.html", user, db, d=d, recent=recent, hotspots=services.repeat_hotspots(db)[:6])
 
 
 @router.get("/areas/{code}")
@@ -91,6 +94,23 @@ def area_page(code: str, request: Request, user: User = Depends(page_user), db: 
     return render(request, "area.html", user, db, **services.area_overview(db, area))
 
 
+@router.get("/monitoring")
+def monitoring(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
+    from .telemetry import snapshot
+
+    calls = [r for r in snapshot() if r["count"]]
+    for r in calls:
+        r["avg_ms"] = 1000 * r["seconds"] / r["count"]
+    return render(
+        request,
+        "monitoring.html",
+        user,
+        db,
+        m=services.ai_monitoring(db),
+        calls=sorted(calls, key=lambda r: -r["count"])[:12],
+    )
+
+
 @router.get("/matrix")
 def matrix(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
     return render(request, "matrix.html", user, db, table=risk.matrix_table())
@@ -98,61 +118,115 @@ def matrix(request: Request, user: User = Depends(page_user), db: Session = Depe
 
 # ------------------------------------------------------------------ stage 1: report and score
 
+
 @router.get("/report")
 def report_form(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
     areas = list(db.scalars(select(Area).order_by(Area.name)))
-    return render(request, "report.html", user, db, areas=areas, error=None)
+    # A fresh idempotency key per form: a double submit or a browser retry returns the same draft.
+    return render(request, "report.html", user, db, areas=areas, error=None, idem_key=uuid.uuid4().hex)
 
 
 @router.post("/report")
-async def report_submit(request: Request, area_id: int = Form(...), photo: UploadFile | None = File(None),
-                        user: User = Depends(page_user), db: Session = Depends(get_session)):
+async def report_submit(
+    request: Request,
+    area_id: int = Form(...),
+    photo: UploadFile | None = File(None),
+    idem_key: str = Form(""),
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
     area = db.get(Area, area_id)
     if area is None:
         raise HTTPException(422, "Unknown area")
+    areas = list(db.scalars(select(Area).order_by(Area.name)))
+    try:
+        existing = services.replay_or_conflict(db, user, area, idem_key or None)
+    except services.IdempotencyConflict as exc:
+        return render(request, "report.html", user, db, areas=areas, error=str(exc), idem_key=uuid.uuid4().hex)
+    if existing is not None:
+        return RedirectResponse(f"/hazards/{existing.id}/confirm", status_code=303)
     name = await save_photo(photo)
     if name is None:
-        areas = list(db.scalars(select(Area).order_by(Area.name)))
-        return render(request, "report.html", user, db, areas=areas, error="Please add a photo.")
-    h = services.create_draft(db, user, area, name, get_detector().detect(photo_file(name)))
+        return render(request, "report.html", user, db, areas=areas, error="Please add a photo.", idem_key=idem_key)
+    h = services.create_draft(db, user, area, name, get_detector().detect(photo_file(name)), idem_key=idem_key or None)
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
 
 
 @router.get("/hazards/{hazard_id}/confirm")
-def confirm_form(hazard_id: int, request: Request, user: User = Depends(page_user),
-                 db: Session = Depends(get_session), error: str | None = None):
+def confirm_form(
+    hazard_id: int,
+    request: Request,
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+    error: str | None = None,
+):
     h = _hazard(db, hazard_id)
     if h.status != Status.DRAFT:
         return RedirectResponse(f"/hazards/{h.id}", status_code=303)
-    return render(request, "confirm.html", user, db, h=h, suggestions=json.loads(h.ai_suggestions or "[]"),
-                  consequences=risk.consequence_levels(), error=error)
+    return render(
+        request,
+        "confirm.html",
+        user,
+        db,
+        h=h,
+        suggestions=json.loads(h.ai_suggestions or "[]"),
+        consequences=risk.consequence_levels(),
+        error=error,
+    )
 
 
 @router.post("/hazards/{hazard_id}/confirm")
-async def confirm_submit(hazard_id: int, request: Request, category_code: str = Form(...),
-                         consequence: int = Form(...), description: str = Form(""),
-                         fixed_on_spot: bool = Form(False), closure_action: str = Form(""),
-                         closure_photo: UploadFile | None = File(None),
-                         user: User = Depends(page_user), db: Session = Depends(get_session)):
+async def confirm_submit(
+    hazard_id: int,
+    request: Request,
+    category_code: str = Form(...),
+    consequence: int = Form(...),
+    description: str = Form(""),
+    fixed_on_spot: bool = Form(False),
+    closure_action: str = Form(""),
+    closure_photo: UploadFile | None = File(None),
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
     h = _hazard(db, hazard_id)
     try:
         photo = await save_photo(closure_photo, prefix="closed_") if fixed_on_spot else None
-        services.confirm(db, h, user, services.Confirmation(category_code, consequence, description,
-                                                            fixed_on_spot, closure_action, photo))
+        services.confirm(
+            db,
+            h,
+            user,
+            services.Confirmation(category_code, consequence, description, fixed_on_spot, closure_action, photo),
+        )
     except (services.WorkflowError, services.PermissionDenied) as exc:
         db.rollback()
-        return render(request, "confirm.html", user, db, h=h, suggestions=json.loads(h.ai_suggestions or "[]"),
-                      consequences=risk.consequence_levels(), error=str(exc))
+        return render(
+            request,
+            "confirm.html",
+            user,
+            db,
+            h=h,
+            suggestions=json.loads(h.ai_suggestions or "[]"),
+            consequences=risk.consequence_levels(),
+            error=str(exc),
+        )
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}?created=1", status_code=303)
 
 
 # ------------------------------------------------------------------ stage 2: close and document
 
+
 @router.get("/hazards")
-def hazard_list(request: Request, status: str = "", area: str = "", level: str = "", category: str = "",
-                user: User = Depends(page_user), db: Session = Depends(get_session)):
+def hazard_list(
+    request: Request,
+    status: str = "",
+    area: str = "",
+    level: str = "",
+    category: str = "",
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
     q = select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc())
     if status:
         q = q.where(Hazard.status == Status(status))
@@ -164,8 +238,15 @@ def hazard_list(request: Request, status: str = "", area: str = "", level: str =
         q = q.where(Hazard.category_code == category)
     hazards = list(db.scalars(q.limit(300)))
     areas = list(db.scalars(select(Area).order_by(Area.name)))
-    return render(request, "hazards.html", user, db, hazards=hazards, areas=areas,
-                  f={"status": status, "area": area, "level": level, "category": category})
+    return render(
+        request,
+        "hazards.html",
+        user,
+        db,
+        hazards=hazards,
+        areas=areas,
+        f={"status": status, "area": area, "level": level, "category": category},
+    )
 
 
 @router.get("/queue")
@@ -178,18 +259,34 @@ def my_queue(request: Request, user: User = Depends(page_user), db: Session = De
 
 
 @router.get("/hazards/{hazard_id}")
-def hazard_detail(hazard_id: int, request: Request, user: User = Depends(page_user),
-                  db: Session = Depends(get_session), created: int = 0, error: str | None = None):
+def hazard_detail(
+    hazard_id: int,
+    request: Request,
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+    created: int = 0,
+    error: str | None = None,
+):
     h = _hazard(db, hazard_id)
     if h.status == Status.DRAFT:
         return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
-    return render(request, "hazard.html", user, db, h=h, can_act=services.can_act_on(user, h),
-                  suggestions=json.loads(h.ai_suggestions or "[]"), created=created, error=error)
+    return render(
+        request,
+        "hazard.html",
+        user,
+        db,
+        h=h,
+        can_act=services.can_act_on(user, h),
+        suggestions=json.loads(h.ai_suggestions or "[]"),
+        created=created,
+        error=error,
+    )
 
 
 @router.post("/hazards/{hazard_id}/plan")
-def plan(hazard_id: int, planned_action: str = Form(...), user: User = Depends(page_user),
-         db: Session = Depends(get_session)):
+def plan(
+    hazard_id: int, planned_action: str = Form(...), user: User = Depends(page_user), db: Session = Depends(get_session)
+):
     h = _hazard(db, hazard_id)
     try:
         services.plan_action(db, h, user, planned_action)
@@ -201,8 +298,13 @@ def plan(hazard_id: int, planned_action: str = Form(...), user: User = Depends(p
 
 
 @router.post("/hazards/{hazard_id}/close")
-async def close(hazard_id: int, action: str = Form(...), photo: UploadFile | None = File(None),
-                user: User = Depends(page_user), db: Session = Depends(get_session)):
+async def close(
+    hazard_id: int,
+    action: str = Form(...),
+    photo: UploadFile | None = File(None),
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
     h = _hazard(db, hazard_id)
     try:
         name = await save_photo(photo, prefix="closed_")
@@ -216,10 +318,17 @@ async def close(hazard_id: int, action: str = Form(...), photo: UploadFile | Non
 
 # ------------------------------------------------------------------ notifications
 
+
 @router.get("/notifications")
 def notifications(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
-    items = list(db.scalars(select(Notification).where(Notification.user_id == user.id)
-                            .order_by(Notification.created_at.desc()).limit(50)))
+    items = list(
+        db.scalars(
+            select(Notification)
+            .where(Notification.user_id == user.id)
+            .order_by(Notification.created_at.desc())
+            .limit(50)
+        )
+    )
     resp = render(request, "notifications.html", user, db, items=items)
     for n in items:
         n.read = True

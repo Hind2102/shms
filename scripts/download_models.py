@@ -50,5 +50,5 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--all", action="store_true", help="also download yolo9e")
     args = ap.parse_args()
-    for k in (["yolo8s", "yolo9e"] if args.all else ["yolo8s"]):
+    for k in ["yolo8s", "yolo9e"] if args.all else ["yolo8s"]:
         fetch(k)

@@ -35,7 +35,9 @@ class Settings:
     upload_dir: Path = field(default_factory=lambda: Path(_env("UPLOAD_DIR", str(PROJECT_DIR / "uploads"))))
     # Which AI detector the app uses: "yolo", "ollama" or "mock".
     detector: str = field(default_factory=lambda: _env("DETECTOR", "mock"))
-    yolo_weights: str = field(default_factory=lambda: _env("YOLO_WEIGHTS", str(PROJECT_DIR / "models" / "sh17_yolo8s.pt")))
+    yolo_weights: str = field(
+        default_factory=lambda: _env("YOLO_WEIGHTS", str(PROJECT_DIR / "models" / "sh17_yolo8s.pt"))
+    )
     yolo_conf: float = field(default_factory=lambda: float(_env("YOLO_CONF", "0.35")))
     yolo_device: str = field(default_factory=lambda: _env("YOLO_DEVICE", ""))  # "", "cpu", "mps", "cuda:0"
     ollama_url: str = field(default_factory=lambda: _env("OLLAMA_URL", "http://localhost:11434"))
