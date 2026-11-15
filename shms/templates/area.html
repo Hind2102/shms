@@ -17,6 +17,7 @@
     <div class="card">
       <h2>Required PPE</h2>
       <div class="ppe">{% for p in area.ppe_list %}<span>{{ p }}</span>{% endfor %}</div>
+      <p class="muted small" style="margin-top:10px">AI checks reports here for: {{ area.check_codes | map('ppe') | join(', ') }}.</p>
     </div>
     <div class="card">
       <h2>Area Owner</h2>

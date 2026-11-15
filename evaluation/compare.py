@@ -15,7 +15,8 @@ from pathlib import Path
 from .sh17 import HAZARDS
 
 RESULTS = Path(__file__).resolve().parent / "results"
-LABELS = {"no_hard_hat": "No hard hat", "no_hi_vis_vest": "No hi-vis vest", "no_gloves": "No gloves"}
+LABELS = {"no_hard_hat": "No hard hat", "no_eye_protection": "No eye protection",
+          "no_gloves": "No gloves", "no_hi_vis_vest": "No hi-vis vest"}
 # Validated categorical palette (fixed order; values are direct-labelled because two slots are < 3:1 contrast)
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
 INK, MUTED, GRID = "#1d2733", "#5f6b7a", "#e3e6ea"
@@ -102,7 +103,7 @@ def fig_pr(runs: list[dict], path: Path) -> None:
     import matplotlib.pyplot as plt
 
     runs = runs[:4]
-    fig, axes = plt.subplots(1, 3, figsize=(9, 3.2), dpi=200, sharey=True)
+    fig, axes = plt.subplots(1, len(HAZARDS), figsize=(11, 3.2), dpi=200, sharey=True)
     for ax, h in zip(axes, HAZARDS):
         for i, m in enumerate(runs):
             if "threshold_sweep" in m:

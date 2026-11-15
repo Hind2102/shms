@@ -21,6 +21,7 @@ router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
 templates.env.globals.update(taxonomy=taxonomy, risk=risk, Status=Status, Role=Role)
 templates.env.filters["cat"] = lambda code: taxonomy.get(code).name if code else "Not classified"
+templates.env.filters["ppe"] = lambda code: taxonomy.get(code).ppe
 templates.env.filters["dt"] = lambda d: d.strftime("%d %b %Y %H:%M") if d else ""
 templates.env.filters["fromjson"] = lambda s: json.loads(s or "[]")
 
@@ -110,8 +111,10 @@ async def report_submit(request: Request, area_id: int = Form(...), photo: Uploa
     if area is None:
         raise HTTPException(422, "Unknown area")
     name = await save_photo(photo)
-    result = get_detector().detect(photo_file(name)) if name else None
-    h = services.create_draft(db, user, area, name, result)
+    if name is None:
+        areas = list(db.scalars(select(Area).order_by(Area.name)))
+        return render(request, "report.html", user, db, areas=areas, error="Please add a photo.")
+    h = services.create_draft(db, user, area, name, get_detector().detect(photo_file(name)))
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
 

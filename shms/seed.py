@@ -29,40 +29,31 @@ USERS = [
     ("Yousef (Refinery Manager)", Role.MANAGER),
 ]
 
-BASE_PPE = "Hard hat, Safety glasses, Hi-vis vest, Safety boots, Gloves"
-# code, name, owner index, extra PPE, x, y, w, h, relative hazard weight
+BASE_PPE = "Hard hat, Safety glasses, Gloves, Safety boots"
+ALL = "no_hard_hat,no_eye_protection,no_gloves,no_hi_vis_vest"
+NO_VEST = "no_hard_hat,no_eye_protection,no_gloves"
+# code, name, owner index, extra PPE shown at the entrance, AI checks, x, y, w, h, relative hazard weight
+# Hi-vis vests are required where mobile plant and vehicles operate (bauxite handling, grinding,
+# calcination, tank-farm road tankers); every area requires hard hat, eye protection and gloves.
 AREAS = [
-    ("BXH", "Bauxite Handling", 3, "Dust mask, Hearing protection", 20, 40, 200, 230, 1.0),
-    ("GRD", "Grinding & Desilication", 3, "Hearing protection", 240, 40, 180, 230, 1.0),
-    ("DIG", "Digestion", 3, "Face shield (caustic), Chemical gloves", 440, 40, 200, 230, 2.2),
-    ("CLR", "Clarification (Red Mud)", 4, "Face shield (caustic), Chemical gloves", 660, 40, 150, 230, 1.4),
-    ("FLT", "Security Filtration", 4, "Face shield (caustic), Chemical gloves", 830, 40, 150, 230, 1.8),
-    ("PRC", "Precipitation", 5, "Chemical gloves", 660, 300, 320, 250, 1.2),
-    ("CAL", "Calcination", 5, "Heat-resistant gloves, Dust mask", 380, 300, 260, 250, 1.3),
-    ("TNK", "Caustic Tank Farm", 6, "Face shield (caustic), Chemical suit for transfers", 240, 300, 120, 250, 0.9),
-    ("PWR", "Powerhouse & Utilities", 6, "Hearing protection, Arc-rated clothing (switchrooms)", 20, 300, 200, 250, 0.7),
+    ("BXH", "Bauxite Handling", 3, "Hi-vis vest, Dust mask, Hearing protection", ALL, 20, 40, 200, 230, 1.0),
+    ("GRD", "Grinding & Desilication", 3, "Hi-vis vest, Hearing protection", ALL, 240, 40, 180, 230, 1.0),
+    ("DIG", "Digestion", 3, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 440, 40, 200, 230, 2.2),
+    ("CLR", "Clarification (Red Mud)", 4, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 660, 40, 150, 230, 1.4),
+    ("FLT", "Security Filtration", 4, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 830, 40, 150, 230, 1.8),
+    ("PRC", "Precipitation", 5, "Chemical gloves", NO_VEST, 660, 300, 320, 250, 1.2),
+    ("CAL", "Calcination", 5, "Hi-vis vest, Heat-resistant gloves, Dust mask", ALL, 380, 300, 260, 250, 1.3),
+    ("TNK", "Caustic Tank Farm", 6, "Hi-vis vest, Face shield (caustic transfers), Chemical suit", ALL, 240, 300, 120, 250, 0.9),
+    ("PWR", "Powerhouse & Utilities", 6, "Hearing protection, Arc-rated clothing (switchrooms)", NO_VEST, 20, 300, 200, 250, 0.7),
 ]
 
-CATEGORY_WEIGHTS = {
-    "caustic_spill": 18, "steam_leak": 10, "slip_trip": 16, "no_hard_hat": 6, "no_hi_vis_vest": 5,
-    "no_gloves": 8, "other_ppe": 6, "fall_from_height": 7, "electrical": 5, "machine_guarding": 5,
-    "unsafe_behaviour": 6, "fire": 3, "other": 5,
-}
+CATEGORY_WEIGHTS = {"no_hard_hat": 6, "no_eye_protection": 9, "no_gloves": 8, "no_hi_vis_vest": 5}
 
 ACTIONS = {
-    "caustic_spill": "Isolated line, neutralised and washed down spill; flange gasket replaced by maintenance.",
-    "steam_leak": "Barricaded area; leaking steam trap isolated and replaced under permit.",
-    "slip_trip": "Housekeeping completed; hoses re-routed to hose rack.",
-    "no_hard_hat": "Worker stopped and briefed; hard hat issued. Toolbox talk held with crew.",
-    "no_hi_vis_vest": "Worker briefed; hi-vis vest issued from area PPE station.",
+    "no_hard_hat": "Work stopped; worker briefed and hard hat issued. Toolbox talk held with the crew.",
+    "no_eye_protection": "Task paused; safety glasses and face shield issued. Eye-wash station location reconfirmed.",
     "no_gloves": "Task paused; chemical gloves issued and task risk assessment reviewed.",
-    "other_ppe": "Face shield issued; PPE requirement sign re-posted at area entry.",
-    "fall_from_height": "Area barricaded; missing grating replaced and handrail repaired.",
-    "electrical": "Panel isolated (LOTO); damaged cable replaced by electrician.",
-    "machine_guarding": "Equipment stopped; guard re-installed and checked before restart.",
-    "unsafe_behaviour": "Activity stopped; supervisor coaching conversation recorded.",
-    "fire": "Combustibles removed; extinguisher access cleared.",
-    "other": "Corrective action completed by area team.",
+    "no_hi_vis_vest": "Worker briefed; hi-vis vest issued from the area PPE station.",
 }
 
 
@@ -75,19 +66,19 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     users = [User(name=n, role=r) for n, r in USERS]
     db.add_all(users)
     db.flush()
-    areas = [Area(code=c, name=nm, owner_id=users[o].id, required_ppe=f"{BASE_PPE}, {extra}",
-                  x=x, y=y, w=w, h=h) for c, nm, o, extra, x, y, w, h, _ in AREAS]
+    areas = [Area(code=c, name=nm, owner_id=users[o].id, required_ppe=f"{BASE_PPE}, {extra}", ai_checks=checks,
+                  x=x, y=y, w=w, h=h) for c, nm, o, extra, checks, x, y, w, h, _ in AREAS]
     db.add_all(areas)
     db.flush()
 
     reporters = [u for u in users if u.role == Role.REPORTER]
     area_w = [a[-1] for a in AREAS]
-    cats, cat_w = list(CATEGORY_WEIGHTS), list(CATEGORY_WEIGHTS.values())
     times = sorted(now - timedelta(days=rng.uniform(0, 180), hours=rng.uniform(0, 12)) for _ in range(n_history))
 
     for t in times:
         area = rng.choices(areas, area_w)[0]
-        cat = rng.choices(cats, cat_w)[0]
+        cats = area.check_codes
+        cat = rng.choices(cats, [CATEGORY_WEIGHTS[c] for c in cats])[0]
         reporter = rng.choice(reporters)
         h = services.create_draft(db, reporter, area, None, None, at=t)
         cons = max(1, min(5, taxonomy.get(cat).default_consequence + rng.choice([-1, 0, 0, 0, 1])))

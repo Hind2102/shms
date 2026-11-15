@@ -37,9 +37,10 @@ def test_failing_detector_returns_error_instead_of_raising(photo):
 
 def test_parse_vlm_answer():
     s = parse_answer(json.dumps({"people_visible": True, "worker_without_hard_hat": True,
+                                 "worker_without_eye_protection": True,
                                  "worker_without_hi_vis_vest": False, "bare_hands_visible": True,
                                  "confidence": 0.9, "explanation": "man welding, bare head"}))
-    assert {x.code for x in s} == {"no_hard_hat", "no_gloves"} and s[0].confidence == 0.9
+    assert {x.code for x in s} == {"no_hard_hat", "no_eye_protection", "no_gloves"} and s[0].confidence == 0.9
 
 
 def test_parse_vlm_answer_clamps_bad_confidence():

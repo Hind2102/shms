@@ -1,19 +1,20 @@
 # SHMS – Site Hazard Management System
 
-AI-assisted web platform for reporting hazards from a photo, scoring them on a 5 × 5 consequence × likelihood
-risk matrix, routing them to the accountable Area Owner, documenting **how** each one was closed, and showing
-site-wide risk on a live dashboard and heat map of a (synthesized) alumina refinery.
+AI-assisted web platform for reporting PPE non-compliance from a photo, scoring it on a 5 × 5 consequence ×
+likelihood risk matrix, routing it to the accountable Area Owner, documenting **how** each case was closed, and
+showing site-wide risk on a live dashboard and heat map of a (synthesized) alumina refinery.
 
-The AI suggests three PPE hazards (worker without **hard hat**, without **hi-vis vest**, **bare hands**). It was
-evaluated on the held-out split of the public, peer-reviewed **SH17** dataset with precision, recall and F1
-(see [Evaluation](#evaluation)). Two local AI back-ends are compared: **YOLO** detectors trained on SH17, and a
+**Every hazard type in the app is detected by AI and was evaluated on labelled data.** The AI checks a photo
+against the PPE that the area requires: **hard hat**, **eye / face protection** (caustic splash), **gloves** and,
+in traffic areas, a **hi-vis vest**. It was evaluated on the held-out split of the public, peer-reviewed **SH17**
+dataset with precision, recall and F1 (see [Evaluation](#evaluation)). Two local AI back-ends are compared: **YOLO** detectors trained on SH17, and a
 **vision-language model served by Ollama** (`qwen2.5vl:7b`). No paid API is used.
 
 | | |
 |---|---|
 | **Team** | Hind Alhmoudi (sole member) – requirements, hazard taxonomy and risk matrix, architecture, all code, tests, evaluation, label audit, report |
 | **Course** | Software Engineering and Programming – Master in Applied Artificial Intelligence |
-| **Tested on** | macOS 26 (Apple M5 Pro, 24 GB) with Python 3.12; Ubuntu 24.04 with Python 3.11–3.13 (GitHub Actions also runs macOS) |
+| **Tested on** | macOS (Apple M5 Pro, 24 GB) with Python 3.12; Ubuntu 24.04 with Python 3.11–3.13 (GitHub Actions also runs macOS) |
 | **Paid APIs** | None |
 
 ---
@@ -102,14 +103,15 @@ Open <http://127.0.0.1:8000>. On first start the database is created and filled 
 Main workflow:
 
 1. **Report** – as *Ahmed (Operator)*: *+ Report hazard* → choose area → take/upload a photo (try
-   `data/samples/`). The AI marks what it found on the photo.
-2. **Confirm and score** – keep or correct the suggested hazard type, choose the worst credible consequence.
+   `data/samples/`). The AI checks it against the PPE that area requires and marks what it found.
+2. **Confirm and score** – keep or correct the suggested PPE hazard, choose the worst credible consequence.
    Likelihood is computed from the area's history and the risk level is shown. Tick *I already fixed it on the
    spot* to close it immediately with the action taken and a closing photo.
 3. **Route and close** – otherwise the hazard goes to the Area Owner (e.g. *Khalid* for Digestion). High and
    Extreme hazards alert the safety supervisor (*Sara*). The owner plans an action and closes the hazard with a
    description of the control and a closing photo. Every step is kept in the audit trail.
-4. **Monitor** – the dashboard shows KPIs, the heat map (click an area for its live hazards and required PPE),
+4. **Monitor** – the dashboard shows KPIs, the heat map (click an area for its live hazards, required PPE and
+   what the AI checks there),
    weekly trend, repeat hotspots and the hazard register with filters.
 
 The JSON API is documented at <http://127.0.0.1:8000/docs>.
@@ -122,8 +124,8 @@ To reset the demo: stop the server and delete `shms.db` and `uploads/`.
 pytest                 # or: make test
 ```
 
-98 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
-cover every cell of the risk matrix, the PPE rules, the workflow state machine and permissions, the HTTP API
+105 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the
 metric functions against hand-computed values, and the evaluation pipeline on a miniature fake dataset.
 GitHub Actions runs the suite on Ubuntu and macOS with Python 3.11 and 3.12.
@@ -186,9 +188,10 @@ python -m evaluation.label_audit score                  # accuracy, 95% Wilson C
 * All people, areas and records in the app are synthesized; no refinery data is included.
 * Photos are processed locally; nothing is sent to external services.
 * Demo sign-in has no passwords; a deployment would use the company's single sign-on.
-* The AI covers PPE only. Unsafe conditions (caustic spills, steam leaks, missing grating) have no public
-  labelled dataset and are classified by the reporter; a labelled refinery dataset with ≥ 3 annotators is
-  future work.
+* Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions
+  (caustic spills, steam leaks, missing grating) have no such dataset; collecting one with ≥ 3 annotators and
+  measuring their agreement is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled
+  by alarms and emergency response, and steam plumes in a refinery would cause frequent false alarms.
 * SH17 images come from Pexels (manufacturing settings), not refineries, so field performance may differ.
 
 ## Acknowledgements

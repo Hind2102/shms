@@ -48,13 +48,13 @@ def test_full_workflow_and_dashboard_update(client):
 def test_reporter_can_correct_ai(client):
     hz = create(client).json()
     r = client.post(f"/api/hazards/{hz['id']}/confirm", headers=h(REPORTER),
-                    json={"category_code": "caustic_spill", "consequence": 4})
-    assert r.json()["ai_accepted"] is False and r.json()["category_code"] == "caustic_spill"
+                    json={"category_code": "no_eye_protection", "consequence": 4})
+    assert r.json()["ai_accepted"] is False and r.json()["category_code"] == "no_eye_protection"
 
 
-def test_report_without_photo(client):
+def test_photo_is_required(client):
     r = client.post("/api/hazards", data={"area_code": "CAL"}, headers=h(REPORTER))
-    assert r.status_code == 201 and r.json()["ai_model"] is None
+    assert r.status_code == 422
 
 
 def test_requires_sign_in(client):
@@ -63,7 +63,7 @@ def test_requires_sign_in(client):
 
 def test_wrong_person_cannot_close(client):
     hz = create(client).json()
-    client.post(f"/api/hazards/{hz['id']}/confirm", headers=h(REPORTER), json={"category_code": "slip_trip", "consequence": 2})
+    client.post(f"/api/hazards/{hz['id']}/confirm", headers=h(REPORTER), json={"category_code": "no_gloves", "consequence": 2})
     r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(REPORTER), json={"action": "x"})
     assert r.status_code == 403
 
@@ -71,7 +71,7 @@ def test_wrong_person_cannot_close(client):
 def test_validation_errors(client):
     hz = create(client).json()
     assert client.post(f"/api/hazards/{hz['id']}/confirm", headers=h(REPORTER),
-                       json={"category_code": "slip_trip", "consequence": 9}).status_code == 422
+                       json={"category_code": "no_gloves", "consequence": 9}).status_code == 422
     assert client.post(f"/api/hazards/{hz['id']}/confirm", headers=h(REPORTER),
                        json={"category_code": "nope", "consequence": 2}).status_code == 422
     assert create(client, area="XXX").status_code == 422
@@ -96,11 +96,18 @@ def test_html_pages_render(client):
 
 def test_html_report_flow(client):
     client.post("/login", data={"user_id": REPORTER})
-    r = client.post("/report", data={"area_id": 3}, files={"photo": ("p_no_hi_vis_vest.jpg", jpeg_bytes(), "image/jpeg")},
+    r = client.post("/report", data={"area_id": 3}, files={"photo": ("p_no_eye_protection.jpg", jpeg_bytes(), "image/jpeg")},
                     follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].endswith("/confirm")
     page = client.get(r.headers["location"]).text
-    assert "AI suggestion" in page and "Worker without high-visibility vest" in page
-    r = client.post(r.headers["location"], data={"category_code": "no_hi_vis_vest", "consequence": "2",
-                                                  "fixed_on_spot": "true", "closure_action": "Vest issued"})
+    assert "AI suggestion" in page and "Worker without eye / face protection" in page
+    r = client.post(r.headers["location"], data={"category_code": "no_eye_protection", "consequence": "4",
+                                                  "fixed_on_spot": "true", "closure_action": "Face shield issued"})
     assert r.status_code == 200 and "fixed on the spot" in r.text
+
+
+def test_vest_not_suggested_where_not_required(client):
+    """Digestion (area 3) does not require a hi-vis vest, so a vest detection is not pre-selected."""
+    client.post("/login", data={"user_id": REPORTER})
+    r = client.post("/report", data={"area_id": 3}, files={"photo": ("p_no_hi_vis_vest.jpg", jpeg_bytes(), "image/jpeg")})
+    assert r.status_code == 200 and "not required in this area" in r.text and "(AI suggestion)" not in r.text

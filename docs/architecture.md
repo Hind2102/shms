@@ -76,8 +76,10 @@ flowchart LR
    measures the model, not a mismatch in definitions, and the rules are unit-tested separately.
 4. **Local models only.** Photos from a refinery are confidential; YOLO and Ollama run on the user's machine,
    so no images leave the site and no paid API is needed.
-5. **AI scope limited to what can be measured.** The AI suggests only the three PPE hazards that have a public
-   labelled test set. All other categories (spills, steam leaks, missing grating …) are reported manually.
+5. **Only hazards the AI can detect and that were measured.** The hazard list contains exactly the four PPE
+   hazards with a public, peer-reviewed labelled test set (SH17). Each area lists the PPE it requires
+   (`Area.ai_checks`); the AI's suggestions are checked against that list, so a missing vest is only flagged
+   where vests are required.
 6. **Likelihood is computed, not guessed.** It comes from the number of similar hazards in the same area in the
    last 90 days, which links individual cases (problem 1 in the proposal) and makes repeat hazards rise in risk.
 7. **One process, one file database.** FastAPI + SQLite + server-rendered pages: no front-end build, no database

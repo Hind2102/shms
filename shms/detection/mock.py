@@ -17,7 +17,7 @@ class MockDetector(HazardDetector):
     """
 
     name = "mock"
-    _codes = ("no_hard_hat", "no_hi_vis_vest", "no_gloves")
+    _codes = ("no_hard_hat", "no_hi_vis_vest", "no_gloves", "no_eye_protection")
 
     def _predict(self, image_path: Path) -> tuple[list[Suggestion], list[Box]]:
         stem = image_path.name.lower()

@@ -16,6 +16,8 @@ class Category:
     group: str
     ai: bool
     default_consequence: int
+    why: str = ""
+    ppe: str = ""
 
 
 @lru_cache(maxsize=1)

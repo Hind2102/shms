@@ -2,7 +2,7 @@
 {% from "_macros.html" import photo %}
 {% block title %}Confirm report #{{ h.id }}{% endblock %}
 {% block content %}
-{% set top = suggestions[0] if suggestions else None %}
+{% set req = suggestions | selectattr('required') | list %}{% set top = req[0] if req else None %}
 <h1>Confirm report #{{ h.id }} – {{ h.area.name }}</h1>
 {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
 <div class="grid two">
@@ -18,15 +18,16 @@
       <div class="alert err small">The AI could not analyse this photo ({{ h.ai_error }}). Please classify it yourself.</div>
     {% elif not h.ai_model %}
       <p class="muted">No photo, so no AI suggestion.</p>
-    {% elif suggestions %}
-      {% for s in suggestions %}
+    {% elif req %}
+      {% for s in req %}
       <div class="sugg"><div><strong>{{ s.code | cat }}</strong><br><span class="muted small">{{ s.explanation }}</span></div>
         <div style="display:flex;align-items:center">{{ (s.confidence*100)|round|int }}%<span class="bar"><i style="width:{{ (s.confidence*100)|round|int }}%"></i></span></div></div>
       {% endfor %}
     {% else %}
-      <div class="alert ok small">No missing PPE detected. If you see another hazard (spill, leak, missing grating…) choose it below.</div>
+      <div class="alert ok small">No missing PPE detected. If you can see missing PPE that the AI missed, choose it below – your correction is recorded.</div>
     {% endif %}
-    {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. The AI only checks PPE; it was evaluated on the SH17 test set.</p>{% endif %}
+    {% for s in suggestions if not s.required %}<p class="muted small">Also seen, not required in this area: {{ s.code | cat }}</p>{% endfor %}
+    {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. Checked against the PPE this area requires. AI evaluated on the SH17 held-out test set.</p>{% endif %}
   </div>
 </div>
 
@@ -34,12 +35,11 @@
   <h2>Step 2 of 2 – confirm and score</h2>
   <label for="cat">Hazard type</label>
   <select id="cat" name="category_code" required>
-    {% for group, cats in taxonomy.grouped().items() %}
-      <optgroup label="{{ group }}">
-      {% for c in cats %}<option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>{% endfor %}
-      </optgroup>
+    {% for code in h.area.check_codes %}{% set c = taxonomy.get(code) %}
+      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
     {% endfor %}
   </select>
+  <p class="muted small">PPE required in {{ h.area.name }}: {{ h.area.check_codes | map('ppe') | join(', ') }}.</p>
 
   <label>Worst credible consequence</label>
   <div class="radio-list">
@@ -51,12 +51,12 @@
   <p class="muted small">Likelihood is estimated automatically from similar hazards reported in {{ h.area.name }} over the last {{ risk.lookback_days() }} days. <a href="/matrix" target="_blank">See the risk matrix</a>.</p>
 
   <label for="desc">What did you see? (optional)</label>
-  <textarea id="desc" name="description" placeholder="e.g. contractor grinding without hard hat near pump P-201"></textarea>
+  <textarea id="desc" name="description" placeholder="e.g. contractor opening caustic drain valve without face shield near pump P-201"></textarea>
 
   <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="fixed" name="fixed_on_spot" value="true" style="width:auto"> I already fixed it on the spot</label>
   <div id="fixfields" class="hide">
     <label for="act">Action taken</label>
-    <textarea id="act" name="closure_action" placeholder="e.g. stopped work, issued hard hat, briefed crew"></textarea>
+    <textarea id="act" name="closure_action" placeholder="e.g. stopped work, issued face shield, briefed crew"></textarea>
     <label for="cphoto">Closing photo (optional)</label>
     <input id="cphoto" type="file" name="closure_photo" accept="image/*" capture="environment">
   </div>

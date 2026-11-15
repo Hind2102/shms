@@ -6,6 +6,7 @@ not *violations*. A hazard is therefore derived with explicit, testable rules:
 * ``no_hard_hat``   - a visible head with no helmet on it
 * ``no_gloves``     - a visible hand with no glove on it
 * ``no_hi_vis_vest``- a visible person with no safety vest (or safety suit) on the torso
+* ``no_eye_protection`` - a visible face with no safety glasses / goggles or face guard on it
 
 The same function is applied to (a) the YOLO model's detections and (b) the
 SH17 ground-truth boxes, so model output and ground truth are compared on
@@ -32,7 +33,11 @@ class RuleConfig:
     min_person_area: float = 0.004
     min_head_area: float = 0.0004
     min_hand_area: float = 0.0002
-    enabled: tuple[str, ...] = field(default=("no_hard_hat", "no_hi_vis_vest", "no_gloves"))
+    # Glasses / face guard "protect" a face when this share of the protector lies inside the face box.
+    eye_cover: float = 0.30
+    eye_labels: tuple[str, ...] = ("glasses", "face-guard")
+    min_face_area: float = 0.0004
+    enabled: tuple[str, ...] = field(default=("no_hard_hat", "no_hi_vis_vest", "no_gloves", "no_eye_protection"))
 
 
 DEFAULT_RULES = RuleConfig()
@@ -72,6 +77,8 @@ def hazards_from_boxes(boxes: list[Box], cfg: RuleConfig = DEFAULT_RULES) -> lis
     hands, gloves = by.get("hands", []) + by.get("hand", []), by.get("gloves", []) + by.get("glove", [])
     persons = by.get("person", [])
     vests = [b for lbl in cfg.vest_labels for b in by.get(lbl, [])]
+    faces = by.get("face", [])
+    eyewear = [b for lbl in cfg.eye_labels for b in by.get(lbl, [])]
 
     out: list[Suggestion] = []
 
@@ -101,5 +108,11 @@ def hazards_from_boxes(boxes: list[Box], cfg: RuleConfig = DEFAULT_RULES) -> lis
         if bare:
             out.append(Suggestion("no_hi_vis_vest", max(b.confidence for b in bare), bare,
                                   f"{len(bare)} person(s) detected without a high-visibility vest"))
+
+    if "no_eye_protection" in cfg.enabled:
+        bare = [f for f in faces if f.area >= cfg.min_face_area and not _covered(f, eyewear, cfg.eye_cover)]
+        if bare:
+            out.append(Suggestion("no_eye_protection", max(b.confidence for b in bare), bare,
+                                  f"{len(bare)} face(s) detected without safety glasses or face guard"))
 
     return out

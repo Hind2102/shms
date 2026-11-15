@@ -21,7 +21,7 @@ from shms.detection.rules import hazards_from_boxes
 # Class order from sh17.yaml in the official repository (used by the released weights).
 SH17_NAMES = ["person", "ear", "ear-mufs", "face", "face-guard", "face-mask", "foot", "tool", "glasses",
               "gloves", "helmet", "hands", "head", "medical-suit", "shoes", "safety-suit", "safety-vest"]
-HAZARDS = ["no_hard_hat", "no_hi_vis_vest", "no_gloves"]
+HAZARDS = ["no_hard_hat", "no_eye_protection", "no_gloves", "no_hi_vis_vest"]
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 
 

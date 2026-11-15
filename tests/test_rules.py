@@ -69,3 +69,17 @@ def test_label_spelling_is_normalised():
 
 def test_no_people_no_hazards():
     assert codes([B("tool", .1, .1, .3, .3)]) == set()
+
+
+def test_face_without_eye_protection():
+    assert "no_eye_protection" in codes([B("face", .40, .12, .48, .22)])
+
+
+def test_glasses_or_face_guard_protect_face():
+    face = B("face", .40, .12, .48, .22)
+    assert "no_eye_protection" not in codes([face, B("glasses", .41, .14, .47, .17)])
+    assert "no_eye_protection" not in codes([face, B("face-guard", .39, .10, .49, .23)])
+
+
+def test_medical_mask_is_not_eye_protection():
+    assert "no_eye_protection" in codes([B("face", .40, .12, .48, .22), B("face-mask", .41, .17, .47, .22)])

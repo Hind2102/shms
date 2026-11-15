@@ -36,8 +36,10 @@ from .sh17 import HAZARDS, find_layout, gt_hazards, label_path, read_boxes
 DATA = Path(__file__).resolve().parent / "data"
 RESULTS = Path(__file__).resolve().parent / "results"
 SHOW = {"head": "#e8710a", "helmet": "#2e7d32", "person": "#1f3a5f", "safety-vest": "#9c27b0",
-        "safety-suit": "#9c27b0", "hands": "#c62828", "gloves": "#00897b"}
+        "safety-suit": "#9c27b0", "hands": "#c62828", "gloves": "#00897b", "face": "#795548",
+        "glasses": "#0277bd", "face-guard": "#0277bd"}
 QUESTION = {"no_hard_hat": "Is any visible person's head without a hard hat?",
+            "no_eye_protection": "Is any visible person's face without safety glasses / goggles / face shield?",
             "no_hi_vis_vest": "Is any visible person without a hi-vis vest / safety suit?",
             "no_gloves": "Is any visible hand without a glove?"}
 

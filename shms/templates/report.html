@@ -3,8 +3,9 @@
 {% block content %}
 <div class="card" style="max-width:640px">
   <h1>Report a hazard</h1>
-  <p class="muted small">Step 1 of 2 – take or upload a photo. The AI checks it for missing PPE (hard hat, hi-vis vest, gloves);
-     you confirm or correct the result in step 2. Time is recorded automatically.</p>
+  <p class="muted small">Step 1 of 2 – take or upload a photo of the person and task. The AI checks it against the PPE the area
+     requires (hard hat, eye / face protection, gloves, hi-vis vest where required); you confirm or correct the result in step 2.
+     Time is recorded automatically.</p>
   {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
   <form method="post" action="/report" enctype="multipart/form-data" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Analysing photo…'">
     <label for="area">Where is the hazard?</label>
@@ -12,8 +13,7 @@
       {% for a in areas %}<option value="{{ a.id }}">{{ a.name }} ({{ a.code }})</option>{% endfor %}
     </select>
     <label for="photo">Photo</label>
-    <input id="photo" type="file" name="photo" accept="image/*" capture="environment">
-    <p class="muted small">No photo? You can still report – choose the hazard type yourself in the next step.</p>
+    <input id="photo" type="file" name="photo" accept="image/*" capture="environment" required>
     <br><button class="btn block" type="submit">Analyse and continue</button>
   </form>
 </div>

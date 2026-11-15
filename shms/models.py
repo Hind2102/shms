@@ -48,7 +48,9 @@ class Area(Base):
     code: Mapped[str] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(100))
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    required_ppe: Mapped[str] = mapped_column(Text, default="")  # comma-separated
+    required_ppe: Mapped[str] = mapped_column(Text, default="")  # comma-separated, shown to people entering
+    # Hazard codes the AI checks in this area (the PPE this area requires), comma-separated
+    ai_checks: Mapped[str] = mapped_column(Text, default="no_hard_hat,no_eye_protection,no_gloves,no_hi_vis_vest")
     # Rectangle on the synthesized refinery layout (SVG user units, 1000 x 600 canvas)
     x: Mapped[int] = mapped_column(Integer, default=0)
     y: Mapped[int] = mapped_column(Integer, default=0)
@@ -61,6 +63,10 @@ class Area(Base):
     @property
     def ppe_list(self) -> list[str]:
         return [p.strip() for p in self.required_ppe.split(",") if p.strip()]
+
+    @property
+    def check_codes(self) -> list[str]:
+        return [c.strip() for c in self.ai_checks.split(",") if c.strip()]
 
 
 class Hazard(Base):

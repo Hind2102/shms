@@ -79,11 +79,14 @@ def create_draft(db: Session, reporter: User, area: Area, photo_path: str | None
     h = Hazard(area=area, reporter_id=reporter.id, status=Status.DRAFT, photo_path=photo_path,
                created_at=at or utcnow())
     if result is not None:
+        # The AI checks the photo against the PPE this area requires; anything else is kept for
+        # traceability but marked as not required and never pre-selected.
+        required = set(area.check_codes)
         h.ai_model = result.model
         h.ai_latency_ms = round(result.latency_ms, 1)
         h.ai_error = result.error
-        h.ai_suggestions = json.dumps([s.to_dict() for s in result.suggestions])
-        top = result.top
+        h.ai_suggestions = json.dumps([{**s.to_dict(), "required": s.code in required} for s in result.suggestions])
+        top = max((s for s in result.suggestions if s.code in required), key=lambda s: s.confidence, default=None)
         h.ai_top_code = top.code if top else None
     db.add(h)
     db.flush()
@@ -109,6 +112,8 @@ def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime |
         raise PermissionDenied("Only the reporter can confirm this report")
     if c.category_code not in taxonomy.categories():
         raise WorkflowError(f"Unknown hazard category: {c.category_code!r}")
+    if c.category_code not in h.area.check_codes:
+        raise WorkflowError(f"{taxonomy.get(c.category_code).name} is not a PPE requirement in {h.area.name}")
     if c.consequence not in risk.LEVELS:
         raise WorkflowError("Consequence must be 1-5")
     if c.fixed_on_spot and not c.closure_action.strip():

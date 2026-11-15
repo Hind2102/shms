@@ -18,14 +18,15 @@ from PIL import Image
 from .base import Box, HazardDetector, Suggestion
 
 PROMPT = """You are a safety inspector at an alumina refinery, where every person on site must wear a
-hard hat, a high-visibility vest (or hi-vis coverall) and gloves when handling anything.
+hard hat, safety glasses (or goggles / face shield), gloves and a high-visibility vest (or safety suit).
 Look carefully at the photo and answer each question about the people that are clearly visible.
 
 - worker_without_hard_hat: is any visible person's head NOT covered by a hard hat / safety helmet?
-- worker_without_hi_vis_vest: is any visible person's torso NOT covered by a high-visibility vest or safety suit?
+- worker_without_eye_protection: is any visible person's face NOT protected by safety glasses, goggles or a face shield?
 - bare_hands_visible: is any visible hand NOT wearing a glove?
+- worker_without_hi_vis_vest: is any visible person's torso NOT covered by a high-visibility vest or safety suit?
 
-If no person is visible, answer false to all three. Give a confidence between 0 and 1 for your
+If no person is visible, answer false to all four. Give a confidence between 0 and 1 for your
 overall answer and one short sentence explaining what you saw."""
 
 SCHEMA = {
@@ -33,17 +34,19 @@ SCHEMA = {
     "properties": {
         "people_visible": {"type": "boolean"},
         "worker_without_hard_hat": {"type": "boolean"},
-        "worker_without_hi_vis_vest": {"type": "boolean"},
+        "worker_without_eye_protection": {"type": "boolean"},
         "bare_hands_visible": {"type": "boolean"},
+        "worker_without_hi_vis_vest": {"type": "boolean"},
         "confidence": {"type": "number"},
         "explanation": {"type": "string"},
     },
-    "required": ["people_visible", "worker_without_hard_hat", "worker_without_hi_vis_vest",
-                 "bare_hands_visible", "confidence", "explanation"],
+    "required": ["people_visible", "worker_without_hard_hat", "worker_without_eye_protection",
+                 "bare_hands_visible", "worker_without_hi_vis_vest", "confidence", "explanation"],
 }
 
 FIELD_TO_CODE = {
     "worker_without_hard_hat": "no_hard_hat",
+    "worker_without_eye_protection": "no_eye_protection",
     "worker_without_hi_vis_vest": "no_hi_vis_vest",
     "bare_hands_visible": "no_gloves",
 }

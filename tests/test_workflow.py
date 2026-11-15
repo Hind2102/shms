@@ -50,8 +50,8 @@ def test_fixed_on_spot_requires_action(empty_db):
 
 def test_ai_acceptance_recorded(empty_db):
     assert report(empty_db, code="no_hard_hat", ai_code="no_hard_hat").ai_accepted is True
-    assert report(empty_db, code="caustic_spill", ai_code="no_hard_hat").ai_accepted is False
-    assert report(empty_db, code="caustic_spill", ai_code=None).ai_accepted is None
+    assert report(empty_db, code="no_gloves", ai_code="no_hard_hat").ai_accepted is False
+    assert report(empty_db, code="no_gloves", ai_code=None).ai_accepted is None
 
 
 def test_unknown_category_rejected(empty_db):
@@ -61,29 +61,29 @@ def test_unknown_category_rejected(empty_db):
 
 def test_likelihood_grows_with_similar_history(empty_db):
     now = utcnow()
-    first = report(empty_db, code="caustic_spill", at=now - timedelta(days=10))
+    first = report(empty_db, code="no_eye_protection", at=now - timedelta(days=10))
     assert first.likelihood == 1
     for d in range(9, 4, -1):  # five more in the window
-        report(empty_db, code="caustic_spill", at=now - timedelta(days=d))
-    latest = report(empty_db, code="caustic_spill", at=now)
+        report(empty_db, code="no_eye_protection", at=now - timedelta(days=d))
+    latest = report(empty_db, code="no_eye_protection", at=now)
     assert latest.likelihood == 4  # 6 similar hazards -> Likely
-    other = report(empty_db, code="slip_trip", at=now)
+    other = report(empty_db, code="no_gloves", at=now)
     assert other.likelihood == 1  # different category -> not similar
 
 
 def test_history_outside_lookback_is_ignored(empty_db):
     now = utcnow()
     for _ in range(5):
-        report(empty_db, code="steam_leak", at=now - timedelta(days=200))
-    assert report(empty_db, code="steam_leak", at=now).likelihood == 1
+        report(empty_db, code="no_hi_vis_vest", at=now - timedelta(days=200))
+    assert report(empty_db, code="no_hi_vis_vest", at=now).likelihood == 1
 
 
 def test_high_risk_alerts_supervisor_and_owner(empty_db):
-    h = report(empty_db, code="fall_from_height", consequence=5)  # 5 x 1 = 5 Medium -> no alert
+    h = report(empty_db, code="no_eye_protection", consequence=5)  # 5 x 1 = 5 Medium -> no alert
     assert empty_db.scalars(select(Notification)).all() == []
     for _ in range(3):
-        report(empty_db, code="fall_from_height", consequence=5)
-    h = report(empty_db, code="fall_from_height", consequence=5)  # 4 similar -> L3 -> 15 High
+        report(empty_db, code="no_eye_protection", consequence=5)
+    h = report(empty_db, code="no_eye_protection", consequence=5)  # 4 similar -> L3 -> 15 High
     assert h.risk_level == "High"
     notified = {n.user_id for n in empty_db.scalars(select(Notification).where(Notification.hazard_id == h.id))}
     roles = users(empty_db)
@@ -128,7 +128,7 @@ def test_only_reporter_confirms(empty_db):
     roles = users(empty_db)
     h = services.create_draft(empty_db, roles[Role.REPORTER][0], area(empty_db), None, None)
     with pytest.raises(PermissionDenied):
-        services.confirm(empty_db, h, roles[Role.AREA_OWNER][0], Confirmation("slip_trip", 2))
+        services.confirm(empty_db, h, roles[Role.AREA_OWNER][0], Confirmation("no_gloves", 2))
 
 
 def test_transition_table_has_no_way_out_of_closed():
@@ -146,7 +146,7 @@ def test_dashboard_counts_new_report_immediately(empty_db):
 
 def test_repeat_hotspots(empty_db):
     for _ in range(3):
-        report(empty_db, code="caustic_spill")
+        report(empty_db, code="no_eye_protection")
     hs = services.repeat_hotspots(empty_db)
     assert hs and hs[0]["count"] == 3 and hs[0]["area"].code == "DIG"
 
@@ -163,3 +163,32 @@ def test_seed_is_deterministic(settings):
             seed(s, now=utcnow().replace(year=2026, month=11, day=15, hour=12, minute=0, second=0, microsecond=0))
             results.append(services.dashboard(s, now=utcnow().replace(year=2026, month=11, day=15, hour=12))["by_level"])
     assert results[0] == results[1]
+
+
+def test_only_ppe_required_in_the_area_can_be_reported(empty_db):
+    cal = area(empty_db, "CAL")
+    cal.ai_checks = "no_hard_hat,no_eye_protection,no_gloves"  # no hi-vis vest required here
+    u = users(empty_db)[Role.REPORTER][0]
+    h = services.create_draft(empty_db, u, cal, "x.jpg", ai("no_hi_vis_vest"))
+    with pytest.raises(WorkflowError, match="not a PPE requirement"):
+        services.confirm(empty_db, h, u, Confirmation("no_hi_vis_vest", 3))
+
+
+def test_ai_suggestion_filtered_by_area_requirements(empty_db):
+    import json
+
+    cal = area(empty_db, "CAL")
+    cal.ai_checks = "no_hard_hat,no_eye_protection,no_gloves"
+    u = users(empty_db)[Role.REPORTER][0]
+    result = DetectorResult("mock", [Suggestion("no_hi_vis_vest", 0.95), Suggestion("no_gloves", 0.6)], 5.0)
+    h = services.create_draft(empty_db, u, cal, "x.jpg", result)
+    assert h.ai_top_code == "no_gloves"  # vest is more confident but not required in this area
+    flags = {s["code"]: s["required"] for s in json.loads(h.ai_suggestions)}
+    assert flags == {"no_hi_vis_vest": False, "no_gloves": True}
+
+
+def test_taxonomy_contains_only_ai_detected_hazards():
+    from shms import taxonomy
+
+    assert all(c.ai for c in taxonomy.categories().values())
+    assert set(taxonomy.categories()) == {"no_hard_hat", "no_eye_protection", "no_gloves", "no_hi_vis_vest"}

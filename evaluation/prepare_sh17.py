@@ -72,7 +72,7 @@ def main() -> None:
         helmet_hits, helmet_total = helmet_hits + h, helmet_total + t
         gt = gt_hazards(boxes)
         row = {"image": name, "in_subset": int(name in subset), "n_boxes": len(boxes)}
-        row.update({f"n_{c}": sum(1 for b in boxes if b.label == c) for c in ("person", "head", "helmet", "hands", "gloves", "safety-vest")})
+        row.update({f"n_{c}": sum(1 for b in boxes if b.label == c) for c in ("person", "head", "helmet", "face", "glasses", "face-guard", "hands", "gloves", "safety-vest")})
         row.update({f"gt_{k}": int(v) for k, v in gt.items()})
         rows.append(row)
 

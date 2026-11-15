@@ -71,8 +71,8 @@ def test_sh17_reader_and_derived_labels(tmp_path):
     assert names[0] == "pexels-photo-0.jpeg" and len(names) == 12
     gt0 = gt_hazards(read_boxes(lay.labels / "pexels-photo-0.txt"))
     gt1 = gt_hazards(read_boxes(lay.labels / "pexels-photo-1.txt"))
-    assert gt0 == {"no_hard_hat": True, "no_hi_vis_vest": False, "no_gloves": False}
-    assert gt1 == {"no_hard_hat": False, "no_hi_vis_vest": True, "no_gloves": False}
+    assert gt0 == {"no_hard_hat": True, "no_eye_protection": False, "no_hi_vis_vest": False, "no_gloves": False}
+    assert gt1 == {"no_hard_hat": False, "no_eye_protection": False, "no_hi_vis_vest": True, "no_gloves": False}
 
 
 def test_pipeline_end_to_end_with_mock(tmp_path, monkeypatch):

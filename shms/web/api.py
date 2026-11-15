@@ -67,14 +67,15 @@ async def detect(photo: UploadFile = File(...), user: User = Depends(current_use
 
 
 @router.post("/hazards", status_code=201)
-async def create_hazard(area_code: str = Form(...), photo: UploadFile | None = File(None),
+async def create_hazard(area_code: str = Form(...), photo: UploadFile = File(...),
                         user: User = Depends(current_user), db: Session = Depends(get_session)) -> dict:
     area = db.scalar(select(Area).where(Area.code == area_code))
     if area is None:
         raise HTTPException(422, f"Unknown area {area_code}")
     name = await save_photo(photo)
-    result = get_detector().detect(photo_file(name)) if name else None
-    h = services.create_draft(db, user, area, name, result)
+    if name is None:
+        raise HTTPException(422, "A photo is required")
+    h = services.create_draft(db, user, area, name, get_detector().detect(photo_file(name)))
     db.commit()
     return hazard_out(h)
 
