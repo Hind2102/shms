@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:30px auto">
+  <h1>Sign in</h1>
+  <p class="muted small">Demo sign-in: pick a role to see the system from that person's view. All people, areas and records are synthesized.</p>
+  <form method="post" action="/login" class="login-list">
+    {% for u in users %}
+      <button name="user_id" value="{{ u.id }}"><strong>{{ u.name }}</strong><br><span class="muted small">{{ u.role.value.replace('_',' ').title() }}</span></button>
+    {% endfor %}
+  </form>
+</div>
+{% endblock %}

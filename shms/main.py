@@ -1,0 +1,78 @@
+"""Application factory. The ASGI entry point is ``shms.asgi:app``."""
+
+from __future__ import annotations
+
+import io
+import logging
+import threading
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+from . import services
+from .db import create_all, init_engine, new_session
+from .seed import seed
+from .settings import PACKAGE_DIR, get_settings
+from .web import api, pages
+
+
+log = logging.getLogger("shms")
+
+
+def _warm_up() -> None:
+    """Load the configured detector and run it once on a blank image."""
+    import tempfile
+
+    from PIL import Image
+
+    from .detection import get_detector
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as f:
+            buf = io.BytesIO()
+            Image.new("RGB", (64, 64), "white").save(buf, "JPEG")
+            f.write(buf.getvalue())
+            f.flush()
+            r = get_detector().detect(f.name)
+        log.warning("AI detector %s ready (%s)", r.model, r.error or "ok")
+    except Exception as exc:  # noqa: BLE001 - the app still works; reports show the AI error
+        log.warning("AI detector failed to load: %s", exc)
+
+
+def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastAPI:
+    settings = get_settings()
+    init_engine(database_url or settings.database_url)
+    create_all()
+    if seed_demo:
+        with new_session() as db:
+            seed(db)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        # Load the AI model in the background at start-up so the first report is not slowed down.
+        if settings.detector != "mock":
+            threading.Thread(target=_warm_up, daemon=True).start()
+        yield
+
+    app = FastAPI(title="Site Hazard Management System (SHMS)", version="1.0.0", lifespan=lifespan)
+    settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
+    app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")
+    app.include_router(api.router)
+    app.include_router(pages.router)
+
+    @app.exception_handler(pages.LoginRequired)
+    async def _login(_req: Request, _exc: Exception):
+        return RedirectResponse("/login", status_code=303)
+
+    @app.exception_handler(services.WorkflowError)
+    async def _workflow(_req: Request, exc: Exception):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(services.PermissionDenied)
+    async def _denied(_req: Request, exc: Exception):
+        return JSONResponse({"detail": str(exc)}, status_code=403)
+
+    return app

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+build/
+dist/
+
+# Local configuration and runtime data (never commit secrets)
+.env
+*.db
+uploads/
+
+# Models and datasets are downloaded by scripts (see README)
+models/*.pt
+datasets/
+evaluation/data/sh17_test_abs.txt
+evaluation/data/sh17_eval.yaml
+evaluation/data/label_audit.html
+runs/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

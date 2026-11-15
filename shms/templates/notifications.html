@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+<h1>Alerts</h1>
+<div class="card">
+  <table>
+    {% for n in items %}<tr {% if not n.read %}style="font-weight:600"{% endif %}><td>{{ n.created_at | dt }}</td><td><a href="/hazards/{{ n.hazard_id }}">#{{ n.hazard_id }}</a></td><td>{{ n.message }}</td></tr>
+    {% else %}<tr><td class="muted">No alerts.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

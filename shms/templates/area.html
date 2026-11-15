@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import level %}
+{% block title %}{{ area.name }}{% endblock %}
+{% block content %}
+<h1>{{ area.name }} ({{ area.code }})</h1>
+<div class="grid two">
+  <div class="card">
+    <h2>Live hazards before you enter – {{ open|length }} open</h2>
+    <table>
+      <tr><th>#</th><th>Hazard</th><th>Risk</th><th>Reported</th><th>Planned action</th></tr>
+      {% for h in open %}
+      <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.category_code | cat }}</td><td>{{ level(h.risk_level) }}</td><td>{{ h.created_at | dt }}</td><td class="small">{{ h.planned_action or '–' }}</td></tr>
+      {% else %}<tr><td colspan="5" class="muted">No open hazards in this area.</td></tr>{% endfor %}
+    </table>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Required PPE</h2>
+      <div class="ppe">{% for p in area.ppe_list %}<span>{{ p }}</span>{% endfor %}</div>
+    </div>
+    <div class="card">
+      <h2>Area Owner</h2>
+      <p>{{ area.owner.name }}</p>
+    </div>
+    <div class="card">
+      <h2>Recently closed – what worked</h2>
+      {% for h in recent_closed %}<p class="small"><a href="/hazards/{{ h.id }}">#{{ h.id }}</a> {{ h.category_code | cat }}: {{ h.closure_action }}</p>
+      {% else %}<p class="muted small">None yet.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

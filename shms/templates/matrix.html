@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Risk matrix{% endblock %}
+{% block content %}
+<h1>Risk matrix (5 × 5, consequence × likelihood)</h1>
+<div class="grid two">
+  <div class="card" style="overflow-x:auto">
+    <table class="matrix">
+      <tr><th></th>{% for lk, spec in risk.likelihood_levels().items() %}<th style="text-align:center">L{{ lk }}<br>{{ spec.name }}</th>{% endfor %}</tr>
+      {% for row in table %}
+      <tr><th>C{{ row[0].consequence }} {{ risk.consequence_levels()[row[0].consequence].name }}</th>
+        {% for cell in row %}<td style="background:{{ cell.color }}{% if cell.level == 'Medium' %};color:#3b2d00{% endif %}">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="card">
+    <h2>Response by level</h2>
+    <table>{% for b in risk.bands() %}<tr><td><span class="lvl {{ b.level }}">{{ b.level }}</span><br><span class="small muted">{{ b.min }}–{{ b.max }}</span></td><td class="small">{{ b.action }}</td></tr>{% endfor %}</table>
+  </div>
+</div>
+<div class="grid two">
+  <div class="card"><h2>Consequence levels (chosen by the reporter)</h2>
+    <table>{% for k, v in risk.consequence_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>Likelihood levels (estimated by the system)</h2>
+    <table>{% for k, v in risk.likelihood_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}</td></tr>{% endfor %}</table>
+    <p class="muted small">Look-back window: {{ risk.lookback_days() }} days, same hazard type in the same area.</p></div>
+</div>
+{% endblock %}

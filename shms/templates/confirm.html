@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo %}
+{% block title %}Confirm report #{{ h.id }}{% endblock %}
+{% block content %}
+{% set top = suggestions[0] if suggestions else None %}
+<h1>Confirm report #{{ h.id }} – {{ h.area.name }}</h1>
+{% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+<div class="grid two">
+  <div class="card">
+    {% if h.photo_path %}
+      {% set ev = [] %}{% for s in suggestions %}{% for b in s.evidence %}{% set _ = ev.append(b) %}{% endfor %}{% endfor %}
+      {{ photo(h.photo_path, ev) }}
+    {% else %}<p class="muted">No photo attached.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>AI check</h2>
+    {% if h.ai_error %}
+      <div class="alert err small">The AI could not analyse this photo ({{ h.ai_error }}). Please classify it yourself.</div>
+    {% elif not h.ai_model %}
+      <p class="muted">No photo, so no AI suggestion.</p>
+    {% elif suggestions %}
+      {% for s in suggestions %}
+      <div class="sugg"><div><strong>{{ s.code | cat }}</strong><br><span class="muted small">{{ s.explanation }}</span></div>
+        <div style="display:flex;align-items:center">{{ (s.confidence*100)|round|int }}%<span class="bar"><i style="width:{{ (s.confidence*100)|round|int }}%"></i></span></div></div>
+      {% endfor %}
+    {% else %}
+      <div class="alert ok small">No missing PPE detected. If you see another hazard (spill, leak, missing grating…) choose it below.</div>
+    {% endif %}
+    {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. The AI only checks PPE; it was evaluated on the SH17 test set.</p>{% endif %}
+  </div>
+</div>
+
+<form class="card" method="post" action="/hazards/{{ h.id }}/confirm" enctype="multipart/form-data">
+  <h2>Step 2 of 2 – confirm and score</h2>
+  <label for="cat">Hazard type</label>
+  <select id="cat" name="category_code" required>
+    {% for group, cats in taxonomy.grouped().items() %}
+      <optgroup label="{{ group }}">
+      {% for c in cats %}<option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>{% endfor %}
+      </optgroup>
+    {% endfor %}
+  </select>
+
+  <label>Worst credible consequence</label>
+  <div class="radio-list">
+  {% for lvl, spec in consequences.items() | reverse %}
+    <label><input type="radio" name="consequence" value="{{ lvl }}" required {% if top and taxonomy.get(top.code).default_consequence == lvl %}checked{% endif %}>
+      <span><strong>{{ lvl }} – {{ spec.name }}</strong><br><span class="muted small">{{ spec.definition }}</span></span></label>
+  {% endfor %}
+  </div>
+  <p class="muted small">Likelihood is estimated automatically from similar hazards reported in {{ h.area.name }} over the last {{ risk.lookback_days() }} days. <a href="/matrix" target="_blank">See the risk matrix</a>.</p>
+
+  <label for="desc">What did you see? (optional)</label>
+  <textarea id="desc" name="description" placeholder="e.g. contractor grinding without hard hat near pump P-201"></textarea>
+
+  <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="fixed" name="fixed_on_spot" value="true" style="width:auto"> I already fixed it on the spot</label>
+  <div id="fixfields" class="hide">
+    <label for="act">Action taken</label>
+    <textarea id="act" name="closure_action" placeholder="e.g. stopped work, issued hard hat, briefed crew"></textarea>
+    <label for="cphoto">Closing photo (optional)</label>
+    <input id="cphoto" type="file" name="closure_photo" accept="image/*" capture="environment">
+  </div>
+  <br><button class="btn block" type="submit">Submit report</button>
+</form>
+<script>
+  const fx = document.getElementById('fixed'), ff = document.getElementById('fixfields');
+  fx.addEventListener('change', () => ff.classList.toggle('hide', !fx.checked));
+  document.getElementById('cat').addEventListener('change', e => {
+    const c = e.target.selectedOptions[0].dataset.cons;
+    const r = document.querySelector(`input[name=consequence][value="${c}"]`); if (r) r.checked = true;
+  });
+</script>
+{% endblock %}

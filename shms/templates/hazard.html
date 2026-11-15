@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import level, status, photo %}
+{% block title %}Hazard #{{ h.id }}{% endblock %}
+{% block content %}
+{% if created %}<div class="alert ok">Report submitted.{% if h.status.value == 'open' %} Routed to {{ h.assignee.name }}.{% endif %}{% if h.risk_level in ('High','Extreme') %} Safety supervisor alerted.{% endif %}</div>{% endif %}
+{% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+<h1>#{{ h.id }} · {{ h.category_code | cat }} {{ level(h.risk_level) }} {{ status(h.status) }}</h1>
+<div class="grid two">
+  <div>
+    <div class="card">
+      <table>
+        <tr><th>Area</th><td><a href="/areas/{{ h.area.code }}">{{ h.area.name }}</a></td></tr>
+        <tr><th>Reported</th><td>{{ h.created_at | dt }} by {{ h.reporter.name }}</td></tr>
+        <tr><th>Risk</th><td>Consequence {{ h.consequence }} × Likelihood {{ h.likelihood }} = <strong>{{ h.risk_score }}</strong> {{ level(h.risk_level) }}</td></tr>
+        <tr><th>Target close</th><td>{{ h.due_at | dt }}</td></tr>
+        <tr><th>Assigned to</th><td>{{ h.assignee.name if h.assignee else '–' }}</td></tr>
+        <tr><th>AI</th><td>{% if h.ai_model %}{{ h.ai_model }} suggested <em>{{ h.ai_top_code | cat if h.ai_top_code else 'no PPE hazard' }}</em>
+          {% if h.ai_accepted is not none %}– {{ 'accepted' if h.ai_accepted else 'corrected by reporter' }}{% endif %}{% else %}–{% endif %}</td></tr>
+        {% if h.description %}<tr><th>Description</th><td>{{ h.description }}</td></tr>{% endif %}
+        {% if h.planned_action %}<tr><th>Planned action</th><td>{{ h.planned_action }}</td></tr>{% endif %}
+        {% if h.status.value == 'closed' %}
+        <tr><th>Closed</th><td>{{ h.closed_at | dt }} by {{ h.closed_by.name }}{% if h.closed_on_spot %} (fixed on the spot){% endif %}</td></tr>
+        <tr><th>How it was closed</th><td>{{ h.closure_action }}</td></tr>
+        {% endif %}
+      </table>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      {% if h.photo_path %}<div class="card"><h2>Reported</h2>{% set ev = [] %}{% for s in suggestions %}{% for b in s.evidence %}{% set _ = ev.append(b) %}{% endfor %}{% endfor %}{{ photo(h.photo_path, ev) }}</div>{% endif %}
+      {% if h.closure_photo_path %}<div class="card"><h2>After closure</h2>{{ photo(h.closure_photo_path, []) }}</div>{% endif %}
+    </div>
+  </div>
+  <div>
+    {% if h.status.value == 'open' and can_act %}
+    <form class="card" method="post" action="/hazards/{{ h.id }}/plan">
+      <h2>Plan action</h2>
+      <textarea name="planned_action" required placeholder="What will be done, by whom">{{ h.planned_action or '' }}</textarea>
+      <br><br><button class="btn secondary" type="submit">Save plan</button>
+    </form>
+    <form class="card" method="post" action="/hazards/{{ h.id }}/close" enctype="multipart/form-data">
+      <h2>Close hazard</h2>
+      <label for="action">Action taken (required)</label>
+      <textarea id="action" name="action" required placeholder="Describe the control put in place and how you checked it works"></textarea>
+      <label for="cp">Closing photo</label>
+      <input id="cp" type="file" name="photo" accept="image/*" capture="environment">
+      <br><br><button class="btn" type="submit">Close hazard</button>
+    </form>
+    {% elif h.status.value == 'open' %}
+    <div class="alert info small">Only {{ h.area.owner.name }} or a safety supervisor can close this hazard.</div>
+    {% endif %}
+    <div class="card">
+      <h2>Audit trail</h2>
+      <ul class="timeline">
+        {% for e in h.events %}<li class="{{ e.kind }}"><strong>{{ e.kind | capitalize }}</strong> · {{ e.at | dt }}<br><span class="small">{{ e.actor.name }} – {{ e.note }}</span></li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

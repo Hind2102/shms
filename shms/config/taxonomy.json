@@ -1,0 +1,18 @@
+{
+  "_source": "Hazard categories adapted from OSHA, UK HSE and ISO 45001 groupings for an alumina refinery. 'ai' marks categories the AI may suggest; only these were evaluated on a labelled test set (SH17).",
+  "categories": [
+    {"code": "no_hard_hat", "name": "Worker without hard hat", "group": "Unsafe act - PPE", "ai": true, "default_consequence": 3},
+    {"code": "no_hi_vis_vest", "name": "Worker without high-visibility vest", "group": "Unsafe act - PPE", "ai": true, "default_consequence": 2},
+    {"code": "no_gloves", "name": "Worker handling without gloves", "group": "Unsafe act - PPE", "ai": true, "default_consequence": 2},
+    {"code": "other_ppe", "name": "Other missing PPE (goggles, face shield, respirator)", "group": "Unsafe act - PPE", "ai": false, "default_consequence": 3},
+    {"code": "unsafe_behaviour", "name": "Unsafe behaviour (bypassing controls, line of fire)", "group": "Unsafe act - Behaviour", "ai": false, "default_consequence": 3},
+    {"code": "caustic_spill", "name": "Caustic / slurry spill or leak", "group": "Unsafe condition - Chemical", "ai": false, "default_consequence": 4},
+    {"code": "steam_leak", "name": "Steam or hot process leak", "group": "Unsafe condition - Thermal", "ai": false, "default_consequence": 4},
+    {"code": "fall_from_height", "name": "Missing grating, handrail or edge protection", "group": "Unsafe condition - Working at height", "ai": false, "default_consequence": 5},
+    {"code": "slip_trip", "name": "Slip or trip hazard (housekeeping, obstruction)", "group": "Unsafe condition - Housekeeping", "ai": false, "default_consequence": 2},
+    {"code": "electrical", "name": "Electrical hazard (exposed wiring, damaged panel)", "group": "Unsafe condition - Electrical", "ai": false, "default_consequence": 4},
+    {"code": "machine_guarding", "name": "Missing or damaged machine guard", "group": "Unsafe condition - Mechanical", "ai": false, "default_consequence": 4},
+    {"code": "fire", "name": "Fire hazard (ignition source, blocked extinguisher)", "group": "Unsafe condition - Fire", "ai": false, "default_consequence": 4},
+    {"code": "other", "name": "Other hazard", "group": "Other", "ai": false, "default_consequence": 2}
+  ]
+}

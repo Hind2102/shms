@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import level, status %}
+{% block title %}Hazards{% endblock %}
+{% block content %}
+<h1>Hazard register</h1>
+<form class="card filters" method="get">
+  <div><label>Status</label><select name="status"><option value="">All</option>
+    {% for s in ('open','closed') %}<option {% if f.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label>Area</label><select name="area"><option value="">All</option>
+    {% for a in areas %}<option value="{{ a.code }}" {% if f.area == a.code %}selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></div>
+  <div><label>Risk level</label><select name="level"><option value="">All</option>
+    {% for l in ('Extreme','High','Medium','Low') %}<option {% if f.level == l %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label>Type</label><select name="category"><option value="">All</option>
+    {% for c in taxonomy.categories().values() %}<option value="{{ c.code }}" {% if f.category == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div style="flex:0"><button class="btn" type="submit">Filter</button></div>
+</form>
+<div class="card" style="overflow-x:auto">
+  <p class="muted small">{{ hazards|length }} hazards{% if hazards|length == 300 %} (first 300){% endif %}</p>
+  <table>
+    <tr><th>#</th><th>Reported</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Status</th><th>How closed</th></tr>
+    {% for h in hazards %}
+    <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.created_at | dt }}</td><td>{{ h.area.code }}</td>
+      <td>{{ h.category_code | cat }}</td><td>{{ level(h.risk_level) }} {{ h.risk_score }}</td><td>{{ status(h.status) }}</td>
+      <td class="small muted">{{ h.closure_action or '' }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

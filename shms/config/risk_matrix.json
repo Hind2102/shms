@@ -1,0 +1,24 @@
+{
+  "_source": "5x5 consequence x likelihood matrix following the ADOSH-SF Risk Management Technical Guideline structure. Level definitions are written for an alumina refinery and can be edited without code changes.",
+  "consequence": {
+    "1": {"name": "Insignificant", "definition": "No injury or first aid only; no production impact."},
+    "2": {"name": "Minor", "definition": "Medical treatment case or restricted work; minor spill contained on site."},
+    "3": {"name": "Moderate", "definition": "Lost-time injury; reportable release contained within the refinery boundary."},
+    "4": {"name": "Major", "definition": "Permanent disability or multiple lost-time injuries; significant caustic or steam release."},
+    "5": {"name": "Catastrophic", "definition": "One or more fatalities; major uncontrolled release or fire."}
+  },
+  "likelihood": {
+    "1": {"name": "Rare", "definition": "No similar hazard reported in this area in the look-back window.", "max_count": 0},
+    "2": {"name": "Unlikely", "definition": "1-2 similar hazards reported in this area in the look-back window.", "max_count": 2},
+    "3": {"name": "Possible", "definition": "3-5 similar hazards reported in this area in the look-back window.", "max_count": 5},
+    "4": {"name": "Likely", "definition": "6-10 similar hazards reported in this area in the look-back window.", "max_count": 10},
+    "5": {"name": "Almost certain", "definition": "More than 10 similar hazards reported in this area in the look-back window.", "max_count": null}
+  },
+  "lookback_days": 90,
+  "bands": [
+    {"level": "Low", "min": 1, "max": 4, "action": "Manage by routine procedures; close within 30 days.", "color": "#2e7d32", "target_days": 30},
+    {"level": "Medium", "min": 5, "max": 9, "action": "Area Owner to plan controls; close within 14 days.", "color": "#f9a825", "target_days": 14},
+    {"level": "High", "min": 10, "max": 16, "action": "Supervisor alerted; interim controls within 24 h; close within 7 days.", "color": "#ef6c00", "target_days": 7},
+    {"level": "Extreme", "min": 17, "max": 25, "action": "Stop the activity; supervisor alerted immediately; close within 24 h.", "color": "#c62828", "target_days": 1}
+  ]
+}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import level, status, heatmap, trend %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+  <h1>Refinery hazard dashboard</h1>
+  <a class="btn" href="/report">+ Report a hazard</a>
+</div>
+
+<div class="grid kpis">
+  <div class="kpi"><div class="v">{{ d.kpis.open }}</div><div class="l">Open hazards</div></div>
+  <div class="kpi warn"><div class="v">{{ d.kpis.open_high }}</div><div class="l">Open High / Extreme</div></div>
+  <div class="kpi warn"><div class="v">{{ d.kpis.overdue }}</div><div class="l">Overdue (past target date)</div></div>
+  <div class="kpi"><div class="v">{{ d.kpis.reported_30d }}</div><div class="l">Reported, last 30 days</div></div>
+  <div class="kpi"><div class="v">{{ d.kpis.closed_30d }}</div><div class="l">Closed, last 30 days</div></div>
+  <div class="kpi"><div class="v">{{ d.kpis.median_days_to_close if d.kpis.median_days_to_close is not none else '–' }}</div><div class="l">Median days to close (90 d)</div></div>
+</div>
+<br>
+<div class="grid two">
+  <div class="card">
+    <h2>Heat map – open risk by area</h2>
+    {{ heatmap(d.areas) }}
+  </div>
+  <div>
+    <div class="card">
+      <h2>Open hazards by risk level</h2>
+      <table>{% for l, n in d.by_level.items() %}<tr><td>{{ level(l) }}</td><td style="text-align:right"><strong>{{ n }}</strong></td></tr>{% endfor %}</table>
+    </div>
+    <div class="card">
+      <h2>Repeat hotspots (90 days)</h2>
+      <p class="muted small">Same hazard type reported 3+ times in one area – a sign the fix is not working.</p>
+      <table>
+        {% for r in hotspots %}<tr><td><a href="/areas/{{ r.area.code }}">{{ r.area.code }}</a></td><td>{{ r.category }}</td><td style="text-align:right"><strong>{{ r.count }}</strong></td></tr>
+        {% else %}<tr><td class="muted">None</td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h2>Trend – last 12 weeks</h2>
+    {{ trend(d.weeks) }}
+  </div>
+  <div class="card">
+    <h2>Hazard types (90 days)</h2>
+    <table>{% for name, n in d.by_category[:8] %}<tr><td>{{ name }}</td><td style="text-align:right">{{ n }}</td></tr>{% endfor %}</table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Latest reports</h2>
+  <table>
+    <tr><th>#</th><th>Reported</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Status</th></tr>
+    {% for h in recent %}
+    <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.created_at | dt }}</td><td>{{ h.area.code }}</td>
+        <td>{{ h.category_code | cat }}</td><td>{{ level(h.risk_level) }} {{ h.risk_score }}</td><td>{{ status(h.status) }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

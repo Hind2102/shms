@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SHMS{% endblock %} · Site Hazard Management</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+  <a class="logo" href="/"><span class="tri"></span>SHMS</a>
+  {% if user %}
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/report"><strong>+ Report hazard</strong></a>
+    <a href="/hazards">Hazards</a>
+    {% if user.role.value in ('area_owner', 'supervisor') %}<a href="/queue">My queue</a>{% endif %}
+    <a href="/matrix">Risk matrix</a>
+    <a href="/notifications">Alerts{% if unread %}<span class="badge-count">{{ unread }}</span>{% endif %}</a>
+  </nav>
+  <div class="who">{{ user.name }} · <a href="/logout">switch user</a></div>
+  {% endif %}
+</div></header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

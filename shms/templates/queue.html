@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_macros.html" import level %}
+{% block title %}My queue{% endblock %}
+{% block content %}
+<h1>{% if user.role.value == 'supervisor' %}All open hazards{% else %}Hazards assigned to me{% endif %}</h1>
+<div class="card" style="overflow-x:auto">
+  <table>
+    <tr><th>#</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Due</th><th>Planned action</th></tr>
+    {% for h in hazards %}
+    <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.area.code }}</td><td>{{ h.category_code | cat }}</td>
+      <td>{{ level(h.risk_level) }} {{ h.risk_score }}</td>
+      <td>{{ h.due_at | dt }}</td><td class="small">{{ h.planned_action or '–' }}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">Nothing open. Well done.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

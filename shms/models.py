@@ -1,0 +1,136 @@
+"""ORM data model.
+
+    User ──< Area (owner)            User ──< Hazard (reporter / assignee / closer)
+    Area ──< Hazard ──< HazardEvent  (audit trail of every state change)
+    User ──< Notification >── Hazard (alerts for High / Extreme risk)
+"""
+
+from __future__ import annotations
+
+import enum
+from datetime import datetime, timezone
+
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .db import Base
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class Role(str, enum.Enum):
+    REPORTER = "reporter"          # field operator, contractor or visitor
+    AREA_OWNER = "area_owner"      # accountable for closing hazards in their areas
+    SUPERVISOR = "supervisor"      # safety supervisor: alerted on High/Extreme, can act on any hazard
+    MANAGER = "manager"            # read-only site-wide view
+
+
+class Status(str, enum.Enum):
+    DRAFT = "draft"    # photo uploaded and AI has run; reporter has not confirmed yet
+    OPEN = "open"      # confirmed and routed to the Area Owner
+    CLOSED = "closed"  # action taken and documented
+
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    role: Mapped[Role] = mapped_column(Enum(Role))
+
+    areas: Mapped[list[Area]] = relationship(back_populates="owner")
+
+
+class Area(Base):
+    __tablename__ = "areas"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    required_ppe: Mapped[str] = mapped_column(Text, default="")  # comma-separated
+    # Rectangle on the synthesized refinery layout (SVG user units, 1000 x 600 canvas)
+    x: Mapped[int] = mapped_column(Integer, default=0)
+    y: Mapped[int] = mapped_column(Integer, default=0)
+    w: Mapped[int] = mapped_column(Integer, default=100)
+    h: Mapped[int] = mapped_column(Integer, default=100)
+
+    owner: Mapped[User] = relationship(back_populates="areas")
+    hazards: Mapped[list[Hazard]] = relationship(back_populates="area")
+
+    @property
+    def ppe_list(self) -> list[str]:
+        return [p.strip() for p in self.required_ppe.split(",") if p.strip()]
+
+
+class Hazard(Base):
+    __tablename__ = "hazards"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    area_id: Mapped[int] = mapped_column(ForeignKey("areas.id"))
+    reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[Status] = mapped_column(Enum(Status), default=Status.DRAFT)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+    # What the AI suggested, and whether the reporter kept it (traceability)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ai_suggestions: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    ai_top_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ai_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # Confirmed classification and risk
+    category_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    consequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    likelihood: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    risk_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Routing and closure
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    planned_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    closed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    closure_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closure_photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    closed_on_spot: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    area: Mapped[Area] = relationship(back_populates="hazards")
+    reporter: Mapped[User] = relationship(foreign_keys=[reporter_id])
+    assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
+    closed_by: Mapped[User | None] = relationship(foreign_keys=[closed_by_id])
+    events: Mapped[list[HazardEvent]] = relationship(
+        back_populates="hazard", order_by="HazardEvent.at", cascade="all, delete-orphan"
+    )
+
+
+class HazardEvent(Base):
+    """Append-only audit trail: who did what to a hazard, and when."""
+
+    __tablename__ = "hazard_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hazard_id: Mapped[int] = mapped_column(ForeignKey("hazards.id"))
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(30))  # reported, confirmed, assigned, planned, closed, alerted
+    note: Mapped[str] = mapped_column(Text, default="")
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    hazard: Mapped[Hazard] = relationship(back_populates="events")
+    actor: Mapped[User] = relationship()
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    hazard_id: Mapped[int] = mapped_column(ForeignKey("hazards.id"))
+    message: Mapped[str] = mapped_column(Text)
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    hazard: Mapped[Hazard] = relationship()

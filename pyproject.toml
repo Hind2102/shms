@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shms"
+version = "1.0.0"
+description = "Site Hazard Management System: AI-assisted hazard reporting, ADOSH-SF risk scoring and closure tracking"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Hind Alhmoudi" }]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "sqlalchemy>=2.0",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "pillow>=10.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# YOLO detector (SH17 weights). Pulls in PyTorch, ~1 GB.
+yolo = ["ultralytics>=8.3"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["shms*"]
+
+[tool.setuptools.package-data]
+shms = ["templates/*.html", "static/*", "config/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
