@@ -329,6 +329,39 @@ Dev split (100 training-split images, `--split dev`; `evaluation/results/ollama_
 Latency p50 5.8 s, p95 10.3 s, 0 errors. No prompt change was made after the dev run; v2 was then run **once** on
 the test subset (6.3).
 
+### 6.3 Prompt v2 – single run on the 300-image test subset
+
+```bash
+python -m evaluation.evaluate --root $R --detector ollama --prompt v2 --split dev     # 6.2
+python -m evaluation.evaluate --root $R --detector ollama --prompt v2 --subset        # once
+python -m evaluation.compare && python -m evaluation.compare --only-subset
+```
+
+`evaluation/results/ollama_qwen2.5vl_7b_promptv2_subset/` (commit `03f2b5b`), 300 images, 0 errors.
+
+| Hazard | TP | FP | FN | TN | P | R | Spec [95% CI] | MCC [95% CI] | F1 | Always-yes F1 | YOLOv9e MCC (same images) |
+|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|
+| no_hard_hat | 229 | 5 | 8 | 58 | 0.979 | 0.966 | 0.921 [0.84–0.98] | 0.872 [0.79–0.93] | 0.972 | 0.883 | 0.878 |
+| no_eye_protection | 152 | 6 | 43 | 99 | 0.962 | 0.779 | 0.943 [0.89–0.98] | 0.690 [0.62–0.77] | 0.861 | 0.788 | 0.890 |
+| no_gloves | 234 | 17 | 4 | 45 | 0.932 | 0.983 | 0.726 [0.61–0.83] | 0.777 [0.69–0.86] | 0.957 | 0.885 | 0.856 |
+| no_hi_vis_vest | 247 | 7 | 22 | 24 | 0.972 | 0.918 | 0.774 [0.62–0.91] | 0.585 [0.44–0.71] | 0.945 | 0.946 | 0.667 |
+
+Macro MCC: v2 0.731 vs v1 0.180, YOLOv8s 0.746, YOLOv9e 0.823. Latency p50 5.6 s, p95 11.1 s (YOLOv9e 0.15 s).
+
+Interpretation:
+- v2 removes most of v1's failure: the change of prompt alone moved macro MCC from 0.18 to 0.73 on the same images.
+  This supports – but does not prove – that the framing was the main cause of v1's low recall; model size and
+  downscaling (6.1) were not varied.
+- v2 roughly matches YOLOv9e for hard hat (overlapping CIs), and is clearly weaker for eye protection (recall 0.78)
+  and gloves (specificity 0.73). Indicative gate check on the subset only (the gate is defined on the full split,
+  which the VLM was not run on): hard hat and eye protection would pass; gloves (spec 0.73) and vest (spec 0.77) would
+  fail. Latency p95 11.1 s is within the 20 s target but 60–70× slower than YOLOv9e (p50 5.6 s vs 0.09 s; p95 11.1 s vs 0.15 s).
+- Caveats: prompt v2 was designed after looking at v1 failures on **test** images, so the test subset is not untouched
+  for v2's design; it was then run once without changes. 300 images give wide CIs (e.g. vest specificity 0.62–0.91,
+  31 negatives).
+- Not done (optional, time): `qwen3-vl:8b`. No vision model is used or evaluated for spills or blocked walkways –
+  there is no labelled test set for them.
+
 ## Step 7 – Label audit and scope
 
 ### 7.1 What the label audit does – and does not do
@@ -497,6 +530,24 @@ Roboflow keys, private-key blocks and generic `api_key/secret/password/token = �
 to rotate because of git. (The Kaggle token typed into the assistant chat on 2026-11-15 lives only in
 `~/.kaggle/access_token`, mode 600; rotating it is optional hygiene.)
 
+### 8.4 Docker image and CPU latency (2026-11-18)
+
+- `docker build -t shms-verify:local .` → exit 0, image 2.32 GB.
+- CI smoke test repeated locally on a port confirmed free (8790; a first attempt on 8766 was discarded because an
+  unrelated local program already listened there): `/api/health` `{"status":"ok"}`, `/login` contains "Sign in",
+  `/api/dashboard` contains `kpis`, `/metrics` contains `shms_hazards`; container log shows each request with 200;
+  health status `healthy`; runs as user `app`; 0 tracebacks. Throw-away containers removed afterwards.
+- Same image with `models/` mounted read-only (as in `docker-compose.yml`), YOLOv9e on CPU: 6 × `POST /api/detect`
+  → first 8.3 s (model load), then 1.3–2.2 s; memory 1.38 GiB; 0 errors.
+- `docker compose up` itself was not run: it publishes port 8000, which is occupied on this Mac. README now says how
+  to change the mapping.
+- Native CPU (M5 Pro), `build_detector(..., device="cpu")`, 30 calls on the sample photos: YOLOv8s p50 35 ms /
+  p95 41 ms; YOLOv9e p50 200 ms / p95 216 ms. The README's former "~0.25 s on any laptop" was replaced by these
+  measured values.
+- Observation: `POST /api/detect` returns the raw detector output, including the unreleased `no_hi_vis_vest`
+  suggestion; the report/confirm flow filters it out (8.5). Not changed (API design question, not a crash).
+- GitHub Actions: **never run** – the repository is empty. CI status is unverified until the first push.
+
 ### 8.5 App walkthrough (photo → closure), YOLOv9e on mps, port 8765, `shms_demo.db`
 
 Driven through the HTML forms with `curl` (cookie sessions):
@@ -518,3 +569,104 @@ Driven through the HTML forms with `curl` (cookie sessions):
 
 Note: the closure text stored was cut at a `;` – reproduced with a raw socket capture: **curl** `-F` treats `;` as
 a field separator and never sent the rest. Not an app bug.
+
+### 8.6 Final checks (2026-11-18, HEAD before the last docs commit)
+
+```bash
+pytest                                  # 120 passed (YOLO tests included: weights present)
+ruff check . && ruff format --check .   # All checks passed / 48 files already formatted
+uvicorn shms.asgi:app --port 8765       # /login 200, /api/health 200, /metrics 200, 0 tracebacks (shms_demo.db via .env)
+```
+
+---
+
+## Handover (2026-11-18)
+
+### 1. Verified, and what remains uncertain
+
+Verified (commands and files above):
+- Same held-out test set throughout (manifest diff empty; ground-truth hash identical across three commits);
+  dev split disjoint from test; 0 file overlaps and 0 dHash near-duplicates train↔test.
+- Weights match their published SHA-256; provenance of every results folder.
+- All earlier image-level numbers (P/R/F1, latency, mAP, sweeps) reproduce exactly from the cached predictions; the
+  new specificity/MCC were recomputed independently. The "byte-identical after the formatting patch" claim holds.
+- Release gate: hard hat, eye protection, gloves approved with margin; vest rejected with margin.
+- Load tests (YOLOv8s earlier, YOLOv9e now), memory, CPU latency, Docker build + smoke test, end-to-end workflow in
+  the app, /areas/BXH and /monitoring, 120 tests, ruff, clean secret scan, nothing sensitive tracked.
+
+Uncertain / not established:
+- **Detection mAP is not reproduced** (−6 to −8 points vs the paper); cause unknown.
+- Label quality: the label audit has not been done, so how often the derived labels are wrong is unknown.
+- Selection bias: YOLOv9e choice, the specificity threshold and prompt v2 were decided after seeing test results.
+- Pre-training overlap of YOLO/Qwen with SH17 (Pexels) images is unknown.
+- VLM results rest on 300 images (wide CIs) and one model; other causes of v1's failure were not varied.
+- Field performance: SH17 is not refinery imagery; the proposal's acceptance criterion (≥ 80 %) can only be
+  measured in use.
+- CI has never run (repository empty).
+
+### 2. What was fixed and how it was tested
+
+No application code was changed – no demonstrated bug required it. Changes were limited to:
+- `.gitignore`: `backups/` (checked with `git check-ignore`).
+- `.env`: `SHMS_DATABASE_URL=sqlite:///shms_demo.db` (app start-up verified; previous file backed up).
+- `README.md`: claims aligned with evidence (8.1, 8.4).
+- `Makefile`: `eval-vlm` now runs the README's three commands (`make -n` checked).
+- Re-scored `metrics.json`, new summaries/figures, v2 runs, YOLOv9e load test, `ai_release.json` timestamp.
+
+Issues found but deliberately **not** changed (need your decision, see 5): outdated-schema message says "delete";
+`release_gate.json → _why` says the P/R targets come from the proposal (they do not); vest cannot be reported even
+manually; `/api/detect` returns the unreleased vest suggestion; the two new figures use different colours for the
+same YOLO model.
+
+### 3. Backups and preserved evidence
+
+| What | Where |
+|---|---|
+| Original database (unchanged, still in place) | `shms.db` |
+| Database backup (SHA-256 identical) | `backups/shms_2026-11-17.db` |
+| `.env` before the change | `backups/env_before_2026-11-17.bak` |
+| Results exactly as committed at `c19e9be` + checksums | `backups/evidence_results_c19e9be/`, `backups/evidence_results_c19e9be.sha256` |
+| `evaluation/data` as at `c19e9be` | `backups/evidence_data_c19e9be/` |
+| Superseded summary/figures | git history at `ffa8792` |
+| All commits of this verification | branch `feature/verification` (not merged, not pushed) |
+
+`backups/` is git-ignored: copy it somewhere safe if the laptop is the only copy.
+
+### 4. Remaining tasks before Friday 20 November
+
+| # | Task | Who | Effort | Depends on |
+|---|---|---|---|---|
+| 1 | Click the label audit (100 images × 4 labels), save `label_audit_results.csv` in `evaluation/data/` | Hind | 1–1.5 h | – |
+| 2 | `python -m evaluation.label_audit score`, commit, update README/verification rows | agent | 10 min | 1 |
+| 3 | Decide the five open issues in §2 (wording/design) | Hind | 15 min | – |
+| 4 | Apply the decisions (text fixes ~15 min; making the vest reportable is a code change + test, ~1 h) | agent | 15 min – 1 h | 3 |
+| 5 | Merge `feature/verification` into `main` | agent | 5 min | your OK |
+| 6 | Push to GitHub, watch CI (tests on Ubuntu/macOS, Docker smoke test) | agent | 20–30 min | your OK to push; 5 |
+| 7 | Write the report from this file; review the scope-change draft (7.2) | Hind | — | 1–3 |
+| 8 | Optional: `qwen3-vl:8b` dev + subset run | agent | ~2 h compute | time |
+| 9 | Optional: create a new Kaggle token (old one was typed into a chat) | Hind | 5 min | – |
+
+### 5. Decisions or actions that need you
+
+1. **Label audit** – only you can do it (it must not be filled in by anyone else or by an AI).
+2. **`release_gate.json → _why`**: change "Precision and recall targets come from the proposal" to an accurate
+   statement? (config file – needs your approval under AGENTS.md).
+3. **Vest reporting**: keep "not reportable at all", or allow manual reporting of a missing vest where it is
+   required while keeping the AI check off? (behaviour change).
+4. **Schema-mismatch message**: say "move or back up" instead of "delete"? (wording in `shms/db.py`).
+5. **Push / merge**: may I merge into `main` and push so CI runs, and is the repository meant to be public?
+6. **Scope-change note** (7.2): review the wording before it goes into the report.
+
+### 6. Candid assessment of submission readiness
+
+The software is in good shape: workflow works end to end, 120 tests and lint pass, the Docker image builds and
+passes the smoke test, nothing sensitive is in git. The evaluation is now honest and traceable: every number has a
+command, a file and a commit, the test set is verified unchanged, and the weaknesses (vest, label definition,
+selection bias, F1 vs always-yes) are stated rather than hidden.
+
+It is **not yet submission-ready** for three reasons, all small but real: (1) the label audit is still empty, and
+the README/report must not claim it until it is done; (2) nothing has been pushed, so the public repository and CI –
+both referenced by the README – do not exist in practice yet; (3) two statements need your decision because they are
+in configuration or behaviour (the "from the proposal" justification and vest reporting). The mAP gap to the paper is
+a disclosed limitation, not a blocker. With roughly half a day of your time (audit + decisions + report) and an
+hour of agent work after your go-ahead, the project can be submitted by Friday.

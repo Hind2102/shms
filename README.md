@@ -59,7 +59,9 @@ data/samples/             small sample photos for trying the app
   `brew install python@3.12` and use `python3.12` in the installation step below.
 * ~2 GB disk for the app with YOLO (PyTorch). Add ~6 GB for Ollama + `qwen2.5vl:7b`, and the SH17 dataset
   (download size shown on Kaggle) to reproduce the evaluation.
-* Hardware: any laptop runs the app with YOLOv8s on CPU (~0.25 s per photo). The vision-language model needs
+* Hardware: the app needs no GPU. Measured per photo on the test MacBook (Apple M5 Pro): CPU only – YOLOv9e ~0.2 s,
+  YOLOv8s ~0.04 s; inside the Docker image (CPU, Linux VM) YOLOv9e 1.3–2.2 s. Slower machines will be slower; YOLOv8s
+  is the fallback for weak hardware. The vision-language model needs
   ≥ 16 GB RAM (Apple silicon) or an 8 GB GPU; it was measured on an Apple M5 Pro with 24 GB.
 
 ## Installation
@@ -137,7 +139,9 @@ docker compose up --build                  # http://localhost:8000
 docker compose --profile vlm up            # also starts Ollama (then: SHMS_DETECTOR=ollama)
 ```
 
-The image is built and smoke-tested by CI on every push.
+The image is built and smoke-tested by CI on every push (verified locally on 2026-11-18: build OK, 2.3 GB, health
+check *healthy*, runs as non-root). Compose publishes port 8000; if that port is busy, change `"8000:8000"` to e.g.
+`"8765:8000"` in `docker-compose.yml`.
 
 To reset the demo: stop the server and move `shms.db` and `uploads/` aside (e.g. into `backups/`, which git
 ignores), or point `SHMS_DATABASE_URL` at a new file such as `sqlite:///shms_demo.db`. After upgrading SHMS, do the
