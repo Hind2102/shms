@@ -2,6 +2,10 @@
 
 | Run | Images | Hazard | Precision [95% CI] | Recall [95% CI] | Specificity [95% CI] | MCC [95% CI] | F1 | F1 if always 'yes' | Positives / negatives |
 |---|---:|---|---|---|---|---|---:|---:|---:|
+| ollama_qwen2.5vl_7b_promptv2_subset | 300 | No hard hat | 0.979 [0.96–1.00] | 0.966 [0.94–0.99] | 0.921 [0.84–0.98] | 0.872 [0.79–0.93] | 0.972 | 0.883 | 237 / 63 |
+| ollama_qwen2.5vl_7b_promptv2_subset | 300 | No eye protection | 0.962 [0.93–0.99] | 0.779 [0.72–0.84] | 0.943 [0.89–0.98] | 0.690 [0.62–0.77] | 0.861 | 0.788 | 195 / 105 |
+| ollama_qwen2.5vl_7b_promptv2_subset | 300 | No gloves | 0.932 [0.90–0.96] | 0.983 [0.96–1.00] | 0.726 [0.61–0.83] | 0.777 [0.69–0.86] | 0.957 | 0.885 | 238 / 62 |
+| ollama_qwen2.5vl_7b_promptv2_subset | 300 | No hi-vis vest | 0.972 [0.95–0.99] | 0.918 [0.89–0.95] | 0.774 [0.62–0.91] | 0.585 [0.44–0.71] | 0.945 | 0.946 | 269 / 31 |
 | ollama_qwen2.5vl_7b_subset | 300 | No hard hat | 0.952 [0.90–0.99] | 0.333 [0.27–0.39] | 0.937 [0.87–0.98] | 0.246 [0.17–0.32] | 0.494 | 0.883 | 237 / 63 |
 | ollama_qwen2.5vl_7b_subset | 300 | No eye protection | 0.772 [0.68–0.86] | 0.364 [0.29–0.43] | 0.800 [0.72–0.88] | 0.170 [0.06–0.27] | 0.495 | 0.788 | 195 / 105 |
 | ollama_qwen2.5vl_7b_subset | 300 | No gloves | 0.874 [0.80–0.94] | 0.319 [0.26–0.37] | 0.823 [0.72–0.91] | 0.127 [0.02–0.22] | 0.468 | 0.885 | 238 / 62 |
@@ -17,6 +21,7 @@
 
 | Run | Macro MCC | Macro F1 | Latency p50 (s) | Latency p95 (s) | Errors |
 |---|---:|---:|---:|---:|---:|
+| ollama_qwen2.5vl_7b_promptv2_subset | 0.731 | 0.934 | 5.60 | 11.12 | 0 |
 | ollama_qwen2.5vl_7b_subset | 0.180 | 0.489 | 4.86 | 5.75 | 0 |
 | yolo_sh17_yolo8s_subset | 0.746 | 0.952 | 0.07 | 0.12 | 0 |
 | yolo_sh17_yolo9e_subset | 0.823 | 0.968 | 0.09 | 0.15 | 0 |
