@@ -43,24 +43,69 @@ class SchemaMismatch(RuntimeError):
     pass
 
 
-def create_all() -> None:
+def _alembic_config():
+    from pathlib import Path
+
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(Path(__file__).resolve().parent / "migrations"))
+    return cfg
+
+
+def head_revision() -> str:
+    from alembic.script import ScriptDirectory
+
+    return ScriptDirectory.from_config(_alembic_config()).get_current_head()
+
+
+def schema_status(engine: Engine) -> str:
+    """'empty' (no tables), 'current' (at the newest migration) or 'outdated' (anything else)."""
+    from alembic.migration import MigrationContext
     from sqlalchemy import inspect
+
+    tables = set(inspect(engine).get_table_names()) - {"alembic_version"}
+    if not tables:
+        return "empty"
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    return "current" if current == head_revision() else "outdated"
+
+
+def migrate_to_head(url: str) -> None:
+    """Apply all migrations (same as `alembic upgrade head`) using a private engine, so the
+    foreign-key switch that SQLite migrations need never leaks into the application's connections."""
+    from alembic import command
+
+    engine = create_engine(url)
+    cfg = _alembic_config()
+    try:
+        with engine.begin() as conn:
+            cfg.attributes["connection"] = conn
+            command.upgrade(cfg, "head")
+    finally:
+        engine.dispose()
+
+
+def create_all() -> None:
+    """Create a new database at the newest migration, or check that an existing one is up to date."""
+    from alembic.script import ScriptDirectory
 
     from . import models  # noqa: F401  (register tables)
 
     assert _engine is not None, "call init_engine() first"
-    Base.metadata.create_all(_engine)
-    # An existing database file from an older version may lack new columns; say so clearly instead of
-    # failing later with an obscure SQL error. (A production system would use migrations, e.g. Alembic.)
-    insp = inspect(_engine)
-    for table in Base.metadata.sorted_tables:
-        have = {c["name"] for c in insp.get_columns(table.name)}
-        missing = {c.name for c in table.columns} - have
-        if missing:
-            raise SchemaMismatch(
-                f"The database {_engine.url} was created by an older SHMS version (table {table.name!r} lacks "
-                f"{sorted(missing)}). Move the file aside (e.g. rename shms.db to shms.old.db) or point SHMS_DATABASE_URL at a new file."
-            )
+    status = schema_status(_engine)
+    if status == "empty":
+        from alembic.migration import MigrationContext
+
+        Base.metadata.create_all(_engine)
+        with _engine.begin() as conn:  # record "at newest migration" without running migration scripts
+            MigrationContext.configure(conn).stamp(ScriptDirectory.from_config(_alembic_config()), "head")
+    elif status == "outdated":
+        raise SchemaMismatch(
+            f"The database {_engine.url} was created by an older SHMS version. Back up the file, then run "
+            "`alembic upgrade head` (it migrates the database in SHMS_DATABASE_URL and keeps all data)."
+        )
 
 
 def get_session() -> Iterator[Session]:
