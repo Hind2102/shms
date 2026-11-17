@@ -49,5 +49,5 @@
     "min_specificity": 0.8,
     "max_latency_p95_ms": 20000
   },
-  "decided_at": "2026-11-17T18:56:00+00:00"
+  "decided_at": "2026-11-17T19:42:11+00:00"
 }
