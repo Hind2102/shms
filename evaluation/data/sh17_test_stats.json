@@ -6,6 +6,8 @@
   "train_test_overlap": 0,
   "subset_size": 300,
   "seed": 42,
+  "near_duplicate_check": "dHash 64-bit, <= 4 bits",
+  "near_duplicates_of_train": 0,
   "helmets_overlapping_a_head_pct": 80.5,
   "prevalence_full": {
     "no_hard_hat": 0.76,

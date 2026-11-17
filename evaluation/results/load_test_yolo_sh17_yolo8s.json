@@ -1,0 +1,46 @@
+{
+  "model": "yolo:sh17_yolo8s",
+  "image": "sh17_pexels-photo-7888728__no_hard_hat_no_eye_protection_no_gloves_no_hi_vis_vest.jpg",
+  "machine": "macOS-26.6.2-arm64-arm-64bit",
+  "levels": [
+    {
+      "users": 1,
+      "requests": 40,
+      "errors": 0,
+      "model": "yolo:sh17_yolo8s",
+      "throughput_rps": 43.01,
+      "wall_s": 0.93,
+      "n": 40,
+      "mean_ms": 23.235810422920622,
+      "p50_ms": 21.9475204939954,
+      "p95_ms": 29.998345830244936,
+      "max_ms": 32.08904201164842
+    },
+    {
+      "users": 4,
+      "requests": 40,
+      "errors": 0,
+      "model": "yolo:sh17_yolo8s",
+      "throughput_rps": 55.1,
+      "wall_s": 0.73,
+      "n": 40,
+      "mean_ms": 70.90848124062177,
+      "p50_ms": 72.10262498119846,
+      "p95_ms": 82.7213752141688,
+      "max_ms": 86.23108407482505
+    },
+    {
+      "users": 8,
+      "requests": 40,
+      "errors": 0,
+      "model": "yolo:sh17_yolo8s",
+      "throughput_rps": 54.59,
+      "wall_s": 0.73,
+      "n": 40,
+      "mean_ms": 139.71296875097323,
+      "p50_ms": 139.589395490475,
+      "p95_ms": 180.77763192122802,
+      "max_ms": 211.40208304859698
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "model": "yolo:sh17_yolo8s",
+  "images": 300,
+  "conf": 0.35,
+  "perturbations": {
+    "clean": {
+      "description": "original image",
+      "macro_f1": 0.960007832132104,
+      "no_hard_hat": {
+        "precision": 0.9744680851063829,
+        "recall": 0.9662447257383966,
+        "f1": 0.9703389830508474
+      },
+      "no_eye_protection": {
+        "precision": 0.9396984924623115,
+        "recall": 0.958974358974359,
+        "f1": 0.9492385786802031
+      },
+      "no_gloves": {
+        "precision": 0.9508196721311475,
+        "recall": 0.9747899159663865,
+        "f1": 0.9626556016597511
+      },
+      "no_hi_vis_vest": {
+        "precision": 0.9456521739130435,
+        "recall": 0.9702602230483272,
+        "f1": 0.9577981651376147
+      },
+      "f1_drop_vs_clean": 0.0
+    },
+    "dark": {
+      "description": "brightness x0.4 (indoor / night)",
+      "macro_f1": 0.9613926117301481,
+      "no_hard_hat": {
+        "precision": 0.961864406779661,
+        "recall": 0.9578059071729957,
+        "f1": 0.9598308668076109
+      },
+      "no_eye_protection": {
+        "precision": 0.9540816326530612,
+        "recall": 0.958974358974359,
+        "f1": 0.9565217391304348
+      },
+      "no_gloves": {
+        "precision": 0.9621848739495799,
+        "recall": 0.9621848739495799,
+        "f1": 0.9621848739495799
+      },
+      "no_hi_vis_vest": {
+        "precision": 0.9530685920577617,
+        "recall": 0.9814126394052045,
+        "f1": 0.967032967032967
+      },
+      "f1_drop_vs_clean": -0.0014
+    },
+    "blur": {
+      "description": "Gaussian blur r=3 (motion / focus)",
+      "macro_f1": 0.9357412470948049,
+      "no_hard_hat": {
+        "precision": 0.9732142857142857,
+        "recall": 0.919831223628692,
+        "f1": 0.9457700650759219
+      },
+      "no_eye_protection": {
+        "precision": 0.967032967032967,
+        "recall": 0.9025641025641026,
+        "f1": 0.9336870026525199
+      },
+      "no_gloves": {
+        "precision": 0.9539170506912442,
+        "recall": 0.8697478991596639,
+        "f1": 0.9098901098901099
+      },
+      "no_hi_vis_vest": {
+        "precision": 0.9518518518518518,
+        "recall": 0.9553903345724907,
+        "f1": 0.9536178107606679
+      },
+      "f1_drop_vs_clean": 0.0243
+    },
+    "jpeg": {
+      "description": "JPEG quality 15 (messaging-app compression)",
+      "macro_f1": 0.9290291997846228,
+      "no_hard_hat": {
+        "precision": 0.9570815450643777,
+        "recall": 0.9409282700421941,
+        "f1": 0.948936170212766
+      },
+      "no_eye_protection": {
+        "precision": 0.9521276595744681,
+        "recall": 0.9179487179487179,
+        "f1": 0.9347258485639686
+      },
+      "no_gloves": {
+        "precision": 0.9575471698113207,
+        "recall": 0.8529411764705882,
+        "f1": 0.9022222222222221
+      },
+      "no_hi_vis_vest": {
+        "precision": 0.97165991902834,
+        "recall": 0.8921933085501859,
+        "f1": 0.9302325581395348
+      },
+      "f1_drop_vs_clean": 0.031
+    },
+    "far": {
+      "description": "downscale to 30% (worker far away)",
+      "macro_f1": 0.9486984206883018,
+      "no_hard_hat": {
+        "precision": 0.9617021276595744,
+        "recall": 0.9535864978902954,
+        "f1": 0.9576271186440678
+      },
+      "no_eye_protection": {
+        "precision": 0.9583333333333334,
+        "recall": 0.9435897435897436,
+        "f1": 0.9509043927648579
+      },
+      "no_gloves": {
+        "precision": 0.956140350877193,
+        "recall": 0.9159663865546218,
+        "f1": 0.9356223175965666
+      },
+      "no_hi_vis_vest": {
+        "precision": 0.935251798561151,
+        "recall": 0.966542750929368,
+        "f1": 0.9506398537477148
+      },
+      "f1_drop_vs_clean": 0.0113
+    }
+  }
+}
