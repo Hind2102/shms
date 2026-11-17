@@ -28,8 +28,10 @@ eval-yolo:
 	$(PY) -m evaluation.evaluate --root $(SH17) --detector yolo --weights models/sh17_yolo8s.pt --subset
 	$(PY) -m evaluation.evaluate --root $(SH17) --detector yolo --weights models/sh17_yolo9e.pt --subset
 
-eval-vlm:
-	$(PY) -m evaluation.evaluate --root $(SH17) --detector ollama --model qwen2.5vl:7b --subset
+eval-vlm:           ## prompt v2: dev split first, then one run on the test subset; v1 kept for comparison
+	$(PY) -m evaluation.evaluate --root $(SH17) --detector ollama --model qwen2.5vl:7b --prompt v2 --split dev
+	$(PY) -m evaluation.evaluate --root $(SH17) --detector ollama --model qwen2.5vl:7b --prompt v2 --subset
+	$(PY) -m evaluation.evaluate --root $(SH17) --detector ollama --model qwen2.5vl:7b --prompt v1 --subset
 
 eval-compare:
 	$(PY) -m evaluation.compare
