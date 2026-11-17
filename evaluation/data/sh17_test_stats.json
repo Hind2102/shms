@@ -1,0 +1,47 @@
+{
+  "split_file": "val_files.txt",
+  "images_listed": 1620,
+  "images_found": 1620,
+  "images_missing": 0,
+  "train_test_overlap": 0,
+  "subset_size": 300,
+  "seed": 42,
+  "helmets_overlapping_a_head_pct": 80.5,
+  "prevalence_full": {
+    "no_hard_hat": 0.76,
+    "no_eye_protection": 0.615,
+    "no_gloves": 0.769,
+    "no_hi_vis_vest": 0.891
+  },
+  "prevalence_subset": {
+    "no_hard_hat": 0.79,
+    "no_eye_protection": 0.65,
+    "no_gloves": 0.793,
+    "no_hi_vis_vest": 0.897
+  },
+  "positives_full": {
+    "no_hard_hat": 1232,
+    "no_eye_protection": 996,
+    "no_gloves": 1246,
+    "no_hi_vis_vest": 1443
+  },
+  "class_instances": {
+    "person": 2734,
+    "ear": 1612,
+    "ear-mufs": 49,
+    "face": 1855,
+    "face-guard": 24,
+    "face-mask": 151,
+    "foot": 149,
+    "tool": 923,
+    "glasses": 398,
+    "gloves": 529,
+    "helmet": 154,
+    "hands": 3212,
+    "head": 2427,
+    "medical-suit": 43,
+    "shoes": 956,
+    "safety-suit": 45,
+    "safety-vest": 97
+  }
+}
