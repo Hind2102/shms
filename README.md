@@ -46,6 +46,8 @@ evaluation/               offline evaluation on SH17
 scripts/download_models.py  downloads and checksums the SH17 YOLO weights
 tests/                    pytest suite (unit, workflow, API end-to-end, detectors, evaluation pipeline)
 docs/architecture.md      architecture diagram, component responsibilities, design decisions
+docs/requirements.md      user stories and data model, each story linked to code and tests
+docs/verification.md      verification log: every command, number and decision behind the results
 docs/course_mapping.md    which course lecture is applied where
 Dockerfile, docker-compose.yml   container build (non-root, health check) and Compose stack (+ optional Ollama)
 AGENTS.md                 rules for coding agents working in this repository
@@ -153,7 +155,7 @@ same with an old `shms.db`: the app refuses to start on an outdated schema and s
 pytest                 # or: make test
 ```
 
-120 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+121 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
 cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
 constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the
@@ -195,6 +197,7 @@ python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --subse
 python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v1 --subset   # first prompt, for comparison
 python -m evaluation.compare && python -m evaluation.compare --only-subset
 python -m evaluation.release_gate --run yolo_sh17_yolo9e          # decides which hazard types the app uses
+python -m evaluation.acceptance --run yolo_sh17_yolo9e            # SIMULATED reporter acceptance (proposal criterion)
 ```
 
 (`make eval-prepare eval-yolo eval-vlm eval-compare SH17=~/datasets/sh17` runs the same.)
@@ -247,8 +250,8 @@ and `summary_subset.md` (the shared 300-photo subset, including the vision-langu
 **Release gate.** `python -m evaluation.release_gate --run yolo_sh17_yolo9e` applies the thresholds in
 `evaluation/release_gate.json` (precision ≥ 0.80, recall ≥ 0.75, specificity ≥ 0.80, p95 ≤ 20 s) and writes
 `shms/config/ai_release.json`; the app only enables approved hazard types. The vest check wrongly flags 42 % of
-the test photos that contain no vest violation (74 of 177), so it is **not released**: areas that require vests
-show it as "not AI-checked yet", and the hazard type is not offered on the report form. The precision/recall
+the test photos that contain no vest violation (74 of 177), so it is **not released**. The seeded refinery areas require flame-resistant
+coveralls rather than hi-vis vests, so no area requires a vest and the vest is not offered on the report form. The precision/recall
 targets were set for this evaluation; the proposal's own AI criteria are reporter acceptance (≥ 80 %, monitored
 in the app) and latency (≤ 20 s). The specificity threshold was added after the first test results.
 
@@ -284,7 +287,7 @@ cause unknown** (details in `docs/verification.md`).
 * Photos are processed locally; nothing is sent to external services.
 * Demo sign-in has no passwords; a deployment would use the company's single sign-on.
 * The hazard list contains only the PPE checks that passed the release gate, so other hazards (including a missing
-  hi-vis vest and unsafe conditions) cannot currently be reported in the app, not even manually.
+  hi-vis vest, which no seeded area requires, and unsafe conditions) cannot currently be reported in the app, not even manually.
 * Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions
   (caustic spills, steam leaks, missing grating) have no such dataset; collecting one with ≥ 3 annotators and
   measuring their agreement is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled

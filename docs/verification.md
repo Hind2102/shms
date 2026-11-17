@@ -670,3 +670,62 @@ both referenced by the README – do not exist in practice yet; (3) two statemen
 in configuration or behaviour (the "from the proposal" justification and vest reporting). The mAP gap to the paper is
 a disclosed limitation, not a blocker. With roughly half a day of your time (audit + decisions + report) and an
 hour of agent work after your go-ahead, the project can be submitted by Friday.
+
+---
+
+# Phase 0 – Safety net (2026-11-18)
+
+### P0.1 Patches applied (branch `feature/verification`)
+
+```bash
+git am ../shms_fixes3.patch ../shms_proposal4.patch
+```
+- `f4c58eb` Correct release-gate provenance note; clearer wording for gated checks and outdated databases; readable
+  model names and zoomed PR figure. (Resolves handover decisions 2 and 4; the `_why` text now states the proposal's
+  own criteria.)
+- `aa90777` Simulated reporter acceptance (`evaluation/acceptance.py`), user stories + data model
+  (`docs/requirements.md`), no vest requirement in seeded areas (the synthesized refinery uses flame-resistant
+  coveralls). (Resolves handover decision 3 by design: no area requires a vest.)
+
+### P0.2 README
+Structure lists `docs/requirements.md` and `docs/verification.md`; evaluation commands include
+`python -m evaluation.acceptance --run yolo_sh17_yolo9e`; test count 121; seeded areas require coveralls, not vests.
+
+### P0.3 Demo database
+`shms_demo.db` renamed to `shms_demo.old.db` (`mv -n`, not deleted). Next start re-seeded a fresh `shms_demo.db`:
+240 hazards, **0 areas with a vest check**; `/areas/BXH` lists "Flame-resistant coverall" and AI checks for hard hat,
+eye/face protection, gloves only. (Status: implemented+tested.) Note: the walkthrough in 8.5 was done on the older
+seed, where BXH still required a vest.
+
+### P0.4 Checks and simulated acceptance
+
+```bash
+pytest                                   # 121 passed
+ruff check . && ruff format --check .    # All checks passed / 50 files already formatted
+python -m evaluation.acceptance --run yolo_sh17_yolo9e
+python -m evaluation.acceptance --run yolo_sh17_yolo8s
+python -m evaluation.acceptance --run ollama_qwen2.5vl_7b_promptv2_subset
+python -m evaluation.compare && python -m evaluation.compare --only-subset
+```
+
+**Simulated** reporter acceptance (proposal criterion ≥ 80 %), `evaluation/results/acceptance_<run>.json`:
+
+| Run | Images with ≥ 1 released violation | Accepted unchanged | 95 % Wilson CI | Wrong type | Nothing suggested |
+|---|---:|---:|---|---:|---:|
+| YOLOv9e, full split | 1 492 | 1 450 (97.2 %) | 96.2–97.9 % | 15 | 27 |
+| YOLOv8s, full split | 1 492 | 1 416 (94.9 %) | 93.7–95.9 % | 22 | 54 |
+| Qwen2.5-VL 7B prompt v2, subset | 284 | 277 (97.5 %) | 95.0–98.8 % | 3 | 4 |
+
+Label: **simulated**, not field acceptance. Limits of the simulation (`evaluation/acceptance.py`): (1) an image counts
+as accepted when the AI's top suggestion is *any* violation present – most images contain several, so this is
+lenient; (2) images without a released violation are excluded, so false alarms on compliant workers do not lower
+acceptance (they are captured by specificity instead); (3) a real reporter may also change a correct suggestion.
+Real acceptance is recorded per report in the app (`ai_accepted`) and shown on `/monitoring`.
+
+`compare`: summary tables unchanged; only `fig_pr_full.png` and `fig_pr_subset.png` changed (axes now zoomed to
+0.3–1.0 – the report must mention that the axes do not start at 0).
+
+### P0.5 Publication note
+The pushed history contains the committer e-mail configured for this repository on all commits and, in six commit
+messages written by the course-update patches, a `Claude-Session:` link (only openable by its owner). The secret scan
+(8.3) found no credentials.

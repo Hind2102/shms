@@ -1,0 +1,19 @@
+{
+  "run": "yolo_sh17_yolo9e",
+  "released_hazards": [
+    "no_hard_hat",
+    "no_eye_protection",
+    "no_gloves"
+  ],
+  "operating_threshold": 0.35,
+  "target": 0.8,
+  "images_with_violation": 1492,
+  "accepted_unchanged": 1450,
+  "acceptance_rate": 0.9718498659517426,
+  "acceptance_ci95": [
+    0.9621688209754352,
+    0.979107314144754
+  ],
+  "wrong_type_suggested": 15,
+  "nothing_suggested": 27
+}
