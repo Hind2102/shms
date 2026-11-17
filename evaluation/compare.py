@@ -171,8 +171,16 @@ def fig_pr(runs: list[dict], path: Path) -> None:
                     label=pretty(m),
                 )
         ax.set_title(LABELS[h], fontsize=10, color=INK)
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1.02)
+        # zoom to the data: all operating points sit in the top-right corner of [0, 1]
+        xs_all = [p.get_offsets()[:, 0].min() for p in ax.collections if len(p.get_offsets())] + [
+            min(line.get_xdata()) for line in ax.lines
+        ]
+        ys_all = [p.get_offsets()[:, 1].min() for p in ax.collections if len(p.get_offsets())] + [
+            min(line.get_ydata()) for line in ax.lines
+        ]
+        lo = max(0.0, min(xs_all + ys_all + [1.0]) - 0.04)
+        ax.set_xlim(lo, 1.0)
+        ax.set_ylim(lo, 1.005)
         ax.set_xlabel("Recall", color=MUTED, fontsize=9)
         _style(ax)
         ax.xaxis.grid(True, color=GRID, linewidth=0.8)

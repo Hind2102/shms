@@ -59,7 +59,7 @@ def create_all() -> None:
         if missing:
             raise SchemaMismatch(
                 f"The database {_engine.url} was created by an older SHMS version (table {table.name!r} lacks "
-                f"{sorted(missing)}). It only holds demo data: delete the file (e.g. shms.db) and start again."
+                f"{sorted(missing)}). Move the file aside (e.g. rename shms.db to shms.old.db) or point SHMS_DATABASE_URL at a new file."
             )
 
 
