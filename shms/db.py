@@ -39,11 +39,28 @@ def init_engine(url: str) -> Engine:
     return _engine
 
 
+class SchemaMismatch(RuntimeError):
+    pass
+
+
 def create_all() -> None:
+    from sqlalchemy import inspect
+
     from . import models  # noqa: F401  (register tables)
 
     assert _engine is not None, "call init_engine() first"
     Base.metadata.create_all(_engine)
+    # An existing database file from an older version may lack new columns; say so clearly instead of
+    # failing later with an obscure SQL error. (A production system would use migrations, e.g. Alembic.)
+    insp = inspect(_engine)
+    for table in Base.metadata.sorted_tables:
+        have = {c["name"] for c in insp.get_columns(table.name)}
+        missing = {c.name for c in table.columns} - have
+        if missing:
+            raise SchemaMismatch(
+                f"The database {_engine.url} was created by an older SHMS version (table {table.name!r} lacks "
+                f"{sorted(missing)}). Move the file aside (e.g. rename shms.db to shms.old.db) or point SHMS_DATABASE_URL at a new file."
+            )
 
 
 def get_session() -> Iterator[Session]:

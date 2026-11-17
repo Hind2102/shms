@@ -26,7 +26,7 @@
     {% else %}
       <div class="alert ok small">No missing PPE detected. If you can see missing PPE that the AI missed, choose it below – your correction is recorded.</div>
     {% endif %}
-    {% for s in suggestions if not s.required %}<p class="muted small">Also seen, not required in this area: {{ s.code | cat }}</p>{% endfor %}
+    {% for s in suggestions if not s.required %}<p class="muted small">Also seen, not checked here (not required in this area or not released): {{ s.code | cat }}</p>{% endfor %}
     {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. Checked against the PPE this area requires. AI evaluated on the SH17 held-out test set.</p>{% endif %}
   </div>
 </div>

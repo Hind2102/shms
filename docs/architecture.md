@@ -95,3 +95,7 @@ flowchart LR
 10. **Evaluate offline, monitor online.** Precision/recall come from the labelled SH17 test set. In use, the
     app tracks latency, errors and how often reporters accept or correct the AI against SLOs
     (`config/slo.json`), exported for Prometheus at `/metrics`. A falling acceptance rate triggers re-evaluation.
+11. **Release gate between evaluation and the app.** `evaluation/release_gate.py` turns held-out results into
+    `shms/config/ai_release.json`; the app enables only approved hazard types. Thresholds include specificity,
+    because the test split is dominated by violations and precision/recall alone cannot expose a model that
+    flags almost everything. The vest check failed (specificity 0.58) and is not released.

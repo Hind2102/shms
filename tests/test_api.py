@@ -157,7 +157,7 @@ def test_vest_not_suggested_where_not_required(client):
     r = client.post(
         "/report", data={"area_id": 3}, files={"photo": ("p_no_hi_vis_vest.jpg", jpeg_bytes(), "image/jpeg")}
     )
-    assert r.status_code == 200 and "not required in this area" in r.text and "(AI suggestion)" not in r.text
+    assert r.status_code == 200 and "not checked here" in r.text and "(AI suggestion)" not in r.text
 
 
 def test_idempotent_report_creation(client):

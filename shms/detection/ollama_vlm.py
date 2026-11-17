@@ -80,6 +80,84 @@ def parse_answer(content: str) -> list[Suggestion]:
     return [Suggestion(code, conf, [], expl) for field_, code in FIELD_TO_CODE.items() if data.get(field_) is True]
 
 
+# ---------------------------------------------------------------- prompt v2
+# v1 (above) framed the photo as a refinery; on SH17's everyday scenes the model then often decided "no worker
+# here" and answered no hazard (recall ~0.33). v2 removes that framing and asks about EACH visible person
+# separately, mirroring the YOLO rule engine; the hazards are derived in code, not by the model.
+PROMPT_V2 = """This is an automated PPE compliance check. The photo may show any setting: factory, workshop,
+kitchen, street, office or home. Do NOT decide whether protective equipment is needed there. Treat every
+visible person as if they were on an industrial site, and only report what each person is wearing.
+
+List every clearly visible person (ignore tiny people far in the background). For each person:
+- head_visible: can you see the person's head?
+- hard_hat: is the head covered by a hard hat or safety helmet?
+- face_visible: can you see the person's face?
+- eye_protection: are the eyes covered by safety glasses, goggles or a face shield? (ordinary sunglasses or
+  prescription glasses count as glasses)
+- hands_visible: can you see at least one hand?
+- all_visible_hands_gloved: is every visible hand wearing a glove?
+- torso_visible: can you see the person's upper body?
+- hi_vis_or_safety_suit: is the torso covered by a high-visibility vest, a reflective vest or a safety suit?
+
+Answer false when an item is not worn. Then give one short sentence describing what you saw."""
+
+_PERSON = {
+    "type": "object",
+    "properties": {
+        k: {"type": "boolean"}
+        for k in (
+            "head_visible",
+            "hard_hat",
+            "face_visible",
+            "eye_protection",
+            "hands_visible",
+            "all_visible_hands_gloved",
+            "torso_visible",
+            "hi_vis_or_safety_suit",
+        )
+    },
+    "required": [
+        "head_visible",
+        "hard_hat",
+        "face_visible",
+        "eye_protection",
+        "hands_visible",
+        "all_visible_hands_gloved",
+        "torso_visible",
+        "hi_vis_or_safety_suit",
+    ],
+}
+SCHEMA_V2 = {
+    "type": "object",
+    "properties": {"people": {"type": "array", "items": _PERSON}, "explanation": {"type": "string"}},
+    "required": ["people", "explanation"],
+}
+# hazard code -> (body part must be visible, PPE item that must be worn)
+V2_RULES = {
+    "no_hard_hat": ("head_visible", "hard_hat"),
+    "no_eye_protection": ("face_visible", "eye_protection"),
+    "no_gloves": ("hands_visible", "all_visible_hands_gloved"),
+    "no_hi_vis_vest": ("torso_visible", "hi_vis_or_safety_suit"),
+}
+
+
+def parse_answer_v2(content: str) -> list[Suggestion]:
+    data = json.loads(content)
+    people = [p for p in data.get("people", []) if isinstance(p, dict)]
+    expl = str(data.get("explanation", ""))[:300]
+    out = []
+    for code, (visible, worn) in V2_RULES.items():
+        bare = sum(1 for p in people if p.get(visible) is True and p.get(worn) is not True)
+        if bare:
+            # A VLM gives no calibrated score; confidence = share of visible people missing the item.
+            seen = sum(1 for p in people if p.get(visible) is True)
+            out.append(Suggestion(code, round(0.5 + 0.5 * bare / max(seen, 1), 3), [], f"{bare} of {seen}: {expl}"))
+    return out
+
+
+PROMPTS = {"v1": (PROMPT, SCHEMA, parse_answer), "v2": (PROMPT_V2, SCHEMA_V2, parse_answer_v2)}
+
+
 class OllamaDetector(HazardDetector):
     def __init__(
         self,
@@ -88,21 +166,26 @@ class OllamaDetector(HazardDetector):
         timeout_s: float = 120,
         max_side: int = 1024,
         client: httpx.Client | None = None,
+        prompt: str = "v2",
     ):
+        if prompt not in PROMPTS:
+            raise ValueError(f"Unknown prompt version {prompt!r}; choose from {sorted(PROMPTS)}")
         self.model = model
         self.url = url.rstrip("/")
         self.max_side = max_side
         self.client = client or httpx.Client(timeout=timeout_s)
-        self.name = f"ollama:{model}"
+        self.prompt_version = prompt
+        self.prompt, self.schema, self.parse = PROMPTS[prompt]
+        self.name = f"ollama:{model}:prompt-{prompt}"
 
     def _predict(self, image_path: Path) -> tuple[list[Suggestion], list[Box]]:
         payload = {
             "model": self.model,
             "stream": False,
-            "format": SCHEMA,
+            "format": self.schema,
             "options": {"temperature": 0, "seed": 42},
-            "messages": [{"role": "user", "content": PROMPT, "images": [encode_image(image_path, self.max_side)]}],
+            "messages": [{"role": "user", "content": self.prompt, "images": [encode_image(image_path, self.max_side)]}],
         }
         resp = self.client.post(f"{self.url}/api/chat", json=payload)
         resp.raise_for_status()
-        return parse_answer(resp.json()["message"]["content"]), []
+        return self.parse(resp.json()["message"]["content"]), []

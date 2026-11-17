@@ -1,0 +1,19 @@
+{
+  "run": "ollama_qwen2.5vl_7b_promptv2_subset",
+  "released_hazards": [
+    "no_hard_hat",
+    "no_eye_protection",
+    "no_gloves"
+  ],
+  "operating_threshold": 0.35,
+  "target": 0.8,
+  "images_with_violation": 284,
+  "accepted_unchanged": 277,
+  "acceptance_rate": 0.9753521126760564,
+  "acceptance_ci95": [
+    0.9500054118687039,
+    0.9880104968811086
+  ],
+  "wrong_type_suggested": 3,
+  "nothing_suggested": 4
+}

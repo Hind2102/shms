@@ -29,7 +29,12 @@ def build_detector(kind: str, **overrides) -> HazardDetector:
     if kind == "ollama":
         from .ollama_vlm import OllamaDetector
 
-        return OllamaDetector(overrides.get("model", s.ollama_model), url=s.ollama_url, timeout_s=s.ollama_timeout_s)
+        return OllamaDetector(
+            overrides.get("model", s.ollama_model),
+            url=s.ollama_url,
+            timeout_s=s.ollama_timeout_s,
+            prompt=overrides.get("prompt", s.ollama_prompt),
+        )
     raise ValueError(f"Unknown detector {kind!r}; choose yolo, ollama or mock")
 
 

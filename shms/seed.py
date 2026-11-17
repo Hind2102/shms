@@ -29,22 +29,21 @@ USERS = [
     ("Yousef (Refinery Manager)", Role.MANAGER),
 ]
 
-BASE_PPE = "Hard hat, Safety glasses, Gloves, Safety boots"
-ALL = "no_hard_hat,no_eye_protection,no_gloves,no_hi_vis_vest"
-NO_VEST = "no_hard_hat,no_eye_protection,no_gloves"
+BASE_PPE = "Hard hat, Safety glasses, Gloves, Safety boots, Flame-resistant coverall"
+REQUIRED = "no_hard_hat,no_eye_protection,no_gloves"
 # code, name, owner index, extra PPE shown at the entrance, AI checks, x, y, w, h, relative hazard weight
-# Hi-vis vests are required where mobile plant and vehicles operate (bauxite handling, grinding,
-# calcination, tank-farm road tankers); every area requires hard hat, eye protection and gloves.
+# This refinery uses coveralls, not hi-vis vests, so no area requires a vest (the vest check was also
+# rejected by the release gate). Every area requires hard hat, eye protection and gloves.
 AREAS = [
-    ("BXH", "Bauxite Handling", 3, "Hi-vis vest, Dust mask, Hearing protection", ALL, 20, 40, 200, 230, 1.0),
-    ("GRD", "Grinding & Desilication", 3, "Hi-vis vest, Hearing protection", ALL, 240, 40, 180, 230, 1.0),
-    ("DIG", "Digestion", 3, "Face shield over glasses (caustic), Chemical gloves", NO_VEST, 440, 40, 200, 230, 2.2),
+    ("BXH", "Bauxite Handling", 3, "Dust mask, Hearing protection", REQUIRED, 20, 40, 200, 230, 1.0),
+    ("GRD", "Grinding & Desilication", 3, "Hearing protection", REQUIRED, 240, 40, 180, 230, 1.0),
+    ("DIG", "Digestion", 3, "Face shield over glasses (caustic), Chemical gloves", REQUIRED, 440, 40, 200, 230, 2.2),
     (
         "CLR",
         "Clarification (Red Mud)",
         4,
         "Face shield over glasses (caustic), Chemical gloves",
-        NO_VEST,
+        REQUIRED,
         660,
         40,
         150,
@@ -56,21 +55,21 @@ AREAS = [
         "Security Filtration",
         4,
         "Face shield over glasses (caustic), Chemical gloves",
-        NO_VEST,
+        REQUIRED,
         830,
         40,
         150,
         230,
         1.8,
     ),
-    ("PRC", "Precipitation", 5, "Chemical gloves", NO_VEST, 660, 300, 320, 250, 1.2),
-    ("CAL", "Calcination", 5, "Hi-vis vest, Heat-resistant gloves, Dust mask", ALL, 380, 300, 260, 250, 1.3),
+    ("PRC", "Precipitation", 5, "Chemical gloves", REQUIRED, 660, 300, 320, 250, 1.2),
+    ("CAL", "Calcination", 5, "Heat-resistant gloves, Dust mask", REQUIRED, 380, 300, 260, 250, 1.3),
     (
         "TNK",
         "Caustic Tank Farm",
         6,
-        "Hi-vis vest, Face shield (caustic transfers), Chemical suit",
-        ALL,
+        "Face shield (caustic transfers), Chemical suit",
+        REQUIRED,
         240,
         300,
         120,
@@ -82,7 +81,7 @@ AREAS = [
         "Powerhouse & Utilities",
         6,
         "Hearing protection, Arc-rated clothing (switchrooms)",
-        NO_VEST,
+        REQUIRED,
         20,
         300,
         200,
@@ -114,8 +113,8 @@ def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta
     elif r < 0.93:
         code = rng.choice([c for c in area.check_codes if c != true_code] or [true_code])
     else:
-        return DetectorResult("yolo:sh17_yolo8s", [], rng.uniform(250, 900))
-    return DetectorResult("yolo:sh17_yolo8s", [Suggestion(code, rng.uniform(0.45, 0.95))], rng.uniform(250, 900))
+        return DetectorResult("yolo:sh17_yolo9e", [], rng.uniform(250, 900))
+    return DetectorResult("yolo:sh17_yolo9e", [Suggestion(code, rng.uniform(0.45, 0.95))], rng.uniform(250, 900))
 
 
 def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_seed: int = 42) -> None:

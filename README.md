@@ -4,17 +4,18 @@ AI-assisted web platform for reporting PPE non-compliance from a photo, scoring 
 likelihood risk matrix, routing it to the accountable Area Owner, documenting **how** each case was closed, and
 showing site-wide risk on a live dashboard and heat map of a (synthesized) alumina refinery.
 
-**Every hazard type in the app is detected by AI and was evaluated on labelled data.** The AI checks a photo
-against the PPE that the area requires: **hard hat**, **eye / face protection** (caustic splash), **gloves** and,
-in traffic areas, a **hi-vis vest**. It was evaluated on the held-out split of the public, peer-reviewed **SH17**
-dataset with precision, recall and F1 (see [Evaluation](#evaluation)). Two local AI back-ends are compared: **YOLO** detectors trained on SH17, and a
+**Every hazard type in the app is detected by AI and passed a release gate on labelled data.** The AI checks a
+photo against the PPE that the area requires: **hard hat**, **eye / face protection** (caustic splash) and
+**gloves**. A fourth check, the **hi-vis vest**, was evaluated and *not* released because it wrongly flags too many
+compliant workers. Evaluation uses the held-out split of the public, peer-reviewed **SH17** dataset with
+precision, recall, specificity and MCC (see [Evaluation](#evaluation)). Two local AI back-ends are compared: **YOLO** detectors trained on SH17, and a
 **vision-language model served by Ollama** (`qwen2.5vl:7b`). No paid API is used.
 
 | | |
 |---|---|
 | **Team** | Hind Alhmoudi (sole member) – requirements, hazard taxonomy and risk matrix, architecture, all code, tests, evaluation, label audit, report |
 | **Course** | Software Engineering and Programming – Master in Applied Artificial Intelligence |
-| **Tested on** | macOS (Apple M5 Pro, 24 GB) with Python 3.12; Ubuntu 24.04 with Python 3.11–3.13 (GitHub Actions also runs macOS) |
+| **Tested on** | macOS 26.6 on an Apple M5 Pro (24 GB) with Python 3.12.14 (verified 2026-11-17, see `docs/verification.md`). The GitHub Actions workflow (Ubuntu + macOS, Python 3.11 and 3.12) runs once the code is pushed. |
 | **Paid APIs** | None |
 
 ---
@@ -41,10 +42,12 @@ evaluation/               offline evaluation on SH17
   load_test.py            throughput and latency of the running service with concurrent users
   metrics.py, sh17.py     metric functions and dataset reader
   data/                   manifest, dataset stats, audit results (committed)
-  results/                metrics.json per run, summary.md, figures (committed)
+  results/                metrics.json per run, summary_full.md / summary_subset.md, figures (committed)
 scripts/download_models.py  downloads and checksums the SH17 YOLO weights
 tests/                    pytest suite (unit, workflow, API end-to-end, detectors, evaluation pipeline)
 docs/architecture.md      architecture diagram, component responsibilities, design decisions
+docs/requirements.md      user stories and data model, each story linked to code and tests
+docs/verification.md      verification log: every command, number and decision behind the results
 docs/course_mapping.md    which course lecture is applied where
 Dockerfile, docker-compose.yml   container build (non-root, health check) and Compose stack (+ optional Ollama)
 AGENTS.md                 rules for coding agents working in this repository
@@ -54,21 +57,26 @@ data/samples/             small sample photos for trying the app
 ## Prerequisites
 
 * macOS, Linux or Windows with **Python 3.11 or newer** (`python3 --version`).
-  On macOS without a recent Python: `brew install python@3.12`.
+  macOS ships Python 3.9, which fails during installation with a misleading "setup.py not found" error. On macOS:
+  `brew install python@3.12` and use `python3.12` in the installation step below.
 * ~2 GB disk for the app with YOLO (PyTorch). Add ~6 GB for Ollama + `qwen2.5vl:7b`, and the SH17 dataset
   (download size shown on Kaggle) to reproduce the evaluation.
-* Hardware: any laptop runs the app with YOLOv8s on CPU (~0.25 s per photo). The vision-language model needs
+* Hardware: the app needs no GPU. Measured per photo on the test MacBook (Apple M5 Pro): CPU only – YOLOv9e ~0.2 s,
+  YOLOv8s ~0.04 s; inside the Docker image (CPU, Linux VM) YOLOv9e 1.3–2.2 s. Slower machines will be slower; YOLOv8s
+  is the fallback for weak hardware. The vision-language model needs
   ≥ 16 GB RAM (Apple silicon) or an 8 GB GPU; it was measured on an Apple M5 Pro with 24 GB.
 
 ## Installation
 
+Repository: <https://github.com/Hind2102/shms> (created; code not pushed yet – **pending**).
+
 ```bash
-git clone https://github.com/<your-account>/shms.git
+git clone https://github.com/Hind2102/shms.git
 cd shms
-python3 -m venv .venv
+python3 -m venv .venv                  # macOS: python3.12 -m venv .venv (see Prerequisites)
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -e ".[dev,yolo]" matplotlib
-python scripts/download_models.py --all   # SH17 YOLO weights, verified by SHA-256
+python scripts/download_models.py --all   # SH17 YOLOv9e (used) + YOLOv8s (fallback), SHA-256 verified
 cp .env.example .env
 ```
 
@@ -86,10 +94,12 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | Variable | Default | Meaning |
 |---|---|---|
 | `SHMS_DETECTOR` | `mock` | AI used by the app: `yolo`, `ollama` or `mock` (no model, for tests) |
-| `SHMS_YOLO_WEIGHTS` | `models/sh17_yolo8s.pt` | YOLO weights file |
-| `SHMS_YOLO_CONF` | `0.35` | YOLO operating threshold (chosen on the threshold sweep, see results) |
+| `SHMS_YOLO_WEIGHTS` | `models/sh17_yolo9e.pt` | YOLO weights file (YOLOv8s is the faster fallback) |
+| `SHMS_YOLO_CONF` | `0.35` | YOLO operating threshold (fixed before the evaluation; the threshold sweep on the test split later showed it is at or near the best F1) |
 | `SHMS_YOLO_DEVICE` | auto | `cpu`, `mps` (Apple GPU) or `cuda:0` |
 | `SHMS_OLLAMA_MODEL` | `qwen2.5vl:7b` | Ollama model tag |
+| `SHMS_OLLAMA_PROMPT` | `v2` | Prompt version (`v1` kept to reproduce the first evaluation) |
+| `SHMS_AI_RELEASE_FILE` | `shms/config/ai_release.json` | Release-gate decision: which hazard types the app may use |
 | `SHMS_DATABASE_URL` | `sqlite:///shms.db` | Any SQLAlchemy URL |
 | `SHMS_UPLOAD_DIR` | `uploads` | Where photos are stored |
 
@@ -102,7 +112,7 @@ categories are in `shms/config/taxonomy.json`. Both can be changed without code 
 uvicorn shms.asgi:app --reload       # or: make run
 ```
 
-Open <http://127.0.0.1:8000>. On first start the database is created and filled with a synthesized refinery
+Open <http://127.0.0.1:8000>. (If port 8000 is busy, add `--port 8765` and open that port instead.) On first start the database is created and filled with a synthesized refinery
 (9 areas, 9 users, ~240 historical hazards). Pick a role on the sign-in page (demo sign-in, no passwords).
 
 Main workflow:
@@ -131,9 +141,13 @@ docker compose up --build                  # http://localhost:8000
 docker compose --profile vlm up            # also starts Ollama (then: SHMS_DETECTOR=ollama)
 ```
 
-The image is built and smoke-tested by CI on every push.
+The image is built and smoke-tested by CI on every push (verified locally on 2026-11-18: build OK, 2.3 GB, health
+check *healthy*, runs as non-root). Compose publishes port 8000; if that port is busy, change `"8000:8000"` to e.g.
+`"8765:8000"` in `docker-compose.yml`.
 
-To reset the demo: stop the server and delete `shms.db` and `uploads/`.
+To reset the demo: stop the server and move `shms.db` and `uploads/` aside (e.g. into `backups/`, which git
+ignores), or point `SHMS_DATABASE_URL` at a new file such as `sqlite:///shms_demo.db`. After upgrading SHMS, do the
+same with an old `shms.db`: the app refuses to start on an outdated schema and says so.
 
 ## Testing
 
@@ -141,7 +155,7 @@ To reset the demo: stop the server and delete `shms.db` and `uploads/`.
 pytest                 # or: make test
 ```
 
-112 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+121 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
 cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
 constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the
@@ -173,12 +187,17 @@ the **held-out list** (`val_files.txt`, 1,620 images) that the weights never saw
 ```bash
 export SH17=~/datasets/sh17
 python -m evaluation.prepare_sh17 --root $SH17                         # manifest + statistics
-python -m evaluation.evaluate --root $SH17 --detector yolo --weights models/sh17_yolo8s.pt --map
 python -m evaluation.evaluate --root $SH17 --detector yolo --weights models/sh17_yolo9e.pt --map
-python -m evaluation.evaluate --root $SH17 --detector yolo --weights models/sh17_yolo8s.pt --subset
+python -m evaluation.evaluate --root $SH17 --detector yolo --weights models/sh17_yolo8s.pt --map
 python -m evaluation.evaluate --root $SH17 --detector yolo --weights models/sh17_yolo9e.pt --subset
-python -m evaluation.evaluate --root $SH17 --detector ollama --model qwen2.5vl:7b --subset   # ~needs Ollama
+python -m evaluation.evaluate --root $SH17 --detector yolo --weights models/sh17_yolo8s.pt --subset
+# vision-language model (needs Ollama): develop on the dev split, then one final run on the test subset
+python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --split dev
+python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --subset
+python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v1 --subset   # first prompt, for comparison
 python -m evaluation.compare && python -m evaluation.compare --only-subset
+python -m evaluation.release_gate --run yolo_sh17_yolo9e          # decides which hazard types the app uses
+python -m evaluation.acceptance --run yolo_sh17_yolo9e            # SIMULATED reporter acceptance (proposal criterion)
 ```
 
 (`make eval-prepare eval-yolo eval-vlm eval-compare SH17=~/datasets/sh17` runs the same.)
@@ -189,7 +208,7 @@ held-out images (seed 42), used to compare all models on identical images becaus
 
 ```bash
 python -m evaluation.robustness --root $SH17 --weights models/sh17_yolo8s.pt --device mps   # dark / blur / JPEG / far
-# with the app running (SHMS_DETECTOR=yolo):
+# with the app running (SHMS_DETECTOR=yolo); add --url http://127.0.0.1:<port> if it is not on port 8000:
 python -m evaluation.load_test --image data/samples/<photo>.jpg --users 1 4 8 --requests 40
 ```
 
@@ -198,7 +217,9 @@ python -m evaluation.load_test --image data/samples/<photo>.jpg --users 1 4 8 --
 
 ### Label audit
 
-The derived labels were checked by a safety professional on 100 random held-out images:
+The derived labels are checked by one safety professional (the author) on 100 random held-out images. This
+measures agreement between the dataset-derived labels and one expert; it does not create new ground truth and is
+not a multi-annotator study. Status: **pending** (no results file yet).
 
 ```bash
 python -m evaluation.label_audit build --root $SH17     # writes evaluation/data/label_audit.html
@@ -206,22 +227,67 @@ python -m evaluation.label_audit build --root $SH17     # writes evaluation/data
 python -m evaluation.label_audit score                  # accuracy, 95% Wilson CI, Cohen's kappa
 ```
 
-### Success criteria and results
+### Why F1 alone is misleading here
+
+Most SH17 photos show people *without* PPE (the test split has only 154 helmets and 97 safety vests across
+1,620 images), so 62–89 % of test photos contain each violation. A model that always answers "violation" would
+already score F1 0.76–0.94. Every result therefore also reports **specificity** (share of compliant photos
+correctly left alone), **MCC** (0 = no better than always answering "violation") and the always-"yes" F1.
+
+### Results (held-out SH17 split, 1,620 photos; YOLO confidence 0.35; Apple M5 Pro)
+
+| Hazard | Model | Precision | Recall | Specificity | MCC | F1 (always-yes F1) | Release gate |
+|---|---|---:|---:|---:|---:|---:|---|
+| No hard hat | YOLOv9e | 0.964 | 0.968 | 0.887 | 0.859 | 0.966 (0.864) | ✅ approved |
+| No eye / face protection | YOLOv9e | 0.959 | 0.957 | 0.934 | 0.891 | 0.958 (0.761) | ✅ approved |
+| No gloves | YOLOv9e | 0.965 | 0.957 | 0.885 | 0.833 | 0.961 (0.870) | ✅ approved |
+| No hi-vis vest | YOLOv9e | 0.950 | 0.970 | **0.582** | 0.599 | 0.960 (0.942) | ❌ rejected |
+
+YOLOv9e latency p95 0.15 s per photo; YOLOv8s (fallback) is slightly weaker on every hazard (MCC 0.51–0.82).
+Full tables with 95 % bootstrap confidence intervals: `evaluation/results/summary_full.md` (all 1,620 photos)
+and `summary_subset.md` (the shared 300-photo subset, including the vision-language model).
+
+**Release gate.** `python -m evaluation.release_gate --run yolo_sh17_yolo9e` applies the thresholds in
+`evaluation/release_gate.json` (precision ≥ 0.80, recall ≥ 0.75, specificity ≥ 0.80, p95 ≤ 20 s) and writes
+`shms/config/ai_release.json`; the app only enables approved hazard types. The vest check wrongly flags 42 % of
+the test photos that contain no vest violation (74 of 177), so it is **not released**. The seeded refinery areas require flame-resistant
+coveralls rather than hi-vis vests, so no area requires a vest and the vest is not offered on the report form. The precision/recall
+targets were set for this evaluation; the proposal's own AI criteria are reporter acceptance (≥ 80 %, monitored
+in the app) and latency (≤ 20 s). The specificity threshold was added after the first test results.
+
+**Vision-language model.** With prompt v1 (refinery framing) Qwen2.5-VL 7B missed two thirds of violations
+(recall ≈ 0.33, MCC 0.13–0.25). Prompt v2 removes the framing and asks about each person separately. To avoid
+tuning on the test set, prompts are developed on a **dev set of 100 training-split images**
+(`--split dev`) and only the final prompt is run once on the test subset.
+
+### Success criteria
 
 | Criterion | Target | Result |
 |---|---|---|
-| Precision per PPE hazard (held-out SH17, best model) | ≥ 0.80 | see `evaluation/results/summary.md` |
-| Recall per PPE hazard | ≥ 0.75 | see `evaluation/results/summary.md` |
-| AI latency per photo, p95 (steady state, stated hardware) | ≤ 20 s | see `evaluation/results/summary.md` |
-| New report visible on dashboard | immediately (< 5 s) | verified by `tests/test_api.py::test_full_workflow_and_dashboard_update` |
-| Derived test labels agree with expert | report accuracy and κ | `evaluation/results/label_audit.json` |
-| Automated tests | all pass in CI | GitHub Actions badge / `pytest` |
+| Precision / recall per released hazard (held-out SH17) | ≥ 0.80 / ≥ 0.75 | ✅ 0.96 / 0.96–0.97 (YOLOv9e) |
+| Specificity per released hazard | ≥ 0.80 | ✅ 0.885–0.934; vest 0.582 ❌ → not released |
+| AI latency per photo, p95 | ≤ 20 s | ✅ 0.15 s (YOLOv9e) |
+| Robustness: F1 drop on dark / blurred / compressed / distant photos | report | ≤ 0.031 (YOLOv8s, `robustness_*.json`) |
+| Load: 8 concurrent users | no errors | ✅ 0 errors; p95 371 ms (YOLOv9e), 181 ms (YOLOv8s) (`load_test_*.json`) |
+| Train/test leakage | none | ✅ 0 file overlaps, 0 near-duplicates (pre-training overlap of YOLO/Qwen unknown) |
+| Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | not measurable offline; recorded per report and shown on *AI monitoring* |
+| New report visible on dashboard | immediately (< 5 s; proposal: 5 min) | ✅ `tests/test_api.py::test_full_workflow_and_dashboard_update` |
+| Derived test labels agree with expert | report accuracy and κ | pending (`python -m evaluation.label_audit score`) |
+| Automated tests and lint | all pass | ✅ locally: `pytest` (120), `ruff`; CI and Docker smoke test run after the first push |
+
+Detection mAP50 (object level, 17 classes – a different quantity from the image-level results above) measured
+with the published weights was 63.6 (YOLOv9e) and 54.9 (YOLOv8s), 6–8 points below the SH17 paper (70.9 / 63.7)
+on a split with the same 1,620 images and 15,358 boxes. Device, batch size, image size and the ultralytics
+version that saved the weights (8.2.38: 65.0 / 55.9) were tested and do not explain the gap. **Not reproduced;
+cause unknown** (details in `docs/verification.md`).
 
 ## Data, privacy and limitations
 
 * All people, areas and records in the app are synthesized; no refinery data is included.
 * Photos are processed locally; nothing is sent to external services.
 * Demo sign-in has no passwords; a deployment would use the company's single sign-on.
+* The hazard list contains only the PPE checks that passed the release gate, so other hazards (including a missing
+  hi-vis vest, which no seeded area requires, and unsafe conditions) cannot currently be reported in the app, not even manually.
 * Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions
   (caustic spills, steam leaks, missing grating) have no such dataset; collecting one with ≥ 3 annotators and
   measuring their agreement is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled

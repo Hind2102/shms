@@ -1,0 +1,7 @@
+{
+  "_why": "A hazard type is enabled in the app only if the model meets every threshold on the held-out SH17 split. The proposal's own criteria were reporter acceptance (>= 80 %), a suggestion within 20 s and dashboard update within 5 min; acceptance can only be measured in field use. The precision (>= 0.80) and recall (>= 0.75) thresholds were set by the author before the evaluation was run. The specificity threshold (>= 0.80) was added AFTER seeing test results, when it became clear that most test photos contain a violation, so precision and recall alone cannot reveal a model that flags almost everything (alarm fatigue). Latency is the proposal's 20 s target.",
+  "min_precision": 0.80,
+  "min_recall": 0.75,
+  "min_specificity": 0.80,
+  "max_latency_p95_ms": 20000
+}

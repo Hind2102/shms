@@ -24,14 +24,41 @@ def _safe_div(a: float, b: float) -> float | None:
 def prf(c: dict[str, int]) -> dict[str, float | None]:
     p = _safe_div(c["tp"], c["tp"] + c["fp"])
     r = _safe_div(c["tp"], c["tp"] + c["fn"])
+    spec = _safe_div(c["tn"], c["tn"] + c["fp"])
     f1 = _safe_div(2 * p * r, p + r) if p is not None and r is not None else None
     acc = _safe_div(c["tp"] + c["tn"], sum(c.values()))
-    return {"precision": p, "recall": r, "f1": f1, "accuracy": acc}
+    bal = (r + spec) / 2 if r is not None and spec is not None else None
+    return {
+        "precision": p,
+        "recall": r,
+        "specificity": spec,
+        "f1": f1,
+        "accuracy": acc,
+        "balanced_accuracy": bal,
+        "mcc": mcc(c),
+    }
+
+
+def mcc(c: dict[str, int]) -> float:
+    """Matthews correlation coefficient: 1 = perfect, 0 = no better than a constant or random answer.
+    Unlike F1 it stays honest when one class dominates (most SH17 test photos contain a violation)."""
+    tp, tn, fp, fn = c["tp"], c["tn"], c["fp"], c["fn"]
+    den = math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+    return (tp * tn - fp * fn) / den if den else 0.0
 
 
 def binary_metrics(y_true: Sequence[bool], y_pred: Sequence[bool]) -> dict:
     c = binary_counts(y_true, y_pred)
     return {**c, **prf(c), "support": c["tp"] + c["fn"], "n": len(y_true)}
+
+
+def always_yes_baseline(y_true: Sequence[bool]) -> dict:
+    """What a 'model' that flags every photo would score: the bar a real model must clear."""
+    return {
+        k: v
+        for k, v in binary_metrics(y_true, [True] * len(y_true)).items()
+        if k in ("precision", "recall", "specificity", "f1", "mcc")
+    }
 
 
 def bootstrap_ci(
