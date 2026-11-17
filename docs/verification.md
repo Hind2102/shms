@@ -3,7 +3,7 @@
 Purpose: every number and claim the final report may use, with the command that produced it, the file it lives
 in, and what remains uncertain. Earlier reported numbers are treated as claims and re-checked here.
 
-Branch: `feature/verification` (created from `main` at `c19e9be`). Nothing pushed.
+Branch: `feature/verification` (created from `master` at `c19e9be`). Nothing pushed.
 
 ## Environment (applies to every step)
 
@@ -640,7 +640,7 @@ same YOLO model.
 | 2 | `python -m evaluation.label_audit score`, commit, update README/verification rows | agent | 10 min | 1 |
 | 3 | Decide the five open issues in §2 (wording/design) | Hind | 15 min | – |
 | 4 | Apply the decisions (text fixes ~15 min; making the vest reportable is a code change + test, ~1 h) | agent | 15 min – 1 h | 3 |
-| 5 | Merge `feature/verification` into `main` | agent | 5 min | your OK |
+| 5 | Merge `feature/verification` into `master` | agent | 5 min | your OK |
 | 6 | Push to GitHub, watch CI (tests on Ubuntu/macOS, Docker smoke test) | agent | 20–30 min | your OK to push; 5 |
 | 7 | Write the report from this file; review the scope-change draft (7.2) | Hind | — | 1–3 |
 | 8 | Optional: `qwen3-vl:8b` dev + subset run | agent | ~2 h compute | time |
@@ -654,7 +654,7 @@ same YOLO model.
 3. **Vest reporting**: keep "not reportable at all", or allow manual reporting of a missing vest where it is
    required while keeping the AI check off? (behaviour change).
 4. **Schema-mismatch message**: say "move or back up" instead of "delete"? (wording in `shms/db.py`).
-5. **Push / merge**: may I merge into `main` and push so CI runs, and is the repository meant to be public?
+5. **Push / merge**: may I merge into `master` and push so CI runs, and is the repository meant to be public?
 6. **Scope-change note** (7.2): review the wording before it goes into the report.
 
 ### 6. Candid assessment of submission readiness
