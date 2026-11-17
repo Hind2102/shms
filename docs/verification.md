@@ -77,3 +77,342 @@ Switch to a fresh demo database:
 to it: `git switch --detach ffa8792` (last commit with that schema) and set
 `SHMS_DATABASE_URL=sqlite:///backups/shms_2026-11-17.db` (or restore `backups/env_before_2026-11-17.bak` to
 `.env`). Original `shms.db` is also still in place, untouched.
+
+## Step 3 – Evaluation integrity
+
+### 3.1 Provenance
+
+| Item | Evidence |
+|---|---|
+| Dataset | Kaggle `mugheesahmad/sh17-dataset-for-ppe-detection`, downloaded 2026-11-15 (~20:50–21:08 local) with Kaggle CLI 2.2.5 into `~/Desktop/Final SEP/datasets/sh17` (13 GB, outside the repo). `images/` 8 099, `labels/` 8 099, `meta-data/` 8 099, `train_files.txt` 6 479 lines, `val_files.txt` 1 620 lines (SHA-256 prefixes `6599473388c5b2ca`, `b8c7936d6842e8db`). Also present, unused: `voc_labels/`. Ultralytics wrote `labels.cache` into the dataset folder during mAP validation (only change made to the dataset folder). |
+| Weights | `python scripts/download_models.py --all` → "already present, checksum OK" for both. `sh17_yolo8s.pt` SHA-256 `dfaf451b…f4e40a4b` (22.5 MB), `sh17_yolo9e.pt` `5ac6ac23…4f33f39d` (117.3 MB); digests match the script, which pins the authors' GitHub release v1. Checkpoint metadata: saved by ultralytics **8.2.38** on 2024-06-22/23, `imgsz=640`, 200 epochs. |
+| Code behind results | All five prediction runs (`yolo_sh17_yolo{8s,9e}[_subset]`, `ollama_qwen2.5vl_7b_subset`) were produced on 2026-11-15 with the code at `de90451` (timestamps in each `metrics.json → environment.date`); committed in `ffa8792`. `robustness_sh17_yolo8s.json` and `load_test_yolo_sh17_yolo8s.json` were produced with `b2f307b` (committed `c19e9be`). Metrics re-scored with `19450e9` (Step 3.5); originals preserved in `backups/evidence_results_c19e9be/` with `backups/evidence_results_c19e9be.sha256`. |
+| Seeds | Test subset: `random.Random(42).sample` (300 of 1 620). Dev split: 100 images from the train list (`prepare_sh17.py`). Label audit sample: seed 7. Bootstrap CIs: 1 000 resamples, seed 0. Ollama: `temperature 0, seed 42`. YOLO inference is deterministic given weights and image. |
+
+### 3.2 Splits and leakage
+
+```bash
+R=~/Desktop/"Final SEP"/datasets/sh17
+python -m evaluation.prepare_sh17 --root $R
+git diff --stat evaluation/data/sh17_test_manifest.csv      # empty -> identical test set
+```
+
+- Test manifest unchanged (empty diff). Ground-truth columns hash `cc30023fad5d1b11` – identical at `ffa8792`,
+  `b2f307b` and HEAD (see 3.6).
+- `sh17_dev_manifest.csv`: 100 rows, 100 unique, **100 in `train_files.txt`, 0 in `val_files.txt`**.
+- Exact overlap train ∩ test (by file name): **0**. Near-duplicates (dHash 64-bit, Hamming ≤ 4 bits) of any
+  training image inside the test split: **0**.
+- Limits of these checks: file-name overlap misses re-encoded copies; dHash catches resized/re-compressed
+  copies but not crops, flips, or different photos of the same scene/person; the threshold of 4 bits was not
+  calibrated on this dataset. Overlap between the test images and whatever data the YOLO backbone (COCO
+  pre-training) or Qwen2.5-VL were **pre-trained** on is **unknown** – SH17 images come from Pexels, which is
+  widely scraped, so VLM exposure to some test photos cannot be excluded.
+
+Subset representativeness (300 vs full 1 620; two-proportion z-test subset vs remaining 1 320):
+
+| Hazard | Full | Subset | Diff | p |
+|---|---:|---:|---:|---:|
+| no_hard_hat | 0.760 | 0.790 | +0.030 | 0.19 |
+| no_eye_protection | 0.615 | 0.650 | +0.035 | 0.17 |
+| no_gloves | 0.769 | 0.793 | +0.024 | 0.27 |
+| no_hi_vis_vest | 0.891 | 0.897 | +0.006 | 0.72 |
+
+No difference is significant, but all four are higher in the subset (the hazards are correlated, so this is one
+tendency, not four). Subset numbers are therefore slightly optimistic for precision; full-split numbers are the
+primary YOLO result.
+
+### 3.3 Tuning disclosure
+
+- `conf = 0.35` was the default in the first commit (`6f18c27`), before any results existed in this repository.
+  The threshold sweep (computed on the **test** split) later showed it is at or near the best F1 (Step 3.5).
+  ⚠ The README describes it as "chosen on the threshold sweep", which reads as test-set tuning and contradicts
+  the git history – wording to be corrected (Step 8).
+- The choice of **YOLOv9e over YOLOv8s** and the **specificity ≥ 0.80** criterion in the release gate were
+  decided **after** seeing test-split results (`evaluation/release_gate.json → _why` says so). For those two
+  decisions the test split is not untouched; the reported YOLOv9e numbers carry a small selection bias. A
+  clean confirmation would need a further held-out set that does not exist for SH17.
+- The VLM prompt v2 was written after seeing v1 failures on test images (Step 5 of the earlier session); it is
+  tuned on the dev split only and run once on the test subset (Step 6).
+
+### 3.4 Label definition (boxes → image-level labels)
+
+SH17 annotates objects, not violations. `shms/detection/rules.py::hazards_from_boxes` derives four yes/no labels
+per image, applied identically to ground-truth boxes and model boxes:
+
+- `no_hard_hat`: a head box (≥ 0.04 % of image) with no helmet covering it (≥ 30 % of helmet inside the head box
+  extended upwards by 50 % of its height).
+- `no_eye_protection`: a face box (≥ 0.04 %) with no glasses / face-guard covering ≥ 30 %.
+- `no_gloves`: a hand box (≥ 0.02 %) with no glove covering ≥ 30 %.
+- `no_hi_vis_vest`: a person box (≥ 0.4 %) whose torso contains no safety-vest / safety-suit centre.
+
+Limits: (1) occlusion – a head or hand hidden behind an object yields no label at all; (2) **absence of a helmet
+box is not proof of absence of a helmet** (an unlabelled or occluded helmet becomes a "violation");
+(3) the rule does not know whether PPE is required in the scene (many SH17 photos are offices, shops, homes);
+(4) one violating person makes the whole image positive; (5) thresholds were set by hand, not calibrated.
+`helmets_overlapping_a_head_pct = 80.5` shows heads are usually labelled under helmets, which the rule relies
+on. The label audit (Step 7) will quantify agreement with an expert.
+
+### 3.5 Re-scored results (no model re-run)
+
+```bash
+for w in sh17_yolo9e sh17_yolo8s; do
+  python -m evaluation.evaluate --root $R --detector yolo --weights models/$w.pt --rescore
+  python -m evaluation.evaluate --root $R --detector yolo --weights models/$w.pt --subset --rescore
+done
+python -m evaluation.evaluate --root $R --detector ollama --prompt v1 --subset --rescore
+python -m evaluation.compare && python -m evaluation.compare --only-subset
+```
+
+Checks: every precision, recall, F1, latency, detection-mAP and threshold-sweep value is **identical** to the
+pre-rescore files in `backups/evidence_results_c19e9be/` (0 mismatches); TP/FP/FN/TN, specificity and MCC were
+recomputed independently from `predictions.jsonl` + manifest and match `metrics.json` (0 mismatches).
+Outputs: `evaluation/results/summary_full.md|json`, `summary_subset.md|json`, `fig_mcc_{full,subset}.png`,
+`fig_pr_{full,subset}.png`. 95 % CIs are percentile bootstrap over images (1 000 resamples).
+
+**Image-level violation metrics – full held-out split (1 620 images), operating threshold 0.35**
+
+| Model | Hazard | Pos / Neg | TP | FP | FN | TN | Precision | Recall | Specificity [95% CI] | MCC [95% CI] | F1 | Always-yes F1 |
+|---|---|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|
+| YOLOv9e | no_hard_hat | 1232 / 388 | 1193 | 44 | 39 | 344 | 0.964 | 0.968 | 0.887 [0.86–0.92] | 0.859 [0.83–0.89] | 0.966 | 0.864 |
+| YOLOv9e | no_eye_protection | 996 / 624 | 953 | 41 | 43 | 583 | 0.959 | 0.957 | 0.934 [0.91–0.95] | 0.891 [0.87–0.91] | 0.958 | 0.761 |
+| YOLOv9e | no_gloves | 1246 / 374 | 1192 | 43 | 54 | 331 | 0.965 | 0.957 | 0.885 [0.85–0.92] | 0.833 [0.80–0.86] | 0.961 | 0.870 |
+| YOLOv9e | no_hi_vis_vest | 1443 / 177 | 1399 | 74 | 44 | 103 | 0.950 | 0.970 | 0.582 [0.51–0.65] | 0.599 [0.53–0.66] | 0.960 | 0.942 |
+| YOLOv8s | no_hard_hat | 1232 / 388 | 1162 | 44 | 70 | 344 | 0.964 | 0.943 | 0.887 | 0.812 | 0.953 | 0.864 |
+| YOLOv8s | no_eye_protection | 996 / 624 | 909 | 57 | 87 | 567 | 0.941 | 0.913 | 0.909 | 0.815 | 0.927 | 0.761 |
+| YOLOv8s | no_gloves | 1246 / 374 | 1164 | 57 | 82 | 317 | 0.953 | 0.934 | 0.848 | 0.765 | 0.944 | 0.870 |
+| YOLOv8s | no_hi_vis_vest | 1443 / 177 | 1368 | 79 | 75 | 98 | 0.945 | 0.948 | 0.554 | 0.507 | 0.947 | 0.942 |
+
+**Fixed 300-image subset (all three models on identical images)**
+
+| Model | Hazard | Pos / Neg | TP | FP | FN | TN | P | R | Spec | MCC | F1 | Always-yes F1 |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| YOLOv9e | no_hard_hat | 237 / 63 | 232 | 7 | 5 | 56 | 0.971 | 0.979 | 0.889 | 0.878 | 0.975 | 0.883 |
+| YOLOv9e | no_eye_protection | 195 / 105 | 187 | 7 | 8 | 98 | 0.964 | 0.959 | 0.933 | 0.890 | 0.961 | 0.788 |
+| YOLOv9e | no_gloves | 238 / 62 | 232 | 8 | 6 | 54 | 0.967 | 0.975 | 0.871 | 0.856 | 0.971 | 0.885 |
+| YOLOv9e | no_hi_vis_vest | 269 / 31 | 261 | 10 | 8 | 21 | 0.963 | 0.970 | 0.677 | 0.667 | 0.967 | 0.946 |
+| YOLOv8s | no_hard_hat | 237 / 63 | 225 | 6 | 12 | 57 | 0.974 | 0.949 | 0.905 | 0.827 | 0.962 | 0.883 |
+| YOLOv8s | no_eye_protection | 195 / 105 | 183 | 9 | 12 | 96 | 0.953 | 0.938 | 0.914 | 0.847 | 0.946 | 0.788 |
+| YOLOv8s | no_gloves | 238 / 62 | 223 | 12 | 15 | 50 | 0.949 | 0.937 | 0.806 | 0.731 | 0.943 | 0.885 |
+| YOLOv8s | no_hi_vis_vest | 269 / 31 | 258 | 12 | 11 | 19 | 0.956 | 0.959 | 0.613 | 0.580 | 0.957 | 0.946 |
+| Qwen2.5-VL 7B (prompt v1) | no_hard_hat | 237 / 63 | 79 | 4 | 158 | 59 | 0.952 | 0.333 | 0.937 | 0.246 | 0.494 | 0.883 |
+| Qwen2.5-VL 7B (prompt v1) | no_eye_protection | 195 / 105 | 71 | 21 | 124 | 84 | 0.772 | 0.364 | 0.800 | 0.170 | 0.495 | 0.788 |
+| Qwen2.5-VL 7B (prompt v1) | no_gloves | 238 / 62 | 76 | 11 | 162 | 51 | 0.874 | 0.319 | 0.823 | 0.127 | 0.468 | 0.885 |
+| Qwen2.5-VL 7B (prompt v1) | no_hi_vis_vest | 269 / 31 | 90 | 2 | 179 | 29 | 0.978 | 0.335 | 0.935 | 0.178 | 0.499 | 0.946 |
+
+Macro MCC (subset): YOLOv9e 0.823, YOLOv8s 0.746, Qwen2.5-VL v1 0.180. The Qwen v1 F1 is far **below** the
+always-yes baseline on every hazard.
+
+**Why the vest check barely beats always-yes.** 89 % of test images are vest-positive, so always-yes already
+reaches F1 0.942; F1 is dominated by the large positive class and can hardly move. Only 177 images are
+negatives and only 45 test images contain a labelled vest at all (97 vest boxes). YOLOv9e raises 74 false
+alarms on those 177 negatives (specificity 0.58). Breaking the 74 down: **47 are images whose ground truth has
+no person box at all** (e.g. close-ups of hands, partial bodies) – the model detects a person, finds no vest and
+flags it, while the label rule has no person to evaluate; 27 are images with labelled people, 14 of which have a
+labelled vest the model missed or did not match to the torso. So the weakness is partly the model (rare class)
+and partly the label definition (who counts as a "person"). MCC (0.60) and specificity expose this; F1 hides it.
+
+**Object-level detection mAP is a different quantity** (box localisation over 17 classes, IoU 0.5) and is reported
+separately below; it is not comparable to the image-level violation metrics above.
+
+### 3.6 "Byte-identical after the formatting patch" claim – verified
+
+Two temporary git worktrees (`ffa8792` = code `de90451` + results, and `b2f307b` = formatting patch) were each
+used to run `prepare_sh17` and `compare --only-subset` on the same committed predictions:
+
+- `summary.md` from both commits: **identical** (`cmp`), and identical to the committed `ffa8792:summary.md`.
+- Ground-truth columns of the regenerated test manifest: hash `cc30023fad5d1b11` in both and at HEAD.
+- Re-applying the current `rules.py` at conf 0.35 to the cached YOLO boxes reproduces the stored hazard codes
+  for all 1 620 + 1 620 + 300 + 300 predictions (0 differences).
+
+### 3.7 Superseded outputs removed
+
+`git rm evaluation/results/summary.md summary.json fig_f1.png fig_pr.png` (commit `40ebc24`); still in history at
+`ffa8792`.
+
+### 3.8 Detection mAP vs the SH17 paper (object level; time-boxed 45 min, used ~26 min)
+
+Documented protocol (authors' README, fetched 2026-11-17 via `gh api repos/ahmadmughees/SH17dataset/readme`):
+`model.val(data="sh17.yaml", batch=1, imgsz=640, device="cuda:0")`, "ultralytics==8.0.38". The authors' table
+reports **1 620 images / 15 358 instances** for the validation set – identical to our `val_files.txt` split.
+Class order in their `sh17.yaml` and in both checkpoints equals `evaluation/sh17.py::SH17_NAMES`.
+
+| Run | Software | Settings | YOLOv8s mAP50 / mAP50-95 | YOLOv9e mAP50 / mAP50-95 |
+|---|---|---|---|---|
+| Our evaluation (`--map`) | ultralytics 8.4.214, mps | imgsz 640, batch 8 | 0.549 / 0.346 | 0.636 / 0.421 |
+| Same on CPU | 8.4.214, cpu | imgsz 640, batch 8 | 0.549 / 0.346 | – |
+| Authors' batch size | 8.4.214, mps | imgsz 640, batch 1 | 0.548 / 0.346 | – |
+| Larger input | 8.4.214, mps | imgsz 1280, batch 8 | 0.494 / 0.298 | – |
+| Version that saved the weights | **8.2.38**, mps (isolated venv) | imgsz 640, batch 1 | 0.559 / 0.356 | 0.650 / 0.437 |
+| Documented version | 8.0.38 | – | cannot load the checkpoints (`ultralytics.nn.modules.conv` missing) | – |
+| **Paper / README** | 8.0.38 (stated), CUDA | imgsz 640, batch 1 | **0.637 / 0.417** | **0.709 / 0.487** |
+
+Evidence gathered:
+- The checkpoints were saved by ultralytics **8.2.38**, not 8.0.38 as the README states.
+- Each checkpoint stores its final training-time validation metrics (`train_metrics`): YOLOv8s mAP50 0.6365,
+  mAP50-95 0.4155; YOLOv9e 0.7088 / 0.4864 – i.e. the paper's numbers. That validation used the authors' local
+  `safe_human.yaml`, whose image list we cannot see.
+- Hardware (mps vs cpu), batch size and ultralytics version together explain at most ~1.4 points.
+
+**Verdict: not reproduced.** Our best result is 7.8 (YOLOv8s) and 5.9 (YOLOv9e) mAP50 points below the paper on a
+split with the same image and instance counts. The cause is **not established**; we only exclude device, batch
+size, input size and library version as the main explanation. Scratch environments used:
+`$TMPDIR/…/scratchpad/venv_ul8238` (not part of the project).
+
+## Step 4 – Release gate
+
+```bash
+python -m evaluation.release_gate --run yolo_sh17_yolo9e
+git diff shms/config/ai_release.json      # only "decided_at" changed
+```
+
+Thresholds (`evaluation/release_gate.json`): precision ≥ 0.80, recall ≥ 0.75, specificity ≥ 0.80, p95 latency
+≤ 20 000 ms, on the full held-out split.
+
+| Hazard | P | R | Specificity [95% CI] | Decision |
+|---|---:|---:|---|---|
+| no_hard_hat | 0.964 | 0.968 | 0.887 [0.86–0.92] | APPROVED |
+| no_eye_protection | 0.959 | 0.957 | 0.934 [0.91–0.95] | APPROVED |
+| no_gloves | 0.965 | 0.957 | 0.885 [0.85–0.92] | APPROVED |
+| no_hi_vis_vest | 0.950 | 0.970 | 0.582 [0.51–0.65] | REJECTED (specificity) |
+
+- The approved list is unchanged; only `decided_at` moved (commit `10ebae1`).
+- Robustness of the decision: for every approved hazard the **lower** CI bound of every criterion is above its
+  threshold, and the vest's **upper** specificity bound (0.65) is below 0.80, so no decision is borderline.
+- `tests/test_release_gate.py` (4 tests) pass after the re-score; before it, the "shipped release matches
+  shipped results" test failed (Step 1).
+- ⚠ **Criteria provenance.** `release_gate.json → _why` and the README say the precision and recall targets
+  "come from the proposal". The proposal (`../Site Hazard Management System (SHMS) Proposal.pdf`, §4) lists
+  three success criteria: ≥ 80 % of AI classifications **accepted by the reporter without changes**; AI
+  suggestion within **20 s**; new report on the dashboard within **5 minutes**. It contains no precision/recall
+  targets. The 0.80/0.75 thresholds were therefore introduced later (by the author, before the evaluation was
+  run in this repo); the specificity threshold after seeing results (Step 3.3). The `_why` text is a
+  configuration file covered by AGENTS.md, so it was **not** edited; see Handover → decisions.
+
+## Step 7 – Label audit and scope
+
+### 7.1 What the label audit does – and does not do
+
+```bash
+python -m evaluation.label_audit build --root $R --n 100     # done 2026-11-15 -> evaluation/data/label_audit.html (not in git)
+# Hind: open the page, click Agree / Disagree for every image x hazard, "Download CSV"
+#       -> save as evaluation/data/label_audit_results.csv
+python -m evaluation.label_audit score                       # accuracy + 95% Wilson CI + Cohen's kappa per hazard
+```
+
+- 100 held-out images, drawn with seed 7 from the test manifest. For each image and hazard the page shows the
+  label **derived** from SH17's boxes by `rules.py` (YES/NO); one domain expert (Hind) answers Agree/Disagree.
+- It measures how often the dataset-derived labels agree with one expert (label accuracy, Wilson CI) and the
+  agreement beyond chance (Cohen's kappa between derived labels and the expert's implied labels).
+- It does **not** create new ground truth and does **not** satisfy an "at least 3 annotators" requirement for new
+  annotations: it is one rater checking existing labels, so inter-annotator agreement among new annotators
+  cannot be computed from it.
+- Status (2026-11-17): **not yet done** – `label_audit_results.csv` does not exist. The audit must not be filled
+  in by anyone other than the expert, and not by an AI.
+- The page built on 2026-11-15 (older `label_audit.py`) was checked against the current code: identical 100
+  images in identical order and identical derived labels, so it does not need rebuilding.
+
+### 7.2 Draft scope-change note (for Hind's review – not final wording)
+
+> **Scope change.** The proposal motivated SHMS with unsafe *conditions* in an alumina refinery – caustic spills on
+> walkways, leaking steam or slurry flanges, missing grating or handrails – and planned to compare off-the-shelf
+> models "on a set of labelled hazard images". No public, peer-reviewed labelled test set exists for those
+> conditions, and building one credibly would require several annotators and an agreement study, which did not fit
+> the project. The AI component was therefore scoped to hazards that *can* be measured: PPE violations, using the
+> held-out split of the peer-reviewed SH17 dataset. Four PPE checks were evaluated – hard hat, eye/face protection,
+> gloves and hi-vis vest. Three passed the release gate and are enabled in the app; the **hi-vis vest check was
+> evaluated and rejected** (it flags too many compliant images: specificity 0.58). The workflow, risk matrix,
+> routing, closure records and dashboard are delivered as proposed, but the hazard list
+> (`shms/config/taxonomy.json`) now contains only the four PPE categories, so unsafe conditions cannot currently be
+> reported even manually. Because the hazard-type list on the confirm page is limited to checks that are both
+> required in the area and approved by the release gate (`Area.check_codes`), a missing hi-vis vest can currently
+> not be reported either, not even manually. Detecting unsafe conditions is future work and depends on collecting a labelled
+> dataset with at least three annotators. The proposal's own AI success criterion ("≥ 80 % of AI classifications
+> accepted without changes") can only be measured in field use; the app records acceptance for that purpose,
+> and the offline precision/recall/specificity evaluation was added as a measurable substitute.
+
+The original proposal was not edited.
+
+## Step 5 – Performance and model choice
+
+### 5.1 What the load test measures (applies to both runs)
+
+- Script: `evaluation/load_test.py`. Endpoint: `POST /api/detect` with header `X-User-Id: 1` and a multipart JPEG
+  upload. Server side the request saves the photo to `uploads/detect_*.jpg` and runs the configured detector
+  (`shms/web/api.py::detect`) – real upload, real disk write, real YOLO inference; no database write.
+- Image: `data/samples/sh17_pexels-photo-7888728__no_hard_hat_no_eye_protection_no_gloves_no_hi_vis_vest.jpg`,
+  1280 × 853 px, 162 KB (the same image for every request; YOLO resizes to 640 internally).
+- Warm-up: one request before measuring (excluded). Then for each concurrency level (1, 4, 8 threads) 40
+  requests in total, sent back-to-back by a thread pool.
+- Timing boundary: **client side, end to end** – from just before `httpx.post` to the parsed response on the same
+  machine (loopback): upload, multipart parsing, file write, inference, JSON response. Throughput = successful
+  requests / wall time of the level.
+- Server: one uvicorn worker process (no `--workers`), detector loaded once; requests are served from a thread
+  pool, inference on the Apple GPU (mps).
+- Limits: 40 requests per level is a short burst (< 1 s wall time per level for YOLOv8s), no think time, client
+  and server on the same laptop, one fixed image (no cache effects in YOLO, but OS file cache is warm).
+
+### 5.2 Earlier run (YOLOv8s, 2026-11-17, code `b2f307b`) – `evaluation/results/load_test_yolo_sh17_yolo8s.json`
+
+| Users | Requests | Errors | Throughput (req/s) | p50 (ms) | p95 (ms) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 40 | 0 | 43.0 | 22 | 30 |
+| 4 | 40 | 0 | 55.1 | 72 | 83 |
+| 8 | 40 | 0 | 54.6 | 140 | 181 |
+
+App started with `SHMS_DETECTOR=yolo SHMS_YOLO_DEVICE=mps` on port 8765 (port 8000 is occupied on this Mac by a
+Docker container) and the default `models/sh17_yolo8s.pt` of that version.
+
+### 5.3 New run with the default YOLOv9e (2026-11-17, code `10ebae1`) – `evaluation/results/load_test_yolo_sh17_yolo9e.json`
+
+```bash
+SHMS_DETECTOR=yolo SHMS_YOLO_DEVICE=mps SHMS_YOLO_WEIGHTS=models/sh17_yolo9e.pt uvicorn shms.asgi:app --port 8765 &
+python -m evaluation.load_test --url http://127.0.0.1:8765 \
+  --image data/samples/sh17_pexels-photo-7888728__no_hard_hat_no_eye_protection_no_gloves_no_hi_vis_vest.jpg \
+  --users 1 4 8 --requests 40
+```
+
+(`SHMS_YOLO_WEIGHTS` set explicitly because real environment variables take precedence over `.env`; the response's
+`model` field confirms `yolo:sh17_yolo9e`.) Server peak RSS during the run (sampled every 0.2 s with `ps`):
+**1 380 MB**. 0 tracebacks in the server log.
+
+| Users | Requests | Errors | Throughput (req/s) | p50 (ms) | p95 (ms) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 40 | 0 | 18.8 | 51 | 63 |
+| 4 | 40 | 0 | 21.4 | 183 | 223 |
+| 8 | 40 | 0 | 22.3 | 356 | 371 |
+
+Throughput saturates at ~22 req/s from 4 users on (one process, one GPU); latency then grows linearly with
+queueing. The YOLOv8s file was **not** re-run, to keep it as original evidence.
+
+### 5.4 Model-inference latency (separate from API throughput)
+
+| Measurement | YOLOv8s | YOLOv9e | Source |
+|---|---|---|---|
+| Per-image detector latency, 1 620 test images, p50 / p95 (steady state; includes reading the original SH17 photo – up to 8 192 px – resizing and inference) | 66 / 128 ms | 95 / 154 ms | `evaluation/results/yolo_sh17_yolo*/metrics.json → latency_steady` |
+| Pure `model.predict` on one warm 1280 px image, 50 runs, p50 / p95 | 9 / 9 ms | 37 / 38 ms | standalone script (below) |
+| API end-to-end, 1 user, p50 / p95 | 22 / 30 ms | 51 / 63 ms | load tests 5.2 / 5.3 |
+| API throughput at 8 users | 54.6 req/s | 22.3 req/s | load tests |
+
+Standalone measurement (`/usr/bin/time -l python -c "…YOLO(w).predict(img, device='mps') × 51…"`):
+
+| | YOLOv8s | YOLOv9e |
+|---|---:|---:|
+| Peak RSS | 644 MB | 1 062 MB |
+| macOS peak memory footprint (includes GPU/unified memory) | 606 MB | 2 304 MB |
+| Weights file | 22.5 MB | 117.3 MB |
+| Parameters | 11.1 M | 57.4 M |
+
+All are far below the 20 s latency criterion.
+
+### 5.5 Recommendation: YOLOv9e (with YOLOv8s as the low-resource fallback)
+
+- **Accuracy:** YOLOv9e has higher MCC on every hazard (full split: hard hat 0.859 vs 0.812, eye 0.891 vs 0.815,
+  gloves 0.833 vs 0.765, vest 0.599 vs 0.507) and equal or higher specificity on every hazard (gloves 0.885 vs
+  0.848). Both models would pass the release gate for the same three hazards and fail it for the vest; YOLOv9e
+  passes with larger margins.
+- **Cost:** ~4× slower pure inference, ~2.5× lower API throughput, ~1.6× RSS, 5× file size. On the stated laptop
+  this still means < 0.2 s per photo, which is irrelevant for a reporting workflow (one photo per report).
+- **Reproducibility:** both use pinned, checksummed weights and deterministic inference; equal.
+- **Caveat:** the choice was made after seeing test results (Step 3.3). The gap is consistent across all four
+  hazards and both test sets (full and subset), which makes it unlikely to be a selection artefact, but it is not a
+  pre-registered decision. YOLOv8s remains the better choice for CPU-only or memory-constrained machines.
