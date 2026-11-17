@@ -11,7 +11,7 @@
   <div><label>Risk level</label><select name="level"><option value="">All</option>
     {% for l in ('Extreme','High','Medium','Low') %}<option {% if f.level == l %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
   <div><label>Type</label><select name="category"><option value="">All</option>
-    {% for c in taxonomy.categories().values() %}<option value="{{ c.code }}" {% if f.category == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+    {% for code in taxonomy.enabled_codes() %}{% set c = taxonomy.get(code) %}<option value="{{ c.code }}" {% if f.category == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
   <div style="flex:0"><button class="btn" type="submit">Filter</button></div>
 </form>
 <div class="card" style="overflow-x:auto">

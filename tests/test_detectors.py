@@ -73,9 +73,9 @@ def test_ollama_detector_request_and_downscale(photo):
         }
         return httpx.Response(200, json={"message": {"content": json.dumps(answer)}})
 
-    det = OllamaDetector("qwen2.5vl:7b", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    det = OllamaDetector("qwen2.5vl:7b", client=httpx.Client(transport=httpx.MockTransport(handler)), prompt="v1")
     r = det.detect(photo)
-    assert r.error is None and r.codes() == {"no_hi_vis_vest"} and r.model == "ollama:qwen2.5vl:7b"
+    assert r.error is None and r.codes() == {"no_hi_vis_vest"} and r.model == "ollama:qwen2.5vl:7b:prompt-v1"
     assert seen["model"] == "qwen2.5vl:7b" and seen["options"]["temperature"] == 0
     assert seen["format"]["required"]  # JSON schema enforced
     import base64
@@ -111,3 +111,43 @@ def test_yolo_missing_weights_message(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="download_models"):
         YoloDetector(tmp_path / "nope.pt")
+
+
+def test_prompt_v2_per_person_answer_is_turned_into_hazards():
+    from shms.detection.ollama_vlm import parse_answer_v2
+
+    person = dict.fromkeys(
+        [
+            "head_visible",
+            "hard_hat",
+            "face_visible",
+            "eye_protection",
+            "hands_visible",
+            "all_visible_hands_gloved",
+            "torso_visible",
+            "hi_vis_or_safety_suit",
+        ],
+        True,
+    )
+    bare_head = {**person, "hard_hat": False}
+    hidden_hands = {**person, "hands_visible": False, "all_visible_hands_gloved": False}  # not visible -> no hazard
+    s = parse_answer_v2(json.dumps({"people": [person, bare_head, hidden_hands], "explanation": "three workers"}))
+    assert {x.code for x in s} == {"no_hard_hat"}
+    assert parse_answer_v2(json.dumps({"people": [], "explanation": "empty room"})) == []
+
+
+def test_prompt_v2_request_uses_per_person_schema(photo):
+    seen = {}
+
+    def handler(request):
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json={"message": {"content": json.dumps({"people": [], "explanation": "x"})}})
+
+    det = OllamaDetector("m", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert det.detect(photo).error is None and det.name == "ollama:m:prompt-v2"
+    assert "people" in seen["format"]["properties"] and "refinery" not in seen["messages"][0]["content"]
+
+
+def test_unknown_prompt_version_rejected():
+    with pytest.raises(ValueError):
+        OllamaDetector("m", prompt="v9")

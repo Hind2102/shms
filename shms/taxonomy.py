@@ -38,6 +38,22 @@ def ai_codes() -> list[str]:
     return [c.code for c in categories().values() if c.ai]
 
 
+def release() -> dict | None:
+    """The release-gate decision (written by `python -m evaluation.release_gate`), or None if absent."""
+    from .settings import get_settings
+
+    path = get_settings().ai_release_file
+    return json.loads(path.read_text()) if path.is_file() else None
+
+
+def enabled_codes() -> list[str]:
+    """Hazard types the app may use: AI categories that passed the release gate on held-out data.
+    Without a release file every AI category is enabled (development and tests)."""
+    r = release()
+    approved = set(r["approved"]) if r else set(ai_codes())
+    return [c for c in ai_codes() if c in approved]
+
+
 def grouped() -> dict[str, list[Category]]:
     out: dict[str, list[Category]] = {}
     for c in categories().values():

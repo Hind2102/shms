@@ -18,7 +18,13 @@ def jpeg_bytes(color="gray", size=(640, 480)) -> bytes:
 
 @pytest.fixture()
 def settings(tmp_path):
-    s = override_settings(upload_dir=tmp_path / "uploads", detector="mock", database_url="sqlite://")
+    # No release file: all four AI hazard types enabled, so workflow tests are independent of evaluation results.
+    s = override_settings(
+        upload_dir=tmp_path / "uploads",
+        detector="mock",
+        database_url="sqlite://",
+        ai_release_file=tmp_path / "none.json",
+    )
     get_detector.cache_clear()
     yield s
     get_detector.cache_clear()

@@ -1,0 +1,7 @@
+{
+  "_why": "A hazard type is enabled in the app only if the model meets every threshold on the held-out SH17 split. Precision and recall targets come from the proposal. Specificity was added after the evaluation showed that most test photos contain a violation, so precision and recall alone cannot reveal a model that flags almost everything; a model that wrongly flags compliant workers erodes trust (alarm fatigue). Latency is the proposal's 20 s target.",
+  "min_precision": 0.80,
+  "min_recall": 0.75,
+  "min_specificity": 0.80,
+  "max_latency_p95_ms": 20000
+}

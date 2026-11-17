@@ -55,6 +55,12 @@ def main() -> None:
     ap.add_argument("--root", required=True, help="folder where the SH17 Kaggle zip was extracted")
     ap.add_argument("--subset", type=int, default=300, help="size of the fixed random subset for VLMs")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument(
+        "--dev",
+        type=int,
+        default=100,
+        help="size of the dev set drawn from the TRAIN split, for tuning prompts (never the test set)",
+    )
     ap.add_argument("--no-dup-check", action="store_true", help="skip the near-duplicate (train/test leakage) check")
     ap.add_argument(
         "--export-samples", type=int, default=6, help="copy N downscaled test images to data/samples/ for the demo"
@@ -137,6 +143,26 @@ def main() -> None:
     (OUT_DIR / "sh17_test_stats.json").write_text(json.dumps(stats, indent=2))
     print(json.dumps(stats, indent=2))
     print(f"Manifest written to {out}")
+
+    # Dev set: images from the TRAIN split, used only to tune prompts / thresholds, so the held-out test
+    # split is touched once, for the final numbers. (The VLM was never trained on SH17, so train images are
+    # unbiased for it; they are NOT suitable for tuning YOLO, which was trained on them.)
+    if args.dev and train:
+        dev_names = sorted(n for n in train if (lay.images / n).is_file())
+        dev_names = random.Random(args.seed).sample(dev_names, min(args.dev, len(dev_names)))
+        dev_rows = []
+        for name in dev_names:
+            gt = gt_hazards(read_boxes(label_path(lay, name)))
+            dev_rows.append({"image": name, "in_subset": 0, **{f"gt_{k}": int(v) for k, v in gt.items()}})
+        dev_out = OUT_DIR / "sh17_dev_manifest.csv"
+        if dev_rows:
+            with dev_out.open("w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(dev_rows[0]))
+                w.writeheader()
+                w.writerows(dev_rows)
+            print(f"Dev manifest ({len(dev_rows)} train-split images) written to {dev_out}")
+        else:
+            print("No training images found on disk; dev manifest not written.")
 
     if args.export_samples:
         sample_dir = Path(__file__).resolve().parent.parent / "data" / "samples"

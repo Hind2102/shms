@@ -1,7 +1,7 @@
 """Download the pre-trained SH17 YOLO weights (published by the dataset authors) and verify them.
 
-    python scripts/download_models.py            # yolo8s (22 MB, default for the app)
-    python scripts/download_models.py --all      # also yolo9e (117 MB, most accurate in the SH17 paper)
+    python scripts/download_models.py            # yolo9e (117 MB) - the model used by the app
+    python scripts/download_models.py --all      # also yolo8s (22 MB), the faster fallback
 
 Source: https://github.com/ahmadmughees/SH17dataset/releases/tag/v1
 """
@@ -48,7 +48,7 @@ def fetch(key: str) -> Path:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--all", action="store_true", help="also download yolo9e")
+    ap.add_argument("--all", action="store_true", help="also download yolo8s")
     args = ap.parse_args()
-    for k in ["yolo8s", "yolo9e"] if args.all else ["yolo8s"]:
+    for k in ["yolo9e", "yolo8s"] if args.all else ["yolo9e"]:
         fetch(k)

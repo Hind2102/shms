@@ -36,13 +36,18 @@ class Settings:
     # Which AI detector the app uses: "yolo", "ollama" or "mock".
     detector: str = field(default_factory=lambda: _env("DETECTOR", "mock"))
     yolo_weights: str = field(
-        default_factory=lambda: _env("YOLO_WEIGHTS", str(PROJECT_DIR / "models" / "sh17_yolo8s.pt"))
+        default_factory=lambda: _env("YOLO_WEIGHTS", str(PROJECT_DIR / "models" / "sh17_yolo9e.pt"))
     )
     yolo_conf: float = field(default_factory=lambda: float(_env("YOLO_CONF", "0.35")))
     yolo_device: str = field(default_factory=lambda: _env("YOLO_DEVICE", ""))  # "", "cpu", "mps", "cuda:0"
     ollama_url: str = field(default_factory=lambda: _env("OLLAMA_URL", "http://localhost:11434"))
     ollama_model: str = field(default_factory=lambda: _env("OLLAMA_MODEL", "qwen2.5vl:7b"))
+    ollama_prompt: str = field(default_factory=lambda: _env("OLLAMA_PROMPT", "v2"))
     ollama_timeout_s: float = field(default_factory=lambda: float(_env("OLLAMA_TIMEOUT_S", "120")))
+    # Release-gate decision: which hazard types passed held-out evaluation (see evaluation/release_gate.py).
+    ai_release_file: Path = field(
+        default_factory=lambda: Path(_env("AI_RELEASE_FILE", str(PACKAGE_DIR / "config" / "ai_release.json")))
+    )
     # Minimum AI confidence for a suggestion to be pre-selected in the report form.
     suggest_threshold: float = field(default_factory=lambda: float(_env("SUGGEST_THRESHOLD", "0.35")))
 

@@ -226,3 +226,18 @@ def test_ai_monitoring_counts_acceptance_and_misses(empty_db):
     assert {"ai": "no_hard_hat", "reporter": "no_gloves", "n": 1} in m["corrections"]
     acc = next(c for c in m["checks"] if c["name"] == "Reporter acceptance")
     assert acc["ok"] is None  # fewer reports than min_reports_for_alert -> no verdict yet
+
+
+def test_old_database_gives_clear_message(tmp_path):
+    import sqlite3
+
+    from shms import db as dbmod
+
+    path = tmp_path / "old.db"
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE hazards (id INTEGER PRIMARY KEY)")  # an 'old' table without the new columns
+    con.commit()
+    con.close()
+    dbmod.init_engine(f"sqlite:///{path}")
+    with pytest.raises(dbmod.SchemaMismatch, match="delete the file"):
+        dbmod.create_all()

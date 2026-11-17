@@ -114,8 +114,8 @@ def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta
     elif r < 0.93:
         code = rng.choice([c for c in area.check_codes if c != true_code] or [true_code])
     else:
-        return DetectorResult("yolo:sh17_yolo8s", [], rng.uniform(250, 900))
-    return DetectorResult("yolo:sh17_yolo8s", [Suggestion(code, rng.uniform(0.45, 0.95))], rng.uniform(250, 900))
+        return DetectorResult("yolo:sh17_yolo9e", [], rng.uniform(250, 900))
+    return DetectorResult("yolo:sh17_yolo9e", [Suggestion(code, rng.uniform(0.45, 0.95))], rng.uniform(250, 900))
 
 
 def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_seed: int = 42) -> None:

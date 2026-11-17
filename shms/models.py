@@ -78,7 +78,11 @@ class Area(Base):
 
     @property
     def check_codes(self) -> list[str]:
-        return [c.strip() for c in self.ai_checks.split(",") if c.strip()]
+        """PPE this area requires that the AI is released to check (area rule ∩ release gate)."""
+        from . import taxonomy
+
+        enabled = set(taxonomy.enabled_codes())
+        return [c.strip() for c in self.ai_checks.split(",") if c.strip() in enabled]
 
 
 class Hazard(Base):

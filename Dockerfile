@@ -22,7 +22,7 @@ RUN pip install --no-deps -e . && mkdir -p /data/uploads /app/models && chown -R
 USER app
 
 ENV SHMS_DETECTOR=yolo \
-    SHMS_YOLO_WEIGHTS=/app/models/sh17_yolo8s.pt \
+    SHMS_YOLO_WEIGHTS=/app/models/sh17_yolo9e.pt \
     SHMS_YOLO_DEVICE=cpu \
     SHMS_DATABASE_URL=sqlite:////data/shms.db \
     SHMS_UPLOAD_DIR=/data/uploads \

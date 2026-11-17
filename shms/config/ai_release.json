@@ -1,0 +1,53 @@
+{
+  "run": "yolo_sh17_yolo9e",
+  "detector": "yolo:sh17_yolo9e",
+  "images": 1620,
+  "approved": [
+    "no_hard_hat",
+    "no_eye_protection",
+    "no_gloves"
+  ],
+  "rejected": {
+    "no_hi_vis_vest": [
+      "specificity 0.582 < 0.8"
+    ]
+  },
+  "per_hazard": {
+    "no_hard_hat": {
+      "precision": 0.9644300727566694,
+      "recall": 0.9683441558441559,
+      "specificity": 0.8865979381443299,
+      "mcc": 0.8587637039123561,
+      "f1": 0.9663831510733091
+    },
+    "no_eye_protection": {
+      "precision": 0.9587525150905433,
+      "recall": 0.9568273092369478,
+      "specificity": 0.9342948717948718,
+      "mcc": 0.8905921425046821,
+      "f1": 0.9577889447236181
+    },
+    "no_gloves": {
+      "precision": 0.9651821862348178,
+      "recall": 0.956661316211878,
+      "specificity": 0.8850267379679144,
+      "mcc": 0.8332630847469471,
+      "f1": 0.9609028617492946
+    },
+    "no_hi_vis_vest": {
+      "precision": 0.9497623896809233,
+      "recall": 0.9695079695079695,
+      "specificity": 0.5819209039548022,
+      "mcc": 0.5988930323879698,
+      "f1": 0.9595336076817558
+    }
+  },
+  "latency_p95_ms": 154.43999999999997,
+  "gate": {
+    "min_precision": 0.8,
+    "min_recall": 0.75,
+    "min_specificity": 0.8,
+    "max_latency_p95_ms": 20000
+  },
+  "decided_at": "2026-11-17T18:56:00+00:00"
+}

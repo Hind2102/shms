@@ -98,7 +98,7 @@ def test_pipeline_end_to_end_with_mock(tmp_path, monkeypatch):
     pytest.importorskip("matplotlib")
     r = run("evaluation.compare")
     assert r.returncode == 0, r.stderr
-    assert (work / "evaluation" / "results" / "fig_f1.png").is_file()
+    assert (work / "evaluation" / "results" / "fig_mcc_full.png").is_file()
 
 
 def test_near_duplicate_detection(tmp_path):
