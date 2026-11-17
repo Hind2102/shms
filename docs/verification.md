@@ -288,6 +288,47 @@ Thresholds (`evaluation/release_gate.json`): precision ≥ 0.80, recall ≥ 0.75
   run in this repo); the specificity threshold after seeing results (Step 3.3). The `_why` text is a
   configuration file covered by AGENTS.md, so it was **not** edited; see Handover → decisions.
 
+## Step 6 – Vision-language models
+
+### 6.1 Prompt v1 – kept unchanged as a failed comparison
+
+`evaluation/results/ollama_qwen2.5vl_7b_subset/` (run 2026-11-15, code `de90451`; re-scored only). On the 300-image
+test subset: recall 0.32–0.36, MCC 0.13–0.25, F1 below the always-yes baseline for every hazard (Step 3.5).
+
+Failure pattern: the answers are nearly all-or-nothing – **197 of 300 images got no hazard at all** (191 of them
+contain at least one labelled violation) and 77 got all four. In the two raw answers inspected on 2026-11-15
+(pexels-photo-7888728, pexels-photo-5953548) the model set `people_visible: false` and explained that the scene
+(home office, pizza delivery) was not an industrial workplace, although one explanation itself listed missing
+PPE. The explanation is not stored for empty answers, so this cannot be confirmed for all 197.
+
+The low recall is therefore **not shown to be only a prompt problem**. Other plausible, untested causes:
+- model size/capability (Ollama reports 8.3 B parameters, quantisation Q4_K_M – `ollama show qwen2.5vl:7b`);
+- input downscaling to 1 024 px on the long side (`encode_image(max_side=1024)`): SH17 photos reach 8 192 px, and
+  gloves, glasses and small heads far from the camera may become a few pixels;
+- the image-level question format (one yes/no per hazard for the whole photo, plus an explicit "if no person is
+  visible answer false" escape) versus the per-object definition used for the labels;
+- the label definition itself (Step 3.4): many SH17 "violations" are people in settings where no PPE is required,
+  which a model asked as a "safety inspector" may reasonably not call a violation.
+
+### 6.2 Prompt v2 – separate, versioned experiment
+
+Prompt v2 (`shms/detection/ollama_vlm.py → PROMPT_V2`, written by the author after seeing v1 fail on test images):
+no refinery framing, "treat every visible person as if on an industrial site", per-person booleans
+(head/face/hands/torso visible; hard hat, eye protection, all hands gloved, hi-vis/safety suit); hazards derived
+in code like the YOLO rules. Not modified during this verification.
+
+Dev split (100 training-split images, `--split dev`; `evaluation/results/ollama_qwen2.5vl_7b_promptv2_dev/`):
+
+| Hazard | P | R | Spec | MCC | F1 | Always-yes F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| no_hard_hat | 0.961 | 0.914 | 0.842 | 0.704 | 0.937 | 0.895 |
+| no_eye_protection | 0.964 | 0.841 | 0.946 | 0.764 | 0.898 | 0.773 |
+| no_gloves | 0.904 | 0.949 | 0.619 | 0.616 | 0.926 | 0.883 |
+| no_hi_vis_vest | 0.930 | 0.879 | 0.333 | 0.175 | 0.904 | 0.953 |
+
+Latency p50 5.8 s, p95 10.3 s, 0 errors. No prompt change was made after the dev run; v2 was then run **once** on
+the test subset (6.3).
+
 ## Step 7 – Label audit and scope
 
 ### 7.1 What the label audit does – and does not do
@@ -416,3 +457,64 @@ All are far below the 20 s latency criterion.
 - **Caveat:** the choice was made after seeing test results (Step 3.3). The gap is consistent across all four
   hazards and both test sets (full and subset), which makes it unlikely to be a selection artefact, but it is not a
   pre-registered decision. YOLOv8s remains the better choice for CPU-only or memory-constrained machines.
+
+## Step 8 – Reproducibility and hygiene
+
+### 8.1 README commands checked
+
+| Command / claim | How checked | Result |
+|---|---|---|
+| `git clone https://github.com/Hind2102/shms.git` | `gh repo view Hind2102/shms` | Repository exists (public) but is **empty** – nothing pushed. README now says "pending". |
+| `python3 -m venv .venv` + `pip install -e ".[dev,yolo]" matplotlib` | fresh `git clone` of this branch into a scratch folder | ✅ with Python 3.12 (pip). ✗ with macOS system Python 3.9.6: pip fails with "File setup.py or setup.cfg not found … editable mode currently requires a setuptools-based build" – README now tells macOS users to use `python3.12`. |
+| `pytest` in the fresh clone (no weights) | as above | 119 passed, 1 skipped ("SH17 weights not downloaded") |
+| `ruff check . && ruff format --check .` | fresh clone and working copy | All checks passed; all files formatted |
+| `python scripts/download_models.py --all` | working copy | "already present, checksum OK" (download path itself not re-run) |
+| `uvicorn shms.asgi:app` | ports 8000/8001 are occupied on this Mac (Docker / another Python program), so `--port 8765` | ✅ app starts; README already mentions `--port 8765` |
+| Evaluation commands (`prepare_sh17`, `evaluate … --rescore`, `compare`, `release_gate`) | Steps 3–4 | ✅ |
+| `load_test` | Step 5; needs `--url` when not on port 8000 | ✅ (README now mentions `--url`) |
+| `make eval-vlm` | `make -n` | previously ran an outdated single command; now runs exactly the three README commands |
+| `docker compose up --build` / CI | – | see 8.4 |
+| "~0.25 s per photo on CPU" (Prerequisites) | see 8.4 | |
+
+README claims corrected (commit `49de103`): tested-on line; repository pending; conf 0.35 provenance; label audit
+pending and single-rater; vest "42 % of people" → "42 % of photos without a vest violation (74/177)"; proposal's
+own AI criteria added; load test p95 for both models; mAP paragraph ("not reproduced, cause unknown"); CI/Docker
+"after the first push"; test count 120; reset by moving files aside instead of deleting; vest/unsafe conditions
+cannot be reported.
+
+### 8.2 Files git must not track
+
+`git ls-files` and `git log --all --name-only` contain **no** `.env`, `kaggle.json`/token, `*.db`, `uploads/`,
+`.venv/`, caches, `models/*.pt`, datasets or `backups/` – neither now nor in history. All are matched by
+`.gitignore` (`git check-ignore -v` checked for each). Largest tracked files: the two full-split
+`predictions.jsonl` (4.6 MB each).
+
+### 8.3 Secret scan
+
+Regex scan of every tracked text file at HEAD and of the full patch history (`git log --all -p`) for Kaggle
+(`KGAT_…`, kaggle.json keys), GitHub (`gh*_`, `github_pat_`), AWS, OpenAI/Anthropic-style, Hugging Face,
+Roboflow keys, private-key blocks and generic `api_key/secret/password/token = …` assignments: **0 hits**. Nothing
+to rotate because of git. (The Kaggle token typed into the assistant chat on 2026-11-15 lives only in
+`~/.kaggle/access_token`, mode 600; rotating it is optional hygiene.)
+
+### 8.5 App walkthrough (photo → closure), YOLOv9e on mps, port 8765, `shms_demo.db`
+
+Driven through the HTML forms with `curl` (cookie sessions):
+
+1. `POST /login` as user 1 (Ahmed, reporter) → 303.
+2. `POST /report` area 1 (BXH) with the sample photo → redirect to `/hazards/241/confirm`; AI `yolo:sh17_yolo9e`,
+   2.5 s (first, cold call), suggestion *Worker without gloves*.
+3. Confirm page offers exactly *hard hat, eye/face protection, gloves* – **no vest option** in BXH, although BXH
+   requires vests (release gate).
+4. `POST /hazards/241/confirm` (no_hard_hat, consequence 4) → status OPEN, risk C4 × L2 = 8 (Medium),
+   `ai_accepted = 0` (reporter changed the AI suggestion), assigned to user 4 (Khalid, Area Owner).
+5. As user 4: `POST /plan` → 303; `POST /close` with closing photo → status CLOSED, `closed_by_id = 4`,
+   closure photo stored.
+6. Audit trail (`hazard_events`): reported → confirmed → assigned → planned → closed.
+7. `GET /areas/BXH` → 200, shows "AI checks reports here for: Hard hat, Eye / face protection, Gloves. Not
+   AI-checked yet (did not pass the release gate on test data): Hi-vis vest."
+8. `GET /monitoring` → 200, shows SLO panels (p95 target ≤ 20 s, error rate ≤ 2 %, acceptance rate).
+9. 0 tracebacks in the server log.
+
+Note: the closure text stored was cut at a `;` – reproduced with a raw socket capture: **curl** `-F` treats `;` as
+a field separator and never sent the rest. Not an app bug.
