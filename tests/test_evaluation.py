@@ -120,3 +120,28 @@ def test_robustness_perturbations_keep_images_valid():
     for name, (_, fn) in PERTURBATIONS.items():
         out = fn(im)
         assert out.mode == "RGB" and min(out.size) >= 32, name
+
+
+def test_acceptance_simulation():
+    from evaluation.acceptance import simulate
+
+    rows = [
+        {"image": "a", "gt_no_hard_hat": "1", "gt_no_gloves": "0"},  # AI right -> accepted
+        {"image": "b", "gt_no_hard_hat": "0", "gt_no_gloves": "1"},  # AI wrong type -> changed
+        {"image": "c", "gt_no_hard_hat": "1", "gt_no_gloves": "1"},  # AI silent -> changed
+        {"image": "d", "gt_no_hard_hat": "0", "gt_no_gloves": "0"},  # no violation -> not counted
+    ]
+    s = lambda code, c: {"code": code, "confidence": c}  # noqa: E731
+    preds = {
+        "a": {"suggestions": [s("no_hard_hat", 0.9)]},
+        "b": {"suggestions": [s("no_hard_hat", 0.8)]},
+        "c": {"suggestions": []},
+        "d": {"suggestions": [s("no_gloves", 0.7)]},
+    }
+    out = simulate(rows, preds, ["no_hard_hat", "no_gloves"], 0.35)
+    assert (
+        out["images_with_violation"],
+        out["accepted_unchanged"],
+        out["wrong_type_suggested"],
+        out["nothing_suggested"],
+    ) == (3, 1, 1, 1)
