@@ -16,12 +16,12 @@
 <section class="panel source project">
   <h2>Defined by this project</h2>
   <div class="cols">
-    <div style="overflow-x:auto">
+    <div class="table-scroll" role="region" aria-label="Consequence by likelihood scores" tabindex="0">
       <table class="matrix">
         <tr><th></th>{% for lk, spec in risk.likelihood_levels().items() %}<th style="text-align:center">L{{ lk }}<br>{{ spec.name }}</th>{% endfor %}</tr>
         {% for row in table %}
         <tr><th>C{{ row[0].consequence }} {{ risk.consequence_levels()[row[0].consequence].name }}</th>
-          {% for cell in row %}<td style="background:{{ cell.color }}{% if cell.level == 'Medium' %};color:#3b2d00{% endif %}">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
+          {% for cell in row %}<td style="background:{{ cell.color }}{% if cell.level in ('Medium', 'High') %};color:#221a00{% endif %}">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
         {% endfor %}
       </table>
     </div>

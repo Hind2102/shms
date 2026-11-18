@@ -1,7 +1,7 @@
 """Sign-in: username and password hash on users; per-user API tokens (hashed).
 
 Existing users get a username derived from the first word of their name (lower case, made unique with the id if
-needed) and NO password: they cannot sign in until one is set with `python -m shms.users set-password <username>`.
+needed) and NO password: they cannot sign in until one is set with `python -m shms.tokens set-password <username>`.
 
 Revision ID: 0005_auth
 Revises: 0004_escalation

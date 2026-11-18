@@ -1,91 +1,80 @@
 {% extends "base.html" %}
+{% from '_site_basemap.html' import basemap %}
+{% from '_macros.html' import level as risk_badge %}
 {% block title %}Site plan{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/static/site-plan.css">
 {% set names = {'open_risk': 'Open risk', 'overdue': 'Overdue', 'reports': 'Reports'} %}
-<div class="board-head"><h1>Refinery plan view</h1></div>
+<h1>Refinery plan view</h1>
 <p class="disclaimer">Illustrative layout – not an actual site plan. Areas and positions are synthesized for this project.</p>
-
 <form class="filters plan-filters" method="get" action="/site">
-  <fieldset class="seg"><legend>Show</legend>
+  <fieldset class="seg"><legend>Overlay</legend>
     {% for key, label in names.items() %}
     <label><input type="radio" name="overlay" value="{{ key }}" {% if v.overlay == key %}checked{% endif %} onchange="this.form.submit()"> {{ label }}</label>
     {% endfor %}
   </fieldset>
-  <div><label for="w">Reported in the last</label>
-    <select id="w" name="window" onchange="this.form.submit()">{% for d in windows %}<option value="{{ d }}" {% if v.window_days == d %}selected{% endif %}>{{ d }} days</option>{% endfor %}</select></div>
-  <div><label for="lv">Risk level</label>
-    <select id="lv" name="level" onchange="this.form.submit()">
+  <div><label for="w">Report window</label><select id="w" name="window" onchange="this.form.submit()">{% for d in windows %}<option value="{{ d }}" {% if v.window_days == d %}selected{% endif %}>{{ d }} days</option>{% endfor %}</select></div>
+  <div><label for="lv">Risk level</label><select id="lv" name="level" onchange="this.form.submit()">
       <option value="">All levels</option>
       <option value="High" {% if v.min_level == 'High' %}selected{% endif %}>High and Extreme</option>
       <option value="Extreme" {% if v.min_level == 'Extreme' %}selected{% endif %}>Extreme only</option>
-    </select></div>
+  </select></div>
+  <div><label for="unit">Check before entering</label><select id="unit" name="unit" onchange="this.form.submit()"><option value="">Choose an area</option>
+  {% for a in v.areas %}<option value="{{ a.code }}" {% if detail and detail.area.code == a.code %}selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></div>
+  {% if route_requested %}<input type="hidden" name="route" value="1">{% endif %}
   <noscript><button class="btn secondary" type="submit">Apply</button></noscript>
 </form>
-
-<div class="plan" data-scale="{{ v.scale }}">
-  <div class="plan-tools" aria-label="Zoom">
-    <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
-    <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
-    <button type="button" data-zoom="reset">Reset view</button>
+{% set query = 'overlay=' ~ v.overlay ~ '&window=' ~ v.window_days ~ '&level=' ~ (v.min_level or '') %}
+<div class="map-shell">
+  <div class="map-toolbar" aria-label="Map controls">
+    <label><input id="show-flow" type="checkbox"> Process flow</label>
+    <div class="map-buttons">
+      <button type="button" data-pan="left" aria-label="Pan left">←</button><button type="button" data-pan="up" aria-label="Pan up">↑</button><button type="button" data-pan="down" aria-label="Pan down">↓</button><button type="button" data-pan="right" aria-label="Pan right">→</button>
+      <button type="button" data-zoom="out" aria-label="Zoom out">−</button><button type="button" data-zoom="in" aria-label="Zoom in">+</button><button type="button" data-zoom="reset">Reset view</button>
+    </div>
   </div>
-  <svg id="plan" viewBox="0 0 1000 590" role="img" aria-label="{{ names[v.overlay] }} by area on the illustrative refinery layout">
-    <defs>
-      <pattern id="none" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-        <rect width="10" height="10" fill="#eceeec"/><line x1="0" y1="0" x2="0" y2="10" stroke="#d4d8d6" stroke-width="4"/>
-      </pattern>
-    </defs>
-    <rect x="0" y="0" width="1000" height="590" fill="#e9ebe8"/>
-    <g class="flow" stroke="#9aa39f" stroke-width="4" fill="none" stroke-dasharray="8 6">
-      <path d="M220 155 H240"/><path d="M420 155 H440"/><path d="M640 155 H660"/><path d="M810 155 H830"/>
-      <path d="M905 270 V300"/><path d="M660 425 H640"/><path d="M360 425 H380"/>
+  <svg id="plan" viewBox="0 0 1200 800" role="group" tabindex="0" aria-label="Illustrative refinery map, {{ names[v.overlay] }} overlay" aria-describedby="map-help">
+    {{ basemap(units, edges) }}
+    <g id="process-flow" fill="none" stroke="#75408a" stroke-width="3" marker-end="url(#flow-head)" aria-hidden="true">
+      {% for id in ['ore-belt','slurry','mud-line','liquor','hydrate'] %}
+      <use href="#{{ id }}"/>{% endfor %}
+      <use href="#recovery" stroke-dasharray="7 4"/>
     </g>
-    {% for a in v.areas %}
-    <a href="/areas/{{ a.code }}" class="area{% if a.value and a.ratio > 0.55 %} dark{% endif %}">
-      <rect x="{{ a.x }}" y="{{ a.y }}" width="{{ a.w }}" height="{{ a.h }}"
-            {% if a.value %}class="lit" style="--t: {{ '%.2f' % (0.18 + 0.82 * a.ratio) }}"{% else %}fill="url(#none)"{% endif %}/>
-      <text x="{{ a.x + 12 }}" y="{{ a.y + 26 }}" class="code">{{ a.code }}</text>
-      <text x="{{ a.x + 12 }}" y="{{ a.y + 46 }}" class="name">{{ a.name }}</text>
-      {% if a.value %}<text x="{{ a.x + 12 }}" y="{{ a.y + a.h - 16 }}" class="val">{{ a.value }}</text>
-      {% else %}<text x="{{ a.x + 12 }}" y="{{ a.y + a.h - 18 }}" class="empty">{{ a.label }}</text>{% endif %}
-      <title>{{ a.name }}: {{ a.label }}{% if a.value %} ({{ a.count }} hazard{{ '' if a.count == 1 else 's' }}){% endif %}</title>
+    {% for u in units if u.reporting and u.code in rows %}
+    {% set a = rows[u.code] %}
+    <a href="/site?{{ query }}&amp;unit={{ u.code }}{% if route_requested %}&amp;route=1{% endif %}#unit-detail" class="unit-link{% if detail and u.code == detail.area.code %} selected{% endif %}" aria-label="{{ a.name }}, {{ names[v.overlay] }}: {{ a.label }}. Check before entering.">
+      <title>{{ a.name }} · {{ names[v.overlay] }} · {{ a.label }}</title>
+      <rect class="lot-target" x="{{ u.x }}" y="{{ u.y }}" width="{{ u.w }}" height="{{ u.h }}"/>
+      <rect x="{{ u.x+1 }}" y="{{ u.y+u.h-25 }}" width="{{ u.w-2 }}" height="24" fill="{{ ('#9b472c' if v.scale == 'risk' else '#476e83') if a.value else 'url(#no-records)' }}" fill-opacity="{{ (0.18 + 0.65*a.ratio) if a.value else 0.55 }}"/>
+      <text x="{{ u.x+8 }}" y="{{ u.y+u.h-8 }}" class="metric-label">{{ u.code }} · {{ a.value if a.value else 'None recorded' }}</text>
     </a>
     {% endfor %}
+    {% if path %}<polyline id="walk-route" fill="none" stroke="#fff" stroke-width="9" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><polyline fill="none" stroke="#785098" stroke-width="5" pointer-events="none" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/>{% endif %}
+    {% include '_site_pins.html' %}
   </svg>
+  <div class="map-key"><span><i class="key-road"></i>One-way road</span><span><i class="key-walk"></i>Pedestrian walkway</span><span><i class="key-rack"></i>Rack / conveyor</span><span><i class="key-context"></i>Untracked facility</span>{% if path %}<span><i class="key-route"></i>Suggested walk</span>{% endif %}</div>
 </div>
-
+<p class="small muted" id="map-help">Choose an area on the map or from the list. Zoom with + or −, then pan with the arrow keys or drag. Home resets the view.</p>
 <div class="basis">
   <p><strong>Calculation:</strong> {{ v.basis }}{% if v.min_level %} Only {{ 'High and Extreme' if v.min_level == 'High' else 'Extreme' }} hazards.{% endif %}</p>
-  <p>Site total: <strong>{{ v.site_total }}</strong> from {{ v.hazards_counted }} hazard{{ '' if v.hazards_counted == 1 else 's' }}.
-    Shading is relative to the area with the highest value; a hatched area has nothing recorded for this view, which is not a statement that it is in order.</p>
+  <p>Site total: <strong>{{ v.site_total }}</strong> from {{ v.hazards_counted }} hazard{{ '' if v.hazards_counted == 1 else 's' }}. Shading is relative to the highest area value. Hatching means nothing recorded for this view.</p>
 </div>
-
-<script>
-(() => {
-  const svg = document.getElementById('plan');
-  const full = [0, 0, 1000, 590];
-  let vb = full.slice();
-  const set = () => svg.setAttribute('viewBox', vb.map(n => Math.round(n)).join(' '));
-  const zoom = (f, cx = vb[0] + vb[2] / 2, cy = vb[1] + vb[3] / 2) => {
-    const w = Math.min(full[2], Math.max(150, vb[2] * f)), h = w * full[3] / full[2];
-    vb = [cx - (cx - vb[0]) * w / vb[2], cy - (cy - vb[1]) * h / vb[3], w, h];
-    set();
-  };
-  document.querySelectorAll('[data-zoom]').forEach(b => b.addEventListener('click', () => {
-    if (b.dataset.zoom === 'reset') { vb = full.slice(); set(); } else zoom(b.dataset.zoom === 'in' ? 0.7 : 1 / 0.7);
-  }));
-  const pt = e => { const r = svg.getBoundingClientRect(); return [vb[0] + (e.clientX - r.left) / r.width * vb[2], vb[1] + (e.clientY - r.top) / r.height * vb[3]]; };
-  svg.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = pt(e); zoom(e.deltaY < 0 ? 0.85 : 1 / 0.85, x, y); }, { passive: false });
-  let drag = null, moved = false;
-  svg.addEventListener('pointerdown', e => { moved = false; if (vb[2] < full[2]) drag = [e.clientX, e.clientY, vb[0], vb[1]]; });
-  svg.addEventListener('pointermove', e => {
-    if (!drag) return;
-    if (Math.abs(e.clientX - drag[0]) + Math.abs(e.clientY - drag[1]) > 4) moved = true;
-    const r = svg.getBoundingClientRect();
-    vb[0] = drag[2] - (e.clientX - drag[0]) / r.width * vb[2]; vb[1] = drag[3] - (e.clientY - drag[1]) / r.height * vb[3]; set();
-  });
-  svg.addEventListener('pointerup', () => { drag = null; });
-  // a drag to pan must not also open the area under the pointer
-  svg.addEventListener('click', e => { if (moved) { e.preventDefault(); moved = false; } }, true);
-})();
-</script>
+{% if detail %}
+<section class="panel entry-panel" id="unit-detail" tabindex="-1" aria-labelledby="unit-title">
+  <h2 id="unit-title">{{ detail.area.name }} · Check before entering</h2>
+  <p><strong>{{ detail.open|length }} active</strong> · <strong>{{ detail.overdue }} overdue</strong> · Highest active risk: <strong>{{ detail.open[0].risk_level if detail.open else 'None recorded' }}</strong>. Includes all report dates and risk levels.</p>
+  <div class="entry-columns">
+  <div><h3>Open hazards</h3><ul>{% for h in detail.open %}<li><a href="/hazards/{{ h.id }}">#{{ h.id }} {{ h.category_code | cat }}</a> {{ risk_badge(h.risk_level) }}</li>{% else %}<li>No active hazards recorded.</li>{% endfor %}</ul></div>
+  <div><h3>Required PPE</h3><p>{{ detail.area.ppe_list|join(', ') or 'No requirements recorded' }}</p>
+    <h3>Recent verified closures</h3><ul>{% for h in detail.recent_closed %}<li><a href="/hazards/{{ h.id }}">#{{ h.id }}</a> {{ h.closure_action }}</li>{% else %}<li>No verified closures recorded.</li>{% endfor %}</ul></div>
+  </div>
+  <p><a href="/areas/{{ detail.area.code }}">Full area board</a> · <a href="/site?{{ query }}&amp;unit={{ detail.area.code }}&amp;route=1#route-status">Show route from gatehouse</a></p>
+  {% if route_requested %}
+  <div id="route-status" tabindex="-1"><strong>{% if path %}Walkway route to {{ detail.area.name }}</strong>. The highlighted path ends at the unit entrance and avoids frontages with active High or Extreme hazards. <a href="#plan">View route on map</a>{% elif detail.area.code in flagged %}Route unavailable.</strong> The destination has active High or Extreme hazards. Contact the Area Owner before entry.{% else %}Route unavailable.</strong> Active High or Extreme hazards block the marked walkway approaches. Contact the Area Owner before entry.{% endif %}
+  <p>Illustrative routing on a synthesized layout – follow site rules and permits.</p></div>
+  {% endif %}
+</section>
+{% endif %}
+{% include '_pin_index.html' %}
+<script src="/static/site-plan.js" defer></script>
 {% endblock %}

@@ -15,7 +15,7 @@ and links every story to where it is implemented and tested.
 | US6 | safety supervisor | be alerted to High and Extreme hazards and trace every action on them | serious hazards get attention at once | notifications, audit trail | `test_high_risk_alerts_supervisor_and_owner` |
 | US7 | operator or visitor | check an area's live hazards and required PPE before entering | I know what to expect and wear | `/areas/{code}` | `test_html_pages_render` |
 | US8 | manager | see where risk concentrates, how it trends and which hazards repeat | I can target resources and see if things improve | dashboard, heat map, repeat hotspots | `test_dashboard_counts_new_report_immediately`, `test_repeat_hotspots` |
-| US9 | safety supervisor | know that the AI is only used where it was proven, and watch it in use | AI suggestions can be trusted | release gate, `/monitoring`, `/metrics` | `test_release_gate.py`, `test_monitoring_and_metrics` |
+| US9 | safety supervisor | know that the AI is only used where it was proven, and watch it in use | reporters can see the limits of each suggestion | release gate, `/monitoring`, `/metrics` | `test_release_gate.py`, `test_monitoring_and_metrics` |
 | US10 | reporter on poor site Wi-Fi | not create duplicates when I tap twice or the page retries | the register stays clean | idempotency keys | `test_idempotent_report_creation`, `test_html_double_submit_returns_same_draft` |
 | US11 | safety supervisor or reporter | verify a closure independently, or reject it with a reason | a hazard is only closed when someone other than the closer has checked it | `services.verify/reject`, `/hazards/{id}/verify`, `/reject`, `/queue` "Awaiting verification" | `test_supervisor_verifies_closure`, `test_closer_cannot_verify_own_closure`, `test_reject_returns_to_open_with_reason`, `test_html_verify_and_reopen_flow` |
 | US12 | Area Owner | plan an action with an owner and a deadline | everyone knows who does what by when | `services.plan_action`, plan form | `test_plan_moves_open_to_planned_with_owner_and_deadline`, `test_html_plan_with_deadline_date` |
@@ -41,8 +41,8 @@ erDiagram
     USER { int id PK; string name; enum role "reporter | area_owner | supervisor | manager" }
     AREA { int id PK; string code UK; string name; int owner_id FK; text required_ppe; text ai_checks; int x; int y; int w; int h }
     HAZARD {
-        int id PK; int area_id FK; int reporter_id FK; enum status "draft | open | closed"
-        string idem_key "unique per reporter"; datetime created_at; string photo_path
+        int id PK; int area_id FK; int reporter_id FK; enum status "draft | open | planned | pending_verification | closed"
+        string idem_key "unique per reporter"; datetime created_at; string photo_path; int x "optional pin"; int y "optional pin"
         string ai_model; text ai_suggestions; string ai_top_code; float ai_latency_ms; bool ai_accepted
         string category_code; int consequence "1-5"; int likelihood "1-5"; int risk_score "1-25"; string risk_level
         datetime due_at; int assignee_id FK; text planned_action

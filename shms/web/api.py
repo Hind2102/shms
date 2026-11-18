@@ -50,6 +50,8 @@ def hazard_out(h: Hazard) -> dict:
         "id": h.id,
         "status": h.status.value,
         "area": h.area.code,
+        "x": h.x,
+        "y": h.y,
         "reporter_id": h.reporter_id,
         "created_at": h.created_at.isoformat(),
         "category_code": h.category_code,
@@ -117,6 +119,8 @@ async def detect(photo: UploadFile = File(...), user: User = Depends(current_use
 async def create_hazard(
     response: Response,
     area_code: str = Form(...),
+    x: int | None = Form(None),
+    y: int | None = Form(None),
     photo: UploadFile = File(...),
     idempotency_key: str | None = Header(None, max_length=64),
     user: User = Depends(current_user),
@@ -125,8 +129,9 @@ async def create_hazard(
     area = db.scalar(select(Area).where(Area.code == area_code))
     if area is None:
         raise HTTPException(422, f"Unknown area {area_code}")
+    services.validate_pin(area, x, y)
     try:
-        existing = services.replay_or_conflict(db, user, area, idempotency_key)
+        existing = services.replay_or_conflict(db, user, area, idempotency_key, x, y)
     except services.IdempotencyConflict as exc:
         raise HTTPException(409, str(exc)) from exc
     if existing is not None:
@@ -144,6 +149,8 @@ async def create_hazard(
         name,
         get_detector().detect(photo_file(name)),
         idem_key=idempotency_key,
+        x=x,
+        y=y,
         experimental=_experimental(photo_file(name)),
     )
     db.commit()

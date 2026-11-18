@@ -173,7 +173,10 @@ Main workflow:
    report volume – each stating its calculation, window and site total; an area with nothing recorded is hatched and
    labelled as such, never as "safe", and report volume is shown in a neutral colour because it is not a measure of
    danger. The dashboard (`/dashboard`) keeps the KPIs, trend, repeat hotspots and the hazard register.
-   Screenshots (desktop and phone): `docs/screenshots/`.
+   Select a reporting unit to inspect required PPE, active cases, overdue actions and recent closures.
+   **Check before entering** can draw an illustrative walkway route from the gatehouse using all active High and Extreme cases. Follow site rules and permits. Distances, wind and facilities are illustrative.
+   Reports can include an optional point within the chosen unit, selected by tap or by entering coordinates. Older reports retain their area-level location. The map groups nearby pins and links to the contributing cases.
+   The nine reporting areas retain their original codes. Ancillary facilities provide process context. See [layout and process sources](docs/site_layout.md) and [desktop and phone screenshots](docs/screenshots/).
 
 **Overdue escalation** (project rule): an open or planned hazard past its target date is escalated to the safety
 supervisors (level 1) and, 7 days later, to the manager (level 2), once each. It runs on page loads (at most once a
@@ -227,7 +230,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-288 tests at the Phase 6 baseline, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
+305 tests, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
@@ -240,6 +243,8 @@ Docker image and smoke-tests the running container.
 ```bash
 ruff check . && ruff format --check .      # lint and formatting
 ```
+
+Phase 6 candidate statement coverage was **72%** (2,269 of 3,166 statements). Baseline statement coverage was **71%** for `shms` and `evaluation` together (2,154 of 3,043 statements). Reproduce on the review base with `pytest --cov=shms --cov=evaluation` after installing pytest-cov. [Coverage by module](evaluation/results/phase6_baseline_coverage/statements.md).
 
 ## Evaluation
 
@@ -270,7 +275,7 @@ python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --split
 python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --subset
 python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v1 --subset   # first prompt, for comparison
 python -m evaluation.compare && python -m evaluation.compare --only-subset
-python -m evaluation.release_gate --run yolo_sh17_yolo9e          # decides which hazard types the app uses
+python -m evaluation.release_gate --run yolo_sh17_yolo9e --dry-run  # inspect the decision and preserve owner notes
 python -m evaluation.acceptance --run yolo_sh17_yolo9e            # SIMULATED reporter acceptance (proposal criterion)
 ```
 
@@ -336,8 +341,8 @@ in the app) and latency (≤ 20 s). The specificity threshold was added after th
 photos, so the test subset is not untouched for its design.
 
 **Simulated reporter acceptance** (the proposal's ≥ 80 % criterion, `evaluation/acceptance.py`): if a reporter keeps
-the AI's top suggestion whenever it names a violation that is really in the photo, 97.2 % of YOLOv9e suggestions would
-be accepted (1 450 / 1 492). This is a **simulation** and lenient by construction; real acceptance is recorded per
+the AI's top suggestion whenever it names a violation that is really in the photo, the simulated acceptance rate is
+97.2 % over photos with a released violation (1 450 / 1 492, including 27 photos with no suggestion in the denominator). This is a **simulation** and lenient by construction; real acceptance is recorded per
 report and shown on *AI monitoring*.
 
 ### External validation and stricter checks (Phase 2)
@@ -380,7 +385,7 @@ them and never says what a liquid is.
 | Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | simulated 97.2 % (lenient, not field data); real acceptance recorded per report on *AI monitoring* |
 | New report visible on dashboard | visible on next dashboard request (proposal: within 5 min) | Functional visibility verified in `tests/test_api.py::test_full_workflow_and_dashboard_update`; elapsed time not separately measured |
 | Derived test labels agree with expert | report accuracy and κ | pending (`python -m evaluation.label_audit score`) |
-| Automated tests and lint | all pass | ✅ `pytest` (288 at Phase 6 baseline), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
+| Automated tests and lint | all pass | ✅ `pytest` (305 in Phase 6), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
 
 Detection mAP50 (object level, 17 classes – a different quantity from the image-level results above) measured
 with the published weights was 63.6 (YOLOv9e) and 54.9 (YOLOv8s), 6–8 points below the SH17 paper (70.9 / 63.7)
@@ -392,7 +397,7 @@ cause unknown** (details in `docs/verification.md`).
 
 | Status | What |
 |---|---|
-| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, plan view, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
+| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
 | **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic test data only; flag off by default); the vision-language model as a PPE detector |
 | **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |

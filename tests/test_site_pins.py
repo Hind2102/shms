@@ -1,0 +1,98 @@
+"""Report coordinates use the selected unit's stable map bounds and remain optional."""
+
+import pytest
+from sqlalchemy import select
+
+from shms import risk, services
+from shms.models import Area, Hazard, Status
+from shms.site_layout import UNITS
+from tests.conftest import jpeg_bytes, login
+from tests.test_api import REPORTER, h
+
+
+def digestion():
+    return next(unit for unit in UNITS if unit.code == "DIG")
+
+
+def submit(client, data, key="pin"):
+    return client.post(
+        "/api/hazards",
+        data={"area_code": "DIG", **data},
+        headers={**h(REPORTER), "Idempotency-Key": key},
+        files={"photo": ("photo.jpg", jpeg_bytes(), "image/jpeg")},
+    )
+
+
+def test_pin_persistence_and_retry(client):
+    unit = digestion()
+    point = {"x": unit.x, "y": unit.y + unit.h}
+    first = submit(client, point)
+    assert first.status_code == 201
+    assert (first.json()["x"], first.json()["y"]) == (point["x"], point["y"])
+    assert submit(client, point).json()["id"] == first.json()["id"]
+    assert submit(client, {**point, "x": point["x"] + 1}).status_code == 409
+    assert submit(client, {}).status_code == 409
+    legacy = submit(client, {}, "without-pin")
+    assert legacy.status_code == 201
+    assert legacy.json()["x"] is None and legacy.json()["y"] is None
+
+
+@pytest.mark.parametrize("point", [{"x": 1}, {"y": 1}, {"x": -1, "y": 2}, {"x": "NaN", "y": "4"}])
+def test_invalid_pin_is_rejected_before_upload(client, db, settings, point):
+    old_count = db.query(Hazard).count()
+    assert submit(client, point).status_code == 422
+    assert db.query(Hazard).count() == old_count
+    assert not list(settings.upload_dir.glob("*"))
+
+
+def test_page_creates_pin_and_map_clusters_only_active_confirmed_reports(client, db):
+    login(client, REPORTER)
+    unit = digestion()
+    area = db.scalar(select(Area).where(Area.code == unit.code))
+    point = {"x": unit.x + 10, "y": unit.y + 10}
+    page = client.post(
+        "/report",
+        data={"area_id": area.id, **point},
+        files={"photo": ("p.jpg", jpeg_bytes(), "image/jpeg")},
+        follow_redirects=False,
+    )
+    assert page.status_code == 303
+    draft_id = int(page.headers["location"].split("/")[2])
+    draft = db.get(Hazard, draft_id)
+    assert (draft.x, draft.y) == (point["x"], point["y"])
+    assert services.site_overview(db)["pin_groups"] == []
+    other = submit(client, {**point, "x": point["x"] + 2}).json()["id"]
+    for hid in (other, draft_id):
+        result = client.post(
+            f"/api/hazards/{hid}/confirm", headers=h(REPORTER), json={"category_code": "no_hard_hat", "consequence": 3}
+        )
+        assert result.status_code == 200
+    db.expire_all()
+    peak = max(db.get(Hazard, hid).risk_score for hid in (other, draft_id))
+    page = client.get("/site").text
+    assert 'data-pin-count="2"' in page
+    marker = page.split('data-pin-count="2"', 1)[1].split("</a>", 1)[0]
+    assert f'fill="{risk.band_for(peak).color}"' in marker
+    assert f'href="/hazards/{other}"' in page and f'href="/hazards/{draft_id}"' in page
+    db.refresh(draft)
+    draft.status, draft.closure_action = Status.CLOSED, "Gloves issued"
+    db.commit()
+    groups = services.site_overview(db, overlay="reports")["pin_groups"]
+    assert [h.id for g in groups for h in g] == [other]
+
+
+def test_migrated_hazards_keep_area_only_location_and_enforce_complete_pair(tmp_path):
+    import sqlite3
+
+    from shms.db import migrate_to_head
+    from tests.test_migrations import _old_db
+
+    path = tmp_path / "historical.db"
+    migrate_to_head(_old_db(path))
+    with sqlite3.connect(path) as database:
+        assert database.execute("SELECT area_id, x, y FROM hazards ORDER BY id").fetchall() == [
+            (1, None, None),
+            (1, None, None),
+        ]
+        with pytest.raises(sqlite3.IntegrityError, match="ck_hazard_pin_pair"):
+            database.execute("UPDATE hazards SET x = 500 WHERE id = 1")

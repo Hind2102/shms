@@ -42,3 +42,5 @@ Baseline pytest-cov statement coverage across shms and evaluation: 2,154/3,043 s
     evaluation/evaluate.py                              150    125    17%
     evaluation/label_rule_audit.py                       99     63    36%
     evaluation/conditions.py                             81     51    37%
+
+Additional checks: README:339 called the simulated acceptance denominator suggestions, although 27 of its 1,492 eligible photos had no suggestion. README:273's reproduction command overwrote the hard-hat caveat as documented at line 353; use the existing dry-run option. Migration 0005's module documentation named a nonexistent password CLI. Local Docker builds should exclude backups and signing-key directories from their build context.

@@ -1,22 +1,44 @@
 {% extends "base.html" %}
+{% from "_site_basemap.html" import basemap %}
 {% block title %}Report a hazard{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/static/site-plan.css">
+<link rel="stylesheet" href="/static/pins.css">
 <div class="card" style="max-width:640px">
   <h1>Report a hazard</h1>
-  <p class="muted small">Step 1 of 2 – take or upload a photo of the person and task. The AI checks it against the PPE the area
-     requires (hard hat, eye / face protection, gloves, hi-vis vest where required); you confirm or correct the result in step 2.
-     Time is recorded automatically.</p>
-  {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
-  <form method="post" action="/report" enctype="multipart/form-data" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Analysing photo…'">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <p>Step 1 of 2 · Choose an area and add a photo of the person and task. The AI checks the hard hat, eye or face protection, and gloves required in that area. You confirm or correct its suggestion in step 2.</p>
+  {% if error %}<div class="alert err" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/report" enctype="multipart/form-data" id="hazard-report">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="idem_key" value="{{ idem_key }}">
     <label for="area">Where is the hazard?</label>
     <select id="area" name="area_id" required>
-      {% for a in areas %}<option value="{{ a.id }}">{{ a.name }} ({{ a.code }})</option>{% endfor %}
+      {% for a in areas %}
+      {% set u = bounds.get(a.code) %}
+      <option value="{{ a.id }}" {% if area_id == a.id %}selected{% endif %}
+              {% if u %}data-x="{{ u.x }}" data-y="{{ u.y }}" data-w="{{ u.w }}" data-h="{{ u.h }}"{% endif %}>{{ a.name }} ({{ a.code }})</option>
+      {% endfor %}
     </select>
+    <details id="pin-picker" {% if x is defined and (x is not none or y is not none) %}open{% endif %}>
+      <summary>Add a map pin (optional)</summary>
+      <p>Tap a point in the selected unit or enter both coordinates. Leave them blank to report by area.</p>
+      <svg id="report-map" viewBox="0 0 1200 800" role="img" aria-label="Illustrative layout of the selected reporting area" hidden>
+        {{ basemap(units) }}
+        <rect id="pin-bounds" fill="none" stroke="#263b43" stroke-dasharray="3 3" stroke-width="1"/>
+        <g id="picked-point" style="display:none" aria-hidden="true"><circle r="5" fill="#232e35" stroke="white" stroke-width="1.5"/><circle r="1.4" fill="white"/></g>
+      </svg>
+      <div class="pin-fields">
+        <div><label for="pin-x">X coordinate</label><input id="pin-x" name="x" type="number" step="1" value="{{ x if x is defined and x is not none else '' }}"></div>
+        <div><label for="pin-y">Y coordinate</label><input id="pin-y" name="y" type="number" step="1" value="{{ y if y is defined and y is not none else '' }}"></div>
+        <button id="clear-pin" class="btn secondary" type="button" hidden>Clear pin</button>
+      </div>
+      <div id="pin-status" role="status" class="small"></div>
+      <noscript><p>Coordinate ranges on the illustrative plan</p><ul>{% for u in units if u.reporting %}<li>{{ u.code }} · X {{ u.x }}–{{ u.x + u.w }}, Y {{ u.y }}–{{ u.y + u.h }}</li>{% endfor %}</ul></noscript>
+    </details>
     <label for="photo">Photo</label>
     <input id="photo" type="file" name="photo" accept="image/*" capture="environment" required>
     <br><button class="btn block" type="submit">Analyse and continue</button>
   </form>
 </div>
+<script src="/static/report-pin.js" defer></script>
 {% endblock %}
