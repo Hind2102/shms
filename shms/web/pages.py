@@ -143,12 +143,41 @@ def site_plan(
     overlay: str = "open_risk",
     window: str = "90",
     level: str = "",
+    unit: str = "",
+    route: str = "",
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
     window_days = int(window) if window.isdigit() else 90
     view = services.site_overview(db, overlay=overlay, window_days=window_days, min_level=level or None)
-    return render(request, "site.html", user, db, v=view, windows=services.WINDOWS)
+    from .. import site_layout
+    from ..models import utcnow
+
+    selected = next((u for u in site_layout.UNITS if u.code == unit and u.reporting), None)
+    area = db.scalar(select(Area).where(Area.code == unit)) if selected else None
+    detail = services.area_overview(db, area) if area else None
+    if detail:
+        now = utcnow()
+        detail["overdue"] = sum(
+            1 for h in detail["open"] if h.status in services.AWAITING_ACTION and h.due_at and h.due_at < now
+        )
+    flagged = site_layout.flagged_areas(db) if route == "1" and area else set()
+    path = site_layout.walk_route(unit, flagged) if route == "1" and area else []
+    return render(
+        request,
+        "site.html",
+        user,
+        db,
+        v=view,
+        windows=services.WINDOWS,
+        units=site_layout.UNITS,
+        edges=site_layout.walkway_edges(),
+        rows={a["code"]: a for a in view["areas"]},
+        detail=detail,
+        route_requested=route == "1",
+        path=path,
+        flagged=flagged,
+    )
 
 
 @router.get("/dashboard")
@@ -193,17 +222,34 @@ def matrix(request: Request, user: User = Depends(page_user), db: Session = Depe
 # ------------------------------------------------------------------ stage 1: report and score
 
 
+def _report_form(request: Request, user: User, db: Session, idem_key: str, **fields) -> HTMLResponse:
+    from ..site_layout import UNITS
+
+    return render(
+        request,
+        "report.html",
+        user,
+        db,
+        areas=list(db.scalars(select(Area).order_by(Area.name))),
+        units=UNITS,
+        bounds={u.code: u for u in UNITS if u.reporting},
+        idem_key=idem_key,
+        **fields,
+    )
+
+
 @router.get("/report")
 def report_form(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
-    areas = list(db.scalars(select(Area).order_by(Area.name)))
     # A fresh idempotency key per form: a double submit or a browser retry returns the same draft.
-    return render(request, "report.html", user, db, areas=areas, error=None, idem_key=uuid.uuid4().hex)
+    return _report_form(request, user, db, uuid.uuid4().hex)
 
 
 @router.post("/report")
 async def report_submit(
     request: Request,
     area_id: int = Form(...),
+    x: int | None = Form(None),
+    y: int | None = Form(None),
     photo: UploadFile | None = File(None),
     idem_key: str = Form(""),
     user: User = Depends(page_user),
@@ -212,16 +258,19 @@ async def report_submit(
     area = db.get(Area, area_id)
     if area is None:
         raise HTTPException(422, "Unknown area")
-    areas = list(db.scalars(select(Area).order_by(Area.name)))
+    fields = {"area_id": area.id, "x": x, "y": y}
     try:
-        existing = services.replay_or_conflict(db, user, area, idem_key or None)
+        services.validate_pin(area, x, y)
+        existing = services.replay_or_conflict(db, user, area, idem_key or None, x, y)
     except services.IdempotencyConflict as exc:
-        return render(request, "report.html", user, db, areas=areas, error=str(exc), idem_key=uuid.uuid4().hex)
+        return _report_form(request, user, db, uuid.uuid4().hex, error=str(exc), status_code=409, **fields)
+    except services.WorkflowError as exc:
+        return _report_form(request, user, db, idem_key, error=str(exc), status_code=422, **fields)
     if existing is not None:
         return RedirectResponse(f"/hazards/{existing.id}/confirm", status_code=303)
     name = await save_photo(photo)
     if name is None:
-        return render(request, "report.html", user, db, areas=areas, error="Please add a photo.", idem_key=idem_key)
+        return _report_form(request, user, db, idem_key, error="Please add a photo.", **fields)
     h = services.create_draft(
         db,
         user,
@@ -229,6 +278,8 @@ async def report_submit(
         name,
         get_detector().detect(photo_file(name)),
         idem_key=idem_key or None,
+        x=x,
+        y=y,
         experimental=_experimental(photo_file(name)),
     )
     db.commit()

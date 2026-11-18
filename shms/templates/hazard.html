@@ -10,6 +10,7 @@
     <div class="card">
       <table>
         <tr><th>Area</th><td><a href="/areas/{{ h.area.code }}">{{ h.area.name }}</a></td></tr>
+        {% if h.x is not none %}<tr><th>Reported map pin</th><td>X {{ h.x }}, Y {{ h.y }}</td></tr>{% endif %}
         <tr><th>Reported</th><td>{{ h.created_at | dt }} by {{ h.reporter.name }}</td></tr>
         <tr><th>Risk</th><td>Consequence {{ h.consequence }} × Likelihood {{ h.likelihood }} = <strong>{{ h.risk_score }}</strong> {{ level(h.risk_level) }}</td></tr>
         <tr><th>Target close</th><td>{{ h.due_at | dt }}</td></tr>

@@ -1,0 +1,35 @@
+.map-shell { margin-top: 16px; border: 1px solid #b4c2bf; background: #fff; }
+.map-toolbar, .map-buttons, .map-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.map-toolbar { justify-content: space-between; padding: 5px 10px; border-bottom: 1px solid #bbc7c4; }
+.map-toolbar label { margin: 0; font-weight: 500; }
+.map-buttons button { background: white; border: 1px solid #9daba9; border-radius: 3px; min-height: 36px; min-width: 38px; font: inherit; cursor: pointer; }
+#plan { width: 100%; display: block; aspect-ratio: 3 / 2; touch-action: pan-y; }
+#plan.is-zoomed { touch-action: none; cursor: grab; }
+#plan.is-zoomed:active { cursor: grabbing; }
+.base-drawing text, .metric-label { font-family: var(--display),sans-serif; fill: #223a3d; }
+.lot-name { font-size: 14px; font-weight: 700; }
+.lot-caption, .map-note { font-size: 11px; }
+.metric-label { font-size: 12px; font-weight: 700; paint-order: stroke; stroke: #f9faf2; stroke-width: 2.4px; stroke-linejoin: round; }
+.unit-link .lot-target { fill: transparent; stroke: transparent; }
+.unit-link:hover .lot-target, .unit-link:focus .lot-target, .unit-link.selected .lot-target { stroke: #493878; stroke-width: 3.5px; fill: #6e5d86; fill-opacity: .11; }
+#process-flow { display: none; }
+.map-shell:has(#show-flow:checked) #process-flow { display: inline; }
+.map-key { border-top: 1px solid #bbc7c4; padding: 7px 12px; gap: 8px 20px; font-size: 13px; }
+.map-key i { display: inline-block; width: 22px; vertical-align: middle; margin-right: 6px; }
+.key-road { border-top: 6px solid #97a5a7; }
+.key-walk { border-top: 3px dashed #297065; }
+.key-rack { border-top: 4px double #435d64; }
+.key-context { background: #dce4dc; height: 10px; border: 1px solid #7e908d; }
+.key-route { border-top: 4px solid #785098; }
+.entry-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.entry-panel ul { margin: 0; padding-left: 20px; }
+.entry-panel li { margin-bottom: 5px; }
+#route-status { background: #f0edf4; padding: 10px 12px; border-left: 3px solid #755d8c; }
+#route-status p { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .map-buttons button { min-height: 44px; }
+  .map-toolbar { gap: 8px; }
+  .entry-columns { grid-template-columns: 1fr; gap: 0; }
+  .plan-filters > div { min-width: 125px; }
+  .plan-filters select { min-width: 0; width: 100%; }
+}

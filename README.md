@@ -173,7 +173,10 @@ Main workflow:
    report volume – each stating its calculation, window and site total; an area with nothing recorded is hatched and
    labelled as such, never as "safe", and report volume is shown in a neutral colour because it is not a measure of
    danger. The dashboard (`/dashboard`) keeps the KPIs, trend, repeat hotspots and the hazard register.
-   Screenshots (desktop and phone): `docs/screenshots/`.
+   Select a reporting unit to inspect required PPE, active cases, overdue actions and recent closures.
+   **Check before entering** can draw an illustrative walkway route from the gatehouse using all active High and Extreme cases. Follow site rules and permits. Distances, wind and facilities are illustrative.
+   Reports can include an optional point within the chosen unit, selected by tap or by entering coordinates. Older reports retain their area-level location. The map groups nearby pins and links to the contributing cases.
+   The nine reporting areas retain their original codes. Ancillary facilities provide process context. See [layout and process sources](docs/site_layout.md) and [desktop and phone screenshots](docs/screenshots/).
 
 **Overdue escalation** (project rule): an open or planned hazard past its target date is escalated to the safety
 supervisors (level 1) and, 7 days later, to the manager (level 2), once each. It runs on page loads (at most once a
@@ -240,6 +243,8 @@ Docker image and smoke-tests the running container.
 ```bash
 ruff check . && ruff format --check .      # lint and formatting
 ```
+
+Phase 6 baseline statement coverage was **71%** for `shms` and `evaluation` together (2,154 of 3,043 statements). Reproduce on the review base with `pytest --cov=shms --cov=evaluation` after installing pytest-cov. [Coverage by module](evaluation/results/phase6_baseline_coverage/statements.md).
 
 ## Evaluation
 
@@ -392,7 +397,7 @@ cause unknown** (details in `docs/verification.md`).
 
 | Status | What |
 |---|---|
-| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, plan view, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
+| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
 | **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic test data only; flag off by default); the vision-language model as a PPE detector |
 | **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |

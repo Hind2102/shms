@@ -3,10 +3,9 @@
 Web and API routes are thin wrappers around these functions, so the whole
 workflow can be tested without HTTP.
 
-Workflow (state machine)::
-
-    DRAFT --confirm(fixed_on_spot=False)--> OPEN --close--> CLOSED
-      \\--confirm(fixed_on_spot=True)----------------------> CLOSED
+Reports move from draft to open and optionally planned. Closing a report, including
+a repair at the point of reporting, sends it for independent verification.
+See ALLOWED_TRANSITIONS for verification, rejection and reopening.
 """
 
 from __future__ import annotations
