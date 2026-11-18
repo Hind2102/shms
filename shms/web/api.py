@@ -144,7 +144,10 @@ async def create_hazard(
 def confirm_hazard(
     hazard_id: int, body: ConfirmIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.confirm(db, _get(db, hazard_id, user), user, services.Confirmation(**body.model_dump()))
+    h = _get(db, hazard_id, user)
+    if h.status != Status.DRAFT:  # same rule as services.confirm, refused before any work (security review)
+        raise HTTPException(422, "Only a draft report can be confirmed; this one has already been confirmed")
+    h = services.confirm(db, h, user, services.Confirmation(**body.model_dump()))
     db.commit()
     return hazard_out(h)
 

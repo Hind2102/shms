@@ -244,6 +244,11 @@ async def confirm_submit(
     db: Session = Depends(get_session),
 ):
     h = _hazard(db, hazard_id, user)
+    if h.status != Status.DRAFT:  # refuse before anything is stored (security review, Phase 1b)
+        return RedirectResponse(
+            f"/hazards/{h.id}?error=This report has already been confirmed and cannot be confirmed again.",
+            status_code=303,
+        )
     try:
         photo = await save_photo(closure_photo, prefix="closed_") if fixed_on_spot else None
         services.confirm(

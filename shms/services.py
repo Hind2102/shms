@@ -50,6 +50,14 @@ class PermissionDenied(PermissionError):
 # ---------------------------------------------------------------- helpers
 
 
+def _require_state(h: Hazard, allowed: set[Status], action: str) -> None:
+    """Each action names the states it may start from. The shared transition table alone is not enough: several
+    actions lead to the same target state (e.g. confirm/reject/reopen -> OPEN), so the table would let one action
+    be used to bypass another's checks (security review, Phase 1b)."""
+    if h.status not in allowed:
+        raise WorkflowError(f"Cannot {action} hazard #{h.id}: it is {h.status.value.replace('_', ' ')}")
+
+
 def _check_move(h: Hazard, new: Status) -> None:
     if new not in ALLOWED_TRANSITIONS[h.status]:
         raise WorkflowError(f"Cannot move hazard #{h.id} from {h.status.value} to {new.value}")
@@ -185,6 +193,8 @@ class Confirmation:
 
 def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime | None = None) -> Hazard:
     """Reporter confirms or corrects the AI suggestion; risk is scored and the hazard is routed or closed."""
+    if h.status != Status.DRAFT:
+        raise WorkflowError("Only a draft report can be confirmed; this one has already been confirmed")
     if actor.id != h.reporter_id and actor.role != Role.SUPERVISOR:
         raise PermissionDenied("Only the reporter can confirm this report")
     if c.category_code not in taxonomy.categories():
@@ -259,6 +269,7 @@ def plan_action(
 ) -> Hazard:
     """OPEN -> PLANNED: a corrective action with an action owner (default: Area Owner) and a deadline
     (default: the target date from the risk band)."""
+    _require_state(h, {Status.OPEN}, "plan an action for")
     if not can_act_on(actor, h):
         raise PermissionDenied("Only the Area Owner or a supervisor can plan actions")
     _check_move(h, Status.PLANNED)
@@ -282,6 +293,7 @@ def close(
     db: Session, h: Hazard, actor: User, action: str, photo_path: str | None = None, at: datetime | None = None
 ) -> Hazard:
     """OPEN/PLANNED -> PENDING_VERIFICATION: the owner documents what was done; someone else verifies it."""
+    _require_state(h, {Status.OPEN, Status.PLANNED}, "close")
     if not can_act_on(actor, h):
         raise PermissionDenied("Only the Area Owner or a supervisor can close this hazard")
     _check_move(h, Status.PENDING_VERIFICATION)
@@ -302,6 +314,7 @@ def can_verify(user: User, h: Hazard) -> bool:
 
 def verify(db: Session, h: Hazard, actor: User, note: str = "", at: datetime | None = None) -> Hazard:
     """PENDING_VERIFICATION -> CLOSED."""
+    _require_state(h, {Status.PENDING_VERIFICATION}, "verify")
     if not can_verify(actor, h) or actor.id == h.closed_by_id:
         raise PermissionDenied("A supervisor or the reporter, not the person who closed it, must verify the closure")
     now = at or utcnow()
@@ -313,6 +326,7 @@ def verify(db: Session, h: Hazard, actor: User, note: str = "", at: datetime | N
 
 def reject(db: Session, h: Hazard, actor: User, reason: str, at: datetime | None = None) -> Hazard:
     """PENDING_VERIFICATION -> OPEN: the closure was not good enough. A reason is mandatory."""
+    _require_state(h, {Status.PENDING_VERIFICATION}, "reject the closure of")
     if not can_verify(actor, h) or actor.id == h.closed_by_id:
         raise PermissionDenied("A supervisor or the reporter, not the person who closed it, must review the closure")
     if not reason.strip():
@@ -325,6 +339,7 @@ def reject(db: Session, h: Hazard, actor: User, reason: str, at: datetime | None
 
 def reopen(db: Session, h: Hazard, actor: User, reason: str, at: datetime | None = None) -> Hazard:
     """CLOSED -> OPEN, e.g. when the hazard recurs. A reason is mandatory; the earlier closure stays in the audit trail."""
+    _require_state(h, {Status.CLOSED}, "reopen")
     if not can_verify(actor, h):
         raise PermissionDenied("Only a supervisor or the reporter can reopen a hazard")
     if not reason.strip():

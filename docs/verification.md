@@ -891,3 +891,40 @@ outbox e-mails (`test_seeding_the_demo_history_writes_no_mail`).
 
 Status labels: sign-in, CSRF, tokens, authorisation, uploads, errors – implemented+tested. The demo passwords and
 synthetic users – simulated. Single sign-on – planned (not implemented).
+
+### P1b.S Security review of `feature/security` and fix (2026-11-18)
+
+Method: security-review skill – one review pass over the whole branch diff, then an independent false-positive check of
+each candidate; only findings with confidence ≥ 8/10 kept. Result: **one finding, MEDIUM, confidence 8/10**; nothing
+HIGH. Checked and found sound: template auto-escaping (no `|safe`), CSRF coverage of every HTML POST, session/CSRF
+signing and constant-time comparison, API token storage, policy checks on every hazard lookup, photo route name
+pattern, upload validation, outbox file names, no secrets in API output.
+
+**Finding – re-confirm bypass of the state machine** (`shms/services.py`, `confirm()`): it checked only who calls
+(reporter or supervisor), never that the hazard was still a draft. Through `POST /hazards/{id}/confirm` or
+`POST /api/hazards/{id}/confirm`, the hazard's own **reporter** could re-confirm an OPEN, PLANNED,
+PENDING_VERIFICATION or CLOSED hazard and so: downgrade its risk (e.g. Extreme → Low, new due date), "close" it with
+*fixed on the spot* without owner rights, move it out of overdue escalation, and send it back to OPEN without the
+reason and checks of `reject()`/`reopen()`. Limits: reporter-only (supervisors already have these powers); every step
+left a `confirmed` audit event; the final CLOSED state still required independent verification. Partly pre-existing
+(the old table allowed only OPEN → CLOSED via this path); the new transitions of Phase 1 widened it.
+
+**Audit of every other action** (point 3 of the instruction) found the same pattern – reliance on the shared
+transition table only – in five more cases, all reachable by a supervisor:
+
+| Action | Wrong state that was accepted | Why |
+|---|---|---|
+| `close()` | DRAFT | `draft → pending_verification` exists for "fixed on the spot" |
+| `reject()` | DRAFT, CLOSED | `→ open` exists for confirm / reopen |
+| `reopen()` | DRAFT, PENDING_VERIFICATION | `→ open` exists for confirm / reject (skips reject's "not the closer" rule) |
+
+**Fix** (`services._require_state`): every action checks its own allowed from-states explicitly before anything else
+– confirm {draft}, plan {open}, close {open, planned}, verify {pending}, reject {pending}, reopen {closed}; escalation
+already selects only {open, planned}. The page route redirects a re-confirm to the hazard page with "This report has
+already been confirmed…" before any upload is stored; the API returns 422. `WorkflowError` → 422 in both.
+
+**Tests** (`tests/test_state_guards.py`, 40, all failed or were missing before the fix where a gap existed):
+re-confirm of open/planned/pending/closed × reporter/supervisor × with/without "fixed on the spot" (16) leaves status,
+category, risk fields, due date, closure and verification fields, escalation level and event count unchanged; API
+(2) → 422 unchanged; page (2) → 303 with message, unchanged; every other action from every wrong state (19) →
+`WorkflowError`, unchanged; escalation touches only open/planned (1). Suite: 248 passed; ruff clean.
