@@ -312,6 +312,18 @@ in the app) and latency (≤ 20 s). The specificity threshold was added after th
 tuning on the test set, prompts are developed on a **dev set of 100 training-split images**
 (`--split dev`) and only the final prompt is run once on the test subset.
 
+### External validation and stricter checks (Phase 2)
+
+* **External validation of the hard-hat check – FAIL.** Pre-registered in `docs/external_validation_plan.md` before
+  any image was downloaded, run once on 5 000 images of the independent *Hard Hat Workers* dataset (CC0): precision
+  **0.281**, recall 0.977, specificity **0.445** (`evaluation/results/external_hardhat_yolo_sh17_yolo9e/`). The model
+  misses most hard hats in these small (416 px) photos (it detects about 39 % of them), so it flags compliant workers.
+  The app's release decision is unchanged, as pre-registered; the SH17 results above do not transfer to this data.
+  Eye protection and gloves have no external validation (no public labelled set was found that maps to them).
+* **Stricter label analysis on SH17** (`evaluation/label_rule_audit.py`): on photos where the relevant body part is
+  labelled, specificity is lower than in the released figures – hard hat 0.750 (64 negatives), eye protection 0.828,
+  gloves 0.636 (only 11 negatives). Much of the released specificity comes from photos without any person.
+
 ### Success criteria
 
 | Criterion | Target | Result |
