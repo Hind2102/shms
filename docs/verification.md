@@ -1200,3 +1200,14 @@ Suite: 288 passed; ruff clean.
 `models/sh17_yolo9e.pt` on `mps`, scratch database. Checked in the page: 5 detection boxes drawn, the hard-hat
 suggestion carries "AI check validated on SH17 only – failed external validation (Hard Hat Workers): unverified
 suggestion", model `yolo:sh17_yolo9e` named; 0 server tracebacks. Script: `docs/screenshots/shoot_confirm.py`.
+
+# Phase 6 — Review and release work, 18 November 2026
+
+**Review base:** 89e60ec; fallback tag resolves to e0a538cb7198e4426da66a946c77179744c865e8. Review findings, raw-count calculation, setup friction and rankings are recorded in review_phase6.md. Existing desktop_confirm.png predates Phase 6.
+
+| Status | Check and command | Result |
+|---|---|---|
+| Implemented + tested | `.venv/bin/pytest`, `.venv/bin/ruff check .`, `.venv/bin/ruff format --check .` | Full baseline green, 88 Python files formatted |
+| Implemented + tested | `uv pip install --python .venv/bin/python pytest-cov`, `pytest --cov=shms --cov=evaluation` | 288 passed, 6 warnings; 71% statement coverage; 110.62 s |
+| Implemented + tested | Clean GitHub clone, CPython 3.12 venv, README pip install, download_models.py --all, copy .env.example | Dependencies and both checksums OK; inline comment breaks configured YOLO path |
+| Planned | Human label-audit score | CSV absent; no score produced |
