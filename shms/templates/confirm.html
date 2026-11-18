@@ -26,7 +26,13 @@
     {% else %}
       <div class="alert info small">The AI found none of the checked items missing ({{ h.area.check_codes | map('ppe') | join(', ') }}). This is not a confirmation that the scene is in order: if you can see missing PPE, choose it below – your correction is recorded.</div>
     {% endif %}
-    {% for s in suggestions if not s.required %}<p class="muted small">Also seen, not checked here (not required in this area or not released): {{ s.code | cat }}</p>{% endfor %}
+    {% set exp = suggestions | selectattr('experimental') | list %}
+    {% if exp %}
+    <div class="alert info small"><strong>Experimental check</strong> (tested only on synthetic warehouse images, not on
+      site photos): {% for s in exp %}{{ s.code | cat }}{% if not loop.last %}; {% endif %}{% endfor %}. Choose it below
+      only if you can see it yourself.</div>
+    {% endif %}
+    {% for s in suggestions if not s.required and not s.experimental %}<p class="muted small">Also seen, not checked here (not required in this area or not released): {{ s.code | cat }}</p>{% endfor %}
     {% if h.area.unchecked_ppe %}<p class="muted small">Not checked by the AI here: {{ h.area.unchecked_ppe | join(', ') }}, and any hazard other than missing PPE.</p>{% endif %}
     {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. Checked against the PPE this area requires. AI evaluated on the SH17 held-out test set.</p>{% endif %}
   </div>
@@ -37,8 +43,8 @@
   <h2>Step 2 of 2 – confirm and score</h2>
   <label for="cat">Hazard type</label>
   <select id="cat" name="category_code" required>
-    {% for code in h.area.check_codes %}{% set c = taxonomy.get(code) %}
-      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
+    {% for code in h.area.report_codes %}{% set c = taxonomy.get(code) %}
+      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if c.experimental %} (experimental){% endif %}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
     {% endfor %}
   </select>
   <p class="muted small">PPE required in {{ h.area.name }}: {{ h.area.check_codes | map('ppe') | join(', ') }}.</p>

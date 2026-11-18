@@ -36,6 +36,24 @@
       "default_consequence": 3,
       "why": "Struck by mobile plant or vehicles in traffic areas.",
       "ppe": "Hi-vis vest"
+    },
+    {
+      "code": "floor_liquid",
+      "name": "Possible liquid on the floor",
+      "group": "Unsafe condition (experimental)",
+      "ai": false,
+      "experimental": true,
+      "default_consequence": 3,
+      "why": "Slips and falls; a spill can also be hot or caustic in a refinery. The AI never says what the liquid is."
+    },
+    {
+      "code": "walkway_obstruction",
+      "name": "Object possibly obstructing a walkway",
+      "group": "Unsafe condition (experimental)",
+      "ai": false,
+      "experimental": true,
+      "default_consequence": 2,
+      "why": "Trips and blocked escape routes. Counts only when a walkway is visible in the photo."
     }
   ]
 }

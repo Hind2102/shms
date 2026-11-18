@@ -69,3 +69,36 @@ def ask(image: Path, prompt: str = "c1", model: str = "qwen2.5vl:7b", url: str =
     r = httpx.post(f"{url}/api/chat", json=payload, timeout=180)
     r.raise_for_status()
     return parse_answer(r.json()["message"]["content"])
+
+
+FROZEN_PROMPT = "c2"  # frozen after dev tuning, evaluated once on the test split (docs/unsafe_conditions_plan.md)
+
+
+def observe(image: Path) -> list[dict]:
+    """Experimental observations for a report, as suggestion records marked experimental. Never raises: a failed
+    or unreachable model gives no observation and never blocks a report. The model's free-text explanation is kept
+    for traceability only and is not shown to the reporter (it could name a substance)."""
+    import logging
+
+    from ..settings import get_settings
+
+    s = get_settings()
+    try:
+        a = ask(image, FROZEN_PROMPT, s.ollama_model, s.ollama_url)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("shms").warning("Experimental conditions check failed", exc_info=True)
+        return []
+    out = []
+    for code, key in (("floor_liquid", "spill"), ("walkway_obstruction", "obstruction")):
+        if a.get(key):
+            out.append(
+                {
+                    "code": code,
+                    "confidence": 0.0,
+                    "evidence": [],
+                    "explanation": a.get("explanation", ""),
+                    "required": False,
+                    "experimental": True,
+                }
+            )
+    return out

@@ -55,6 +55,8 @@ class Settings:
     instance_dir: Path = field(default_factory=lambda: Path(_env("INSTANCE_DIR", str(PROJECT_DIR / "instance"))))
     # Accept the X-User-Id header on the JSON API instead of a token. ONLY for tests and local scripts.
     demo_header_auth: bool = field(default_factory=lambda: _env("DEMO_HEADER_AUTH", "0") == "1")
+    # EXPERIMENTAL unsafe-condition suggestions (liquid on the floor, obstructed walkway); off by default.
+    experimental_conditions: bool = field(default_factory=lambda: _env("EXPERIMENTAL_CONDITIONS", "0") == "1")
     # Test mail backend: every notification is also written as an .eml file here (no e-mail is sent).
     mail_outbox: Path = field(default_factory=lambda: Path(_env("MAIL_OUTBOX", str(PROJECT_DIR / "outbox"))))
     # Minimum AI confidence for a suggestion to be pre-selected in the report form.

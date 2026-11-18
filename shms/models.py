@@ -95,6 +95,13 @@ class Area(Base):
         return [p for p in self.ppe_list if not any(w in p.lower() for w in words)]
 
     @property
+    def report_codes(self) -> list[str]:
+        """Hazard types a reporter may choose here: released AI checks plus experimental types when enabled."""
+        from . import taxonomy
+
+        return self.check_codes + taxonomy.experimental_codes()
+
+    @property
     def check_codes(self) -> list[str]:
         """PPE this area requires that the AI is released to check (area rule ∩ release gate)."""
         from . import taxonomy
