@@ -1225,3 +1225,12 @@ Phase 6 database checks ran on disposable SQLite copies only. Both upgrades to 0
 Final browser capture after geometry refinements: 48 Chromium states, 0 axe WCAG 2.0/2.1 A/AA violations, 0 viewport-overflow findings, HTTP/asset failures or script errors in 10.3 s. Commands and environment are in the docstring of docs/screenshots/audit_ui.py. Each width has site_open_risk, site_overdue, site_reports, site_detail, site_route and report_pin PNGs (desktop 1366 and phone 390). desktop_confirm.png is the separate real-model capture. Software suite: 305 passed; Ruff lint and formatting clean, 97 Python files. Local Docker candidate smoke: /api/health 200, /login 200 and unauthenticated /api/dashboard 401. Published package/API version aligned to the intended 1.2.0 release.
 
 Clock time, Dubai: baseline began 23:50 on 18 November, review commit 23:53, map and browser evidence ready about 00:03 on 19 November. Task 2 and Task 3 overlapped. These are wall-clock milestones, not additive person-hours.
+
+### Release candidate checks
+
+- `pytest --cov=shms --cov=evaluation` on the Phase 6 source: 305 passed, 6 dependency deprecation warnings in 97.88 s; 2,269 of 3,166 statements covered (72%). No human labels or model accuracy results were generated.
+- Fresh GitHub clone of `feature/refinery-site` at 9febda0: created the documented Python 3.12 environment, installed `.[dev,yolo]` plus matplotlib, downloaded both weights with verified checksums and copied the example environment. API version 1.2.0, health/login 200, YOLOv9e returned five boxes for demonstration sample 7888728. This is a functional smoke check.
+- `docker build -t shms:phase6-final .` and disposable container running Uvicorn: health and login HTTP 200; authenticated dashboard returned KPI data. A previous candidate smoke also checked anonymous dashboard HTTP 401.
+- Enumerated tracked paths and all available Git refs using `git ls-files`, `git rev-list --objects --all` and `git cat-file --batch`. Zero private runtime path matches and zero matches for the checked private-key/token signatures in 432 distinct text blobs. Regex scanning does not establish absence of arbitrary credentials. No previous evaluation artifact changed relative to v1.1.1.
+- Owner authorised publication as soon as the release checks pass. The final merge SHA, tag and CI run are available from the GitHub tag and checks because a commit cannot record its own hash.
+- Fresh-clone README test command `pytest`: 305 passed, 6 warnings in 103.31s (0:01:43).
