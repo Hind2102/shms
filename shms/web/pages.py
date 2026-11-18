@@ -13,12 +13,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import escalate, risk, services, taxonomy
+from .. import auth, escalate, risk, services, taxonomy
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User
 from ..settings import PACKAGE_DIR
-from .deps import COOKIE, current_user_optional, photo_file, save_photo
+from .deps import current_user_optional, photo_file, save_photo
 
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
@@ -40,12 +40,35 @@ def page_user(user: User | None = Depends(current_user_optional)) -> User:
     return user
 
 
-def render(request: Request, name: str, user: User | None, db: Session, **ctx) -> HTMLResponse:
+def render(request: Request, name: str, user: User | None, db: Session, status_code: int = 200, **ctx) -> HTMLResponse:
     unread = 0
     if user is not None:
         _escalate_on_page_load(db)
         unread = db.query(Notification).filter_by(user_id=user.id, read=False).count()
-    return templates.TemplateResponse(request, name, {"user": user, "unread": unread, **ctx})
+    token = request.cookies.get(auth.CSRF_COOKIE)
+    if not auth.csrf_valid(token, token):
+        token = auth.new_csrf_token()
+    resp = templates.TemplateResponse(
+        request, name, {"user": user, "unread": unread, "csrf_token": token, **ctx}, status_code=status_code
+    )
+    resp.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", secure=request.url.scheme == "https")
+    return resp
+
+
+class CsrfError(Exception):
+    pass
+
+
+async def csrf_protect(request: Request) -> None:
+    """Every HTML form POST must echo the CSRF cookie in its hidden csrf_token field (double-submit, signed)."""
+    if request.method == "POST":
+        form = await request.form()
+        if not auth.csrf_valid(request.cookies.get(auth.CSRF_COOKIE), form.get("csrf_token")):
+            raise CsrfError
+
+
+# Applies to every route declared below (FastAPI copies router dependencies when a route is added).
+router.dependencies.append(Depends(csrf_protect))
 
 
 def _escalate_on_page_load(db: Session) -> None:
@@ -71,21 +94,36 @@ def _hazard(db: Session, hazard_id: int) -> Hazard:
 
 @router.get("/login")
 def login_form(request: Request, db: Session = Depends(get_session)):
-    users = list(db.scalars(select(User).order_by(User.id)))
-    return render(request, "login.html", None, db, users=users)
+    return render(request, "login.html", None, db)
 
 
 @router.post("/login")
-def login(user_id: int = Form(...)):
+def login(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    db: Session = Depends(get_session),
+):
+    user = db.scalar(select(User).where(User.username == username.strip().lower()))
+    if user is None or not auth.check_password(password, user.password_hash):
+        # Same message whether the user exists or not.
+        return render(request, "login.html", None, db, status_code=401, error="Wrong username or password.")
     resp = RedirectResponse("/", status_code=303)
-    resp.set_cookie(COOKIE, str(user_id), httponly=True, samesite="lax")
+    resp.set_cookie(
+        auth.SESSION_COOKIE,
+        auth.sign_session(user.id),
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        max_age=auth.SESSION_SECONDS,
+    )
     return resp
 
 
-@router.get("/logout")
+@router.post("/logout")
 def logout():
     resp = RedirectResponse("/login", status_code=303)
-    resp.delete_cookie(COOKIE)
+    resp.delete_cookie(auth.SESSION_COOKIE)
     return resp
 
 

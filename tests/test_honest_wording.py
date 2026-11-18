@@ -3,7 +3,7 @@
 import re
 
 from shms.detection.mock import MockDetector
-from tests.conftest import jpeg_bytes
+from tests.conftest import jpeg_bytes, login
 from tests.test_api import REPORTER, h
 
 SAFE_WORDS = re.compile(r"\bsafe\b|no violation|no missing ppe detected|all clear|compliant", re.I)
@@ -26,7 +26,7 @@ def _visible_text(html: str) -> str:
 
 def test_ai_found_nothing_is_not_presented_as_safe(client):
     hid = _draft(client, "site_clean.jpg")
-    client.post("/login", data={"user_id": REPORTER})
+    login(client, REPORTER)
     text = _visible_text(client.get(f"/hazards/{hid}/confirm").text)
     assert not SAFE_WORDS.search(text), SAFE_WORDS.search(text)
     assert "The AI found none of the checked items" in text
@@ -41,7 +41,7 @@ def test_ai_failure_lets_reporter_choose_every_checked_type(client, monkeypatch)
     monkeypatch.setattr("shms.web.api.get_detector", lambda: Broken())
     monkeypatch.setattr("shms.web.pages.get_detector", lambda: Broken())
     hid = _draft(client, "site.jpg")
-    client.post("/login", data={"user_id": REPORTER})
+    login(client, REPORTER)
     page = client.get(f"/hazards/{hid}/confirm").text
     assert "could not analyse this photo" in page
     for code in ("no_hard_hat", "no_eye_protection", "no_gloves"):
@@ -54,6 +54,6 @@ def test_hazard_page_does_not_call_an_empty_ai_result_no_hazard(client):
     client.post(
         f"/api/hazards/{hid}/confirm", headers=h(REPORTER), json={"category_code": "no_gloves", "consequence": 2}
     )
-    client.post("/login", data={"user_id": REPORTER})
+    login(client, REPORTER)
     text = _visible_text(client.get(f"/hazards/{hid}").text)
     assert "no PPE hazard" not in text and "found none of the checked items" in text

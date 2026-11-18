@@ -19,7 +19,7 @@
     {% if user.role.value in ('supervisor', 'manager') %}<a href="/monitoring">AI monitoring</a>{% endif %}
     <a href="/notifications">Alerts{% if unread %}<span class="badge-count">{{ unread }}</span>{% endif %}</a>
   </nav>
-  <div class="who">{{ user.name }} · <a href="/logout">switch user</a></div>
+  <div class="who">{{ user.name }} · <form method="post" action="/logout" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="linkbtn" type="submit">sign out</button></form></div>
   {% endif %}
 </div></header>
 <main>

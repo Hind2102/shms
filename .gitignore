@@ -31,3 +31,6 @@ backups/
 
 # Test mail backend output (never commit)
 outbox/
+
+# Generated secret key for signing sessions (never commit)
+instance/

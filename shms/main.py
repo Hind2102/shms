@@ -8,7 +8,7 @@ import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import services
@@ -63,6 +63,10 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
     app.include_router(api.router)
     app.include_router(telemetry.router)
     app.include_router(pages.router)
+
+    @app.exception_handler(pages.CsrfError)
+    async def _csrf(_req: Request, _exc: Exception):
+        return PlainTextResponse("Form expired or forged (missing CSRF token). Reload the page and try again.", 403)
 
     @app.exception_handler(pages.LoginRequired)
     async def _login(_req: Request, _exc: Exception):

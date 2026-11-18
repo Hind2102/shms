@@ -39,8 +39,10 @@ jobs:
           docker run -d --name shms -p 8000:8000 -e SHMS_DETECTOR=mock shms:${{ github.sha }}
           for i in $(seq 1 30); do curl -fsS http://localhost:8000/api/health && break; sleep 2; done
           curl -fsS http://localhost:8000/login | grep -q "Sign in"
-          curl -fsS http://localhost:8000/api/dashboard | grep -q kpis
-          curl -fsS http://localhost:8000/metrics | grep -q shms_hazards
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/dashboard)" = 401
+          TOKEN=$(docker exec shms python -m shms.tokens create sara --label ci-smoke)
+          curl -fsS -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/dashboard | grep -q kpis
+          curl -fsS -H "Authorization: Bearer $TOKEN" http://localhost:8000/metrics | grep -q shms_hazards
           docker inspect --format '{{.State.Health.Status}}' shms
       - name: Container logs on failure
         if: failure()

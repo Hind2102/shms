@@ -7,6 +7,7 @@ from sqlalchemy import select
 from shms import escalate, services
 from shms.models import Notification, Role, Status, User
 from shms.settings import get_settings
+from tests.conftest import login
 from tests.test_workflow import report, users
 
 
@@ -98,7 +99,7 @@ def test_opening_a_page_escalates_overdue_hazards(client, db):
     h.due_at = h.created_at - timedelta(days=1)
     db.commit()
     escalate.reset_throttle()
-    client.post("/login", data={"user_id": 8})
+    login(client, 8)
     assert client.get("/").status_code == 200
     db.expire_all()
     assert db.get(Hazard, hid).escalation_level == 1

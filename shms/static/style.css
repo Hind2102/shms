@@ -71,3 +71,5 @@ textarea { min-height: 80px; }
 .login-list button { width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 6px 0; font: inherit; cursor: pointer; }
 .login-list button:hover { border-color: var(--accent); }
 .hide { display: none; }
+
+.linkbtn { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }

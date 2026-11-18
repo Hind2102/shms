@@ -195,7 +195,10 @@ def reopen_hazard(
 
 @router.get("/hazards")
 def list_hazards(
-    status: Status | None = None, area: str | None = None, db: Session = Depends(get_session)
+    status: Status | None = None,
+    area: str | None = None,
+    db: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> list[dict]:
     q = select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc())
     if status:
@@ -206,17 +209,17 @@ def list_hazards(
 
 
 @router.get("/hazards/{hazard_id}")
-def get_hazard(hazard_id: int, db: Session = Depends(get_session)) -> dict:
+def get_hazard(hazard_id: int, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     return hazard_out(_get(db, hazard_id))
 
 
 @router.get("/monitoring")
-def monitoring(db: Session = Depends(get_session)) -> dict:
+def monitoring(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     return services.ai_monitoring(db)
 
 
 @router.get("/dashboard")
-def dashboard(db: Session = Depends(get_session)) -> dict:
+def dashboard(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     d = services.dashboard(db)
     d["areas"] = [{**{k: v for k, v in r.items() if k != "area"}, "code": r["area"].code} for r in d["areas"]]
     return d

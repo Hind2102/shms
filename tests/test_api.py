@@ -2,7 +2,7 @@
 
 import time
 
-from tests.conftest import jpeg_bytes
+from tests.conftest import jpeg_bytes, login
 
 REPORTER, OWNER_DIG, SUPERVISOR = 1, 4, 8  # ids from the deterministic seed (DIG is owned by user 4)
 
@@ -22,7 +22,7 @@ def test_health(client):
 
 
 def test_full_workflow_and_dashboard_update(client):
-    before = client.get("/api/dashboard").json()["kpis"]["open"]
+    before = client.get("/api/dashboard", headers=h(SUPERVISOR)).json()["kpis"]["open"]
     t0 = time.perf_counter()
     r = create(client)
     assert r.status_code == 201
@@ -39,7 +39,7 @@ def test_full_workflow_and_dashboard_update(client):
     assert hz["status"] == "open" and hz["assignee_id"] == OWNER_DIG and hz["ai_accepted"] is True
     assert hz["risk_score"] == 3 * hz["likelihood"]
 
-    dash = client.get("/api/dashboard").json()
+    dash = client.get("/api/dashboard", headers=h(SUPERVISOR)).json()
     elapsed = time.perf_counter() - t0
     assert dash["kpis"]["open"] == before + 1  # visible on the dashboard straight away
     assert elapsed < 5  # success criterion: report visible in seconds, not minutes
@@ -115,7 +115,7 @@ def test_detect_endpoint(client):
 
 def test_html_pages_render(client):
     assert client.get("/", follow_redirects=False).status_code == 303  # not signed in -> login
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     for path in [
         "/",
         "/report",
@@ -132,7 +132,7 @@ def test_html_pages_render(client):
 
 
 def test_html_report_flow(client):
-    client.post("/login", data={"user_id": REPORTER})
+    login(client, REPORTER)
     r = client.post(
         "/report",
         data={"area_id": 3},
@@ -156,7 +156,7 @@ def test_html_report_flow(client):
 
 def test_vest_not_suggested_where_not_required(client):
     """Digestion (area 3) does not require a hi-vis vest, so a vest detection is not pre-selected."""
-    client.post("/login", data={"user_id": REPORTER})
+    login(client, REPORTER)
     r = client.post(
         "/report", data={"area_id": 3}, files={"photo": ("p_no_hi_vis_vest.jpg", jpeg_bytes(), "image/jpeg")}
     )
@@ -180,7 +180,7 @@ def test_idempotent_report_creation(client):
 
 
 def test_html_double_submit_returns_same_draft(client):
-    client.post("/login", data={"user_id": REPORTER})
+    login(client, REPORTER)
     form = client.get("/report").text
     key = form.split('name="idem_key" value="')[1].split('"')[0]
     send = lambda: client.post(
@@ -194,15 +194,15 @@ def test_html_double_submit_returns_same_draft(client):
 
 
 def test_monitoring_and_metrics(client):
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     assert client.get("/monitoring").status_code == 200
-    m = client.get("/api/monitoring").json()
+    m = client.get("/api/monitoring", headers=h(SUPERVISOR)).json()
     assert m["reports"] > 0 and {c["name"] for c in m["checks"]} == {
         "AI latency p95",
         "AI error rate",
         "Reporter acceptance",
     }
-    text = client.get("/metrics").text
+    text = client.get("/metrics", headers=h(SUPERVISOR)).text
     assert (
         "shms_http_requests_total" in text
         and 'shms_hazards{status="open"}' in text

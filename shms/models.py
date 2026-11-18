@@ -53,6 +53,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[Role] = mapped_column(Enum(Role))
     email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Sign-in name and scrypt password hash (shms/auth.py). A user without a hash cannot sign in.
+    username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     areas: Mapped[list[Area]] = relationship(back_populates="owner")
 
@@ -199,3 +202,17 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     hazard: Mapped[Hazard] = relationship()
+
+
+class ApiToken(Base):
+    """Per-user token for the JSON API. Only the SHA-256 of the token is stored; the token is shown once."""
+
+    __tablename__ = "api_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    label: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped[User] = relationship()

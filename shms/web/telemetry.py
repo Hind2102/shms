@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 
 from .. import services
 from ..db import get_session
-from ..models import Hazard
+from ..models import Hazard, User
+from .deps import current_user
 
 router = APIRouter(include_in_schema=False)
 _lock = threading.Lock()
@@ -53,7 +54,8 @@ def reset() -> None:
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
-def metrics(db: Session = Depends(get_session)) -> str:
+def metrics(db: Session = Depends(get_session), user: User = Depends(current_user)) -> str:
+    """Prometheus metrics; scrape with an API token (Authorization: Bearer ...)."""
     lines = [
         "# HELP shms_http_requests_total HTTP requests by route and status",
         "# TYPE shms_http_requests_total counter",

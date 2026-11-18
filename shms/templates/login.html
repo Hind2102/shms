@@ -1,13 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Sign in{% endblock %}
 {% block content %}
-<div class="card" style="max-width:520px;margin:30px auto">
+<div class="card" style="max-width:420px;margin:30px auto">
   <h1>Sign in</h1>
-  <p class="muted small">Demo sign-in: pick a role to see the system from that person's view. All people, areas and records are synthesized.</p>
-  <form method="post" action="/login" class="login-list">
-    {% for u in users %}
-      <button name="user_id" value="{{ u.id }}"><strong>{{ u.name }}</strong><br><span class="muted small">{{ u.role.value.replace('_',' ').title() }}</span></button>
-    {% endfor %}
+  {% if error %}<div class="alert err small">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="u">Username</label>
+    <input id="u" name="username" autocomplete="username" required autofocus>
+    <label for="p">Password</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" required>
+    <br><br><button class="btn" type="submit">Sign in</button>
   </form>
+  <p class="muted small">Demo: all people, areas and records are synthesized. Demo accounts and their documented demo
+    password are listed in the README.</p>
 </div>
 {% endblock %}

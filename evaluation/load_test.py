@@ -25,7 +25,12 @@ from .metrics import latency_summary
 RESULTS = Path(__file__).resolve().parent / "results"
 
 
-def run_level(url: str, image: bytes, users: int, total: int, user_id: str) -> dict:
+def _headers(args) -> dict:
+    """API token (normal mode) or, with SHMS_DEMO_HEADER_AUTH=1 on the server, the demo X-User-Id header."""
+    return {"Authorization": f"Bearer {args.token}"} if args.token else {"X-User-Id": args.user_id}
+
+
+def run_level(url: str, image: bytes, users: int, total: int, auth_headers: dict) -> dict:
     lat, errors, model = [], 0, None
 
     def one(_):
@@ -34,7 +39,7 @@ def run_level(url: str, image: bytes, users: int, total: int, user_id: str) -> d
         try:
             r = httpx.post(
                 f"{url}/api/detect",
-                headers={"X-User-Id": user_id},
+                headers=auth_headers,
                 timeout=300,
                 files={"photo": ("load.jpg", image, "image/jpeg")},
             )
@@ -69,18 +74,19 @@ def main() -> None:
     ap.add_argument("--image", required=True, type=Path)
     ap.add_argument("--users", type=int, nargs="+", default=[1, 4, 8])
     ap.add_argument("--requests", type=int, default=40, help="requests per concurrency level")
-    ap.add_argument("--user-id", default="1")
+    ap.add_argument("--token", default="", help="API token: python -m shms.tokens create <username>")
+    ap.add_argument("--user-id", default="1", help="only with SHMS_DEMO_HEADER_AUTH=1 on the server")
     args = ap.parse_args()
     image = args.image.read_bytes()
     httpx.post(
         f"{args.url}/api/detect",
-        headers={"X-User-Id": args.user_id},
+        headers=_headers(args),
         files={"photo": ("warm.jpg", image, "image/jpeg")},
         timeout=300,
     )  # warm-up
     levels = []
     for u in args.users:
-        r = run_level(args.url, image, u, args.requests, args.user_id)
+        r = run_level(args.url, image, u, args.requests, _headers(args))
         levels.append(r)
         print(
             f"{u:3d} users: {r['throughput_rps']:6.2f} req/s  p50 {r.get('p50_ms', 0):7.0f} ms  "

@@ -16,21 +16,33 @@ from ..models import User
 from ..settings import get_settings
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-COOKIE = "shms_uid"
 
 
 def current_user_optional(request: Request, db: Session = Depends(get_session)) -> User | None:
-    """Demo authentication: the user picked on the login page (cookie) or an X-User-Id header (API).
-    A production deployment would replace this with the company's single sign-on."""
-    raw = request.headers.get("X-User-Id") or request.cookies.get(COOKIE)
-    if not raw or not raw.isdigit():
-        return None
-    return db.get(User, int(raw))
+    """HTML pages: the user in a valid signed session cookie (see shms/auth.py)."""
+    from .. import auth
+
+    uid = auth.read_session(request.cookies.get(auth.SESSION_COOKIE))
+    return db.get(User, uid) if uid is not None else None
 
 
-def current_user(user: User | None = Depends(current_user_optional)) -> User:
+def api_user_optional(request: Request, db: Session = Depends(get_session)) -> User | None:
+    """JSON API: a per-user token (Authorization: Bearer ...). The browser session is deliberately not accepted, so
+    the API needs no CSRF protection. The X-User-Id header only works with SHMS_DEMO_HEADER_AUTH=1 (tests, scripts)."""
+    from .. import tokens
+
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token:
+        return tokens.user_for(db, token.strip())
+    raw = request.headers.get("X-User-Id")
+    if get_settings().demo_header_auth and raw and raw.isdigit():
+        return db.get(User, int(raw))
+    return None
+
+
+def current_user(user: User | None = Depends(api_user_optional)) -> User:
     if user is None:
-        raise HTTPException(status_code=401, detail="Not signed in")
+        raise HTTPException(status_code=401, detail="Not signed in", headers={"WWW-Authenticate": "Bearer"})
     return user
 
 

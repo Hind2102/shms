@@ -33,6 +33,7 @@
 </div>
 
 <form class="card" method="post" action="/hazards/{{ h.id }}/confirm" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <h2>Step 2 of 2 – confirm and score</h2>
   <label for="cat">Hazard type</label>
   <select id="cat" name="category_code" required>
