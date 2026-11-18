@@ -928,3 +928,88 @@ re-confirm of open/planned/pending/closed × reporter/supervisor × with/without
 category, risk fields, due date, closure and verification fields, escalation level and event count unchanged; API
 (2) → 422 unchanged; page (2) → 303 with message, unchanged; every other action from every wrong state (19) →
 `WorkflowError`, unchanged; escalation touches only open/planned (1). Suite: 248 passed; ruff clean.
+
+---
+
+# Phase 2 – Stronger evidence (branch `feature/evidence`, 2026-11-18)
+
+### P2.2 Label-rule audit in code (`evaluation/label_rule_audit.py`)
+
+```bash
+python -m evaluation.label_rule_audit --root $R          # YOLOv9e full split, operating threshold 0.35
+```
+
+Output: `evaluation/results/label_rule_audit_yolo_sh17_yolo9e.json`; local gallery for the owner
+`evaluation/data/label_rule_gallery.html` (git-ignored – SH17 images are CC BY-NC-SA). Status: **implemented+tested**
+(5 unit tests); the classification is structural (from boxes), not a human judgement of the photos.
+
+Every disagreement between model and derived label, by structural reason (FP = model says violation, label says no;
+FN = the reverse):
+
+| Hazard | Reasons (count) |
+|---|---|
+| `no_hard_hat` | FN: model found no head **33**; FP: no head box in the labels **27**; FP: PPE labelled, model missed it **16**; FN: model saw PPE that is not in the labels **6**; FP: labelled head below the rule's size limit **1** |
+| `no_eye_protection` | FN: model found no face **35**; FP: PPE labelled, model missed it **23**; FP: no face box in the labels **16**; FN: model saw PPE that is not in the labels **8**; FP: labelled face below the rule's size limit **2** |
+| `no_gloves` | FN: model found no hands **48**; FP: no hands box in the labels **36**; FN: model saw PPE that is not in the labels **6**; FP: PPE labelled, model missed it **4**; FP: labelled hands below the rule's size limit **3** |
+| `no_hi_vis_vest` | FP: no person box in the labels **47**; FN: model found no person **31**; FP: PPE labelled, model missed it **24**; FN: model saw PPE that is not in the labels **13**; FP: labelled person below the rule's size limit **3** |
+
+Reading: "no <part> box in the labels" (27 hard hat, 16 eye, 36 gloves, 47 vest false alarms) are photos in which the
+model sees a head/face/hand/person that the SH17 annotation does not contain – either an unlabelled body part
+(annotation gap: "no person box" ≠ "no person visible") or a model hallucination; which one can only be decided by
+looking at the photos (gallery, for the owner). "PPE labelled, model missed it" and "model found no <part>" are model
+errors (occlusion, small or unusual PPE). Scenes where PPE is not required (offices, kitchens, homes) are a property
+of SH17 that the rule engine cannot see; it labels every bare head as a violation regardless of context.
+
+**Stricter label variant – sensitivity analysis only** (each hazard scored only on photos in which the relevant
+body part is labelled at or above the rule's size limit; released labels and results unchanged):
+
+| Hazard | Released specificity | Released MCC | Images (part labelled) | Pos / Neg | Precision | Recall | Specificity [95% CI] | MCC [95% CI] |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| `no_hard_hat` | 0.887 | 0.859 | 1296 | 1232 / 64 | 0.987 | 0.968 | 0.750 [0.64–0.85] | 0.622 [0.53–0.71] |
+| `no_eye_protection` | 0.934 | 0.891 | 1130 | 996 / 134 | 0.976 | 0.957 | 0.828 [0.77–0.89] | 0.740 [0.68–0.79] |
+| `no_gloves` | 0.885 | 0.833 | 1257 | 1246 / 11 | 0.997 | 0.957 | 0.636 [0.33–0.89] | 0.257 [0.11–0.38] |
+| `no_hi_vis_vest` | 0.582 | 0.599 | 1496 | 1443 / 53 | 0.983 | 0.970 | 0.547 [0.41–0.68] | 0.443 [0.33–0.55] |
+
+**Finding:** a large share of the released specificity comes from "easy" negatives – photos with no labelled head,
+face, hands or person, where neither the labels nor the model can produce a violation. On photos that actually test
+recognition of PPE on a visible body part, specificity is lower: hard hat 0.750 (below the release gate's 0.80, CI
+0.64–0.85, only 64 such negatives), eye protection 0.828 (above), gloves 0.636 on only **11** negatives (not
+estimable with any confidence), vest 0.547. This does not change the released results; it qualifies them and is a
+decision point for the owner (see Handover). The external validation (P2.1) has ~4 000 negatives that show heads with
+hard hats and therefore tests exactly this.
+
+### P2.3 Load test clarity – one table (existing measurements, no re-run)
+
+Hardware: MacBook Pro, Apple M5 Pro, 24 GB, macOS 26.6.2; YOLO on `mps`. Image: the 1280 × 853 px sample photo
+(`data/samples/sh17_pexels-photo-7888728__…jpg`), 162 KB. Server: one uvicorn worker on the same laptop (loopback).
+Warm-up: one request (excluded) for API measurements; one prediction (excluded) for model-only measurements.
+
+| Quantity | What is timed | YOLOv8s | YOLOv9e | Requests / errors | Source |
+|---|---|---|---|---|---|
+| Model-only latency, p50 / p95 | `model.predict` on the decoded sample image, 50 calls | 9 / 9 ms | 37 / 38 ms | 50 / 0 | standalone script (§5.4) |
+| Detector latency on the test set, p50 / p95 | read original SH17 photo (up to 8 192 px) + resize + inference + rules, per image | 66 / 128 ms | 95 / 154 ms | 1 620 / 0 | `results/yolo_sh17_yolo*/metrics.json → latency_steady` |
+| Upload-to-result latency, 1 user, p50 / p95 | client-side end to end: multipart upload, save, inference, JSON response | 22 / 30 ms | 51 / 63 ms | 40 / 0 | `load_test_*.json` level 1 |
+| Upload-to-result latency, 8 users, p50 / p95 | same, 8 concurrent clients (queueing) | 140 / 181 ms | 356 / 371 ms | 40 / 0 | level 8 |
+| API throughput, 1 / 4 / 8 users | successful requests ÷ wall time of the level | 43.0 / 55.1 / 54.6 req/s | 18.8 / 21.4 / 22.3 req/s | 40 per level / 0 | `load_test_*.json` |
+| CPU only, detector p50 / p95 | `build_detector(device="cpu")` on the sample photos, 30 calls | 35 / 41 ms | 200 / 216 ms | 30 / 0 | §8.4 |
+
+Notes: the upload-to-result latency at 1 user is lower than "detector latency on the test set" because the sample
+photo is small (1280 px) while SH17 originals reach 8 192 px. 40 requests per level is a short burst. The YOLOv8s load
+test was run at code `b2f307b` (before authentication); the YOLOv9e one at `10ebae1`; both used the demo header,
+which now needs `SHMS_DEMO_HEADER_AUTH=1` or `--token` (`evaluation/load_test.py`). Not re-run: nothing in the
+measured path (upload → detector) changed except the stricter upload check, whose cost was not measured separately.
+
+### P2.4 Label audit (human task) – status and instructions
+
+Status 2026-11-18: **not done** (`evaluation/data/label_audit_results.csv` absent). Ready for the owner:
+
+1. Open `evaluation/data/label_audit.html` (local file, built 2026-11-15 with seed 7; verified identical to a rebuild
+   with current code – §7.1). 100 images × 4 labels.
+2. For each label click **Agree** if the YES/NO is right for the photo, **Disagree** otherwise; progress is saved in
+   the browser.
+3. **Download CSV** → save as `evaluation/data/label_audit_results.csv`; then
+   `python -m evaluation.label_audit score` (accuracy, 95 % Wilson CI, Cohen's kappa) – to be run and recorded here.
+
+Optional and separate: `evaluation/data/label_rule_gallery.html` shows examples of each disagreement category (green =
+labels, red = model) to judge "no person box ≠ no person visible", occlusion and PPE-not-required scenes. It is not a
+substitute for the audit and its impressions should not be reported as numbers.
