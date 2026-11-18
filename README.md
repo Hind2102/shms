@@ -28,6 +28,8 @@ shms/                     the web application (Python package)
   settings.py             configuration from SHMS_* environment variables / .env
   models.py, db.py        SQLAlchemy data model (users, areas, hazards, events, notifications)
   escalate.py, notify.py  overdue escalation (CLI + page-load check) and notifications with a test mail outbox
+  auth.py, tokens.py      passwords (scrypt), signed sessions, CSRF tokens, hashed API tokens (+ CLI)
+  policy.py               who may see which hazard and photo
   migrations/             Alembic migrations (`alembic upgrade head`; configuration in alembic.ini)
   services.py             workflow state machine, routing, alerts, dashboard queries
   risk.py, taxonomy.py    risk matrix and hazard categories (data in shms/config/*.json)
@@ -105,6 +107,9 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_DATABASE_URL` | `sqlite:///shms.db` | Any SQLAlchemy URL |
 | `SHMS_UPLOAD_DIR` | `uploads` | Where photos are stored |
 | `SHMS_MAIL_OUTBOX` | `outbox` | Test mail backend: notifications are written here as `.eml` files (nothing is sent) |
+| `SHMS_SECRET_KEY` | generated | Signs session cookies and CSRF tokens. If unset, a random key is created once in `instance/secret_key` (git-ignored) |
+| `SHMS_INSTANCE_DIR` | `instance` | Where that generated key is kept (Docker: `/data/instance`) |
+| `SHMS_DEMO_HEADER_AUTH` | `0` | `1` lets the API accept an `X-User-Id` header instead of a token – tests and local scripts only |
 
 Risk-matrix definitions, bands and target close-out times are in `shms/config/risk_matrix.json`; hazard
 categories are in `shms/config/taxonomy.json`. Both can be changed without code changes.
@@ -116,7 +121,19 @@ uvicorn shms.asgi:app --reload       # or: make run
 ```
 
 Open <http://127.0.0.1:8000>. (If port 8000 is busy, add `--port 8765` and open that port instead.) On first start the database is created and filled with a synthesized refinery
-(9 areas, 9 users, ~240 historical hazards). Pick a role on the sign-in page (demo sign-in, no passwords).
+(9 areas, 9 users, ~240 historical hazards). Sign in with one of the **demo accounts** below. The password is the
+same for all of them and is a documented demo value, **not a secret**: `shms-demo-2026`.
+
+| Username | Person (synthesized) | Role |
+|---|---|---|
+| `ahmed`, `fatima`, `ravi` | operators / contractor | reporter |
+| `khalid`, `mariam`, `omar`, `noura` | Area Owners | area owner |
+| `sara` | safety supervisor | supervisor |
+| `yousef` | refinery manager | manager (read-only) |
+
+Passwords are stored as salted scrypt hashes; sessions are signed cookies (12 h); every form carries a CSRF token.
+A database upgraded from an older version has usernames but no passwords: set one with
+`python -m shms.tokens set-password <username>`.
 
 Main workflow:
 
@@ -145,8 +162,18 @@ also written as `.eml` files to `outbox/` – a **test mail backend**; no e-mail
 reserved `shms.example` domain).
 
 Supervisors and the manager also see **AI monitoring** (latency, errors and reporter acceptance against the SLOs
-in `shms/config/slo.json`). The JSON API is documented at <http://127.0.0.1:8000/docs>; Prometheus metrics are at
-<http://127.0.0.1:8000/metrics>.
+in `shms/config/slo.json`). The JSON API is documented at <http://127.0.0.1:8000/docs>. API calls and the
+Prometheus metrics at `/metrics` need a per-user **API token** (only its SHA-256 is stored):
+
+```bash
+python -m shms.tokens create sara --label scripts          # prints the token once
+curl -H "Authorization: Bearer <token>" http://127.0.0.1:8000/api/dashboard
+```
+
+**Who can see and do what** (enforced on the server, `shms/policy.py` and `shms/services.py`): every page and API
+call needs sign-in; confirmed hazards are visible to everyone signed in (a site hazard board); unconfirmed drafts
+and their photos only to their reporter and supervisors; photos are served only through `/photos/…` with the same
+checks. Actions follow the workflow table above; the manager is read-only.
 
 ### Run with Docker (optional)
 
@@ -180,7 +207,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-172 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+208 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
 cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
 constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the
@@ -234,7 +261,7 @@ held-out images (seed 42), used to compare all models on identical images becaus
 ```bash
 python -m evaluation.robustness --root $SH17 --weights models/sh17_yolo8s.pt --device mps   # dark / blur / JPEG / far
 # with the app running (SHMS_DETECTOR=yolo); add --url http://127.0.0.1:<port> if it is not on port 8000:
-python -m evaluation.load_test --image data/samples/<photo>.jpg --users 1 4 8 --requests 40
+python -m evaluation.load_test --image data/samples/<photo>.jpg --users 1 4 8 --requests 40 --token <API token>
 ```
 
 `prepare_sh17.py` also checks for **train/test leakage**: exact file overlap and near-duplicate photos
@@ -310,7 +337,8 @@ cause unknown** (details in `docs/verification.md`).
 
 * All people, areas and records in the app are synthesized; no refinery data is included.
 * Photos are processed locally; nothing is sent to external services.
-* Demo sign-in has no passwords; a deployment would use the company's single sign-on.
+* Demo accounts share one documented demo password; a deployment would use the company's single sign-on and set
+  `SHMS_SECRET_KEY`. Uploaded photos are checked (JPEG/PNG/WebP, ≤ 20 MB, ≤ 40 megapixels) and re-encoded.
 * The hazard list contains only the PPE checks that passed the release gate, so other hazards (including a missing
   hi-vis vest, which no seeded area requires, and unsafe conditions) cannot currently be reported in the app, not even manually.
 * Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions

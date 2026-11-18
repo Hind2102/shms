@@ -49,7 +49,7 @@ Escalation: level 1 when an active hazard (OPEN/PLANNED) passes `due_at` → not
 ## Review Focus
 
 1. Old `shms.db` (pre-`b2f307b` schema) upgraded with `alembic upgrade head` keeps every row and relationship.
-2. A reporter cannot open another reporter's hazard, photo or `/hazards/{id}` by guessing ids (403/404).
+2. A reporter cannot open another reporter's *draft*, its photo or `/hazards/{id}` by guessing ids (404). (Decision during execution: confirmed hazards are visible to all signed-in users – user story US7.)
 3. A form POST without a valid CSRF token is refused even with a valid session.
 4. A file renamed `.jpg` that is not an image, a > 20 MB upload and a decompression bomb are refused.
 5. When the AI returns nothing or fails, the page says the AI found nothing *for the checked items* and never "safe".

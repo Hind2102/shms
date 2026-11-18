@@ -840,3 +840,54 @@ User stories US11–US15 added to `docs/requirements.md`.
 
 Not done in Phase 1 (moved to Phase 1b): the API read endpoints (`GET /api/hazards`, `/api/hazards/{id}`,
 `/api/dashboard`, `/api/monitoring`) currently need no sign-in; authorisation per object is not enforced on pages.
+
+### P1.6 CI failure on PR #3 and fix (2026-11-18)
+
+Run 44235508642: the four test jobs passed; the **docker** job failed. Container log: `PermissionError: [Errno 13]
+Permission denied: '/app/outbox'` – seeding wrote alert e-mails to the default outbox, which the image's non-root
+user cannot create, so the app crashed at start-up. Fix (`54fa73b`): outbox write errors are logged, never raised
+(test `test_unwritable_outbox_never_blocks_a_report` failed first), and the image sets
+`SHMS_MAIL_OUTBOX=/data/outbox`. Local Docker smoke run passed, then CI runs 44236463896 / 44236454587: all 5 jobs
+green. PR #3 merged as `a2a90d4`.
+
+Earlier (Phase 0), two runs showed "failure" because one macOS job was **cancelled** by GitHub ("The job was not
+acquired by Runner of type hosted even after multiple attempts" – runner capacity); no test failed and the same
+commit passed all jobs in its other run. Nothing was changed for that.
+
+---
+
+# Phase 1b (part 2) – Security (branch `feature/security`, 2026-11-18)
+
+All items: **implemented+tested** (`pytest` 208 passed; `ruff` clean; local Docker smoke with the new CI steps passed).
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| Hashed passwords (standard KDF) | `auth.hash_password`: scrypt n=2^14, r=8, p=1, 16-byte salt; constant-time compare | `test_password_hash_is_salted_scrypt_and_verifies`, `test_demo_users_have_hashed_passwords_not_plaintext` |
+| Signed sessions, logout | cookie `shms_session` = uid.issued.HMAC-SHA256, 12 h; HttpOnly, SameSite=Lax, Secure on https; POST /logout | `test_login_with_correct_password_sets_a_signed_session`, `test_tampered_session_cookie_signs_the_user_out`, `test_old_unsigned_user_cookie_is_ignored`, `test_expired_session_is_rejected`, `test_logout_clears_the_session` |
+| Generic login errors | same text and status (401) for unknown user and wrong password | `test_wrong_password_and_unknown_user_get_the_same_generic_message` |
+| CSRF on all HTML forms | signed double-submit token (cookie + hidden field) checked by a router dependency on every POST, login included | `test_form_post_without_or_with_wrong_csrf_token_is_refused`, `test_login_form_also_needs_the_csrf_token`, `test_every_post_form_contains_the_csrf_field` |
+| API: no anonymous header | `Authorization: Bearer <token>`; tokens hashed (SHA-256) in `api_tokens`; CLI `python -m shms.tokens create`; browser session not accepted on the API (so no CSRF exposure); `X-User-Id` only with `SHMS_DEMO_HEADER_AUTH=1` | `test_api_requires_a_token_in_normal_mode`, `test_api_accepts_a_valid_token_and_stores_only_its_hash`, `test_api_does_not_accept_the_browser_session_for_changes`, `test_demo_header_works_only_when_enabled`, `test_read_endpoints_and_metrics_need_sign_in` |
+| Server-side authorisation per route/object | all pages need sign-in; `policy.can_view` on every hazard lookup (pages + API), 404 without revealing existence; actions via the state machine | `test_authz.py` (10 incl. parametrised) |
+| Photos not public | `/uploads` static mount removed; `GET /photos/{name}`: sign-in, policy, name pattern `^[A-Za-z0-9_-]{1,80}\.jpg$` | `test_photos_are_not_public`, `test_other_reporter_cannot_open_a_draft_or_its_photo`, `test_photo_names_cannot_escape_the_upload_folder` |
+| Uploads | ≤ 20 MB read limit; content must decode as JPEG/PNG/WebP (name/MIME not trusted); ≤ 40 MP; generated safe names; re-encoded JPEG | `test_uploads.py` (6) |
+| Errors | central handler: generic HTML/JSON 500, details logged (`shms` logger) | `test_errors.py` (2) |
+| Migrations | `0005_auth`: usernames from first names, no passwords for migrated users (set with `python -m shms.tokens set-password`), `api_tokens` table; schema = models test passes | `test_migrations.py` |
+
+**Design decision deviating from the plan** (plan said "reporter sees own hazards only"): confirmed hazards are
+visible to every signed-in user, because user story US7 requires operators to check an area's live hazards before
+entering; only unconfirmed drafts are private. Recorded in `shms/policy.py`.
+
+**Demo credentials:** usernames = first names, one documented demo password (`shms-demo-2026`, in the README) – not a
+secret. The seed computes the hash once for all demo users (identical hashes; acceptable for a shared documented demo
+password, not for real accounts).
+
+**Test infrastructure:** the default test client (`tests/conftest.py::BrowserClient`) adds the CSRF field the way the
+real form does; CSRF rejection is tested with a plain client. API tests use `X-User-Id` with
+`demo_header_auth=True`, set only in the test settings fixture.
+
+Other changes: `evaluation/load_test.py --token`; CI smoke test now checks 401 without a token and creates a token
+inside the container; Docker keeps the generated secret in `/data/instance`; seeding synthetic history writes no
+outbox e-mails (`test_seeding_the_demo_history_writes_no_mail`).
+
+Status labels: sign-in, CSRF, tokens, authorisation, uploads, errors – implemented+tested. The demo passwords and
+synthetic users – simulated. Single sign-on – planned (not implemented).
