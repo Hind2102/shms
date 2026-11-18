@@ -14,8 +14,10 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import services, taxonomy
+from . import auth, notify, services, taxonomy
 from .models import Area, Hazard, Role, Status, User, utcnow
+
+DEMO_PASSWORD = "shms-demo-2026"  # documented demo password for the synthesized users – not a secret
 
 USERS = [
     ("Ahmed (Operator)", Role.REPORTER),
@@ -124,7 +126,18 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     now = now or utcnow()
 
     # Demo addresses use the reserved .example domain: the test outbox can never deliver real mail.
-    users = [User(name=n, role=r, email=f"{n.split()[0].lower()}@shms.example") for n, r in USERS]
+    # Every demo user signs in with their first name and DEMO_PASSWORD (documented in the README; not a secret).
+    pw = auth.hash_password(DEMO_PASSWORD)
+    users = [
+        User(
+            name=n,
+            role=r,
+            email=f"{n.split()[0].lower()}@shms.example",
+            username=n.split()[0].lower(),
+            password_hash=pw,
+        )
+        for n, r in USERS
+    ]
     db.add_all(users)
     db.flush()
     areas = [
@@ -149,6 +162,12 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     area_w = [a[-1] for a in AREAS]
     times = sorted(now - timedelta(days=rng.uniform(0, 180), hours=rng.uniform(0, 12)) for _ in range(n_history))
 
+    with notify.no_mail():  # synthetic history: in-app notifications only, no outbox e-mails
+        _history(db, rng, areas, area_w, reporters, supervisor, times, now)
+    db.commit()
+
+
+def _history(db, rng, areas, area_w, reporters, supervisor, times, now) -> None:
     for t in times:
         area = rng.choices(areas, area_w)[0]
         cats = area.check_codes
@@ -182,7 +201,6 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
             verify_at = close_at + timedelta(days=rng.uniform(0.5, 3))
             if verify_at < now:
                 services.verify(db, h, supervisor, "Checked on site (synthetic)", at=verify_at)
-    db.commit()
 
 
 def main() -> None:

@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from shms.models import utcnow
+from tests.conftest import login
 from tests.test_api import OWNER_DIG, REPORTER, SUPERVISOR, create, h
 
 
@@ -63,7 +64,7 @@ def test_api_owner_cannot_verify_own_closure_403(client):
 
 def test_html_pending_page_shows_closure_and_verify_form_for_supervisor(client):
     hid = _pending(client)
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     page = client.get(f"/hazards/{hid}").text
     assert "Hard hat issued" in page and "Awaiting verification" in page
     assert f'action="/hazards/{hid}/verify"' in page and f'action="/hazards/{hid}/reject"' in page
@@ -71,7 +72,7 @@ def test_html_pending_page_shows_closure_and_verify_form_for_supervisor(client):
 
 def test_html_verify_and_reopen_flow(client):
     hid = _pending(client)
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     r = client.post(f"/hazards/{hid}/verify", data={"note": "Checked on site"}, follow_redirects=True)
     assert r.status_code == 200 and "Verified" in r.text
     assert f'action="/hazards/{hid}/reopen"' in r.text
@@ -81,14 +82,14 @@ def test_html_verify_and_reopen_flow(client):
 
 def test_html_owner_sees_plan_form_with_deadline(client):
     hid = _open_hazard(client)
-    client.post("/login", data={"user_id": OWNER_DIG})
+    login(client, OWNER_DIG)
     page = client.get(f"/hazards/{hid}").text
     assert 'name="due"' in page and 'name="owner_id"' in page
 
 
 def test_html_plan_with_deadline_date(client):
     hid = _open_hazard(client)
-    client.post("/login", data={"user_id": OWNER_DIG})
+    login(client, OWNER_DIG)
     day = (utcnow() + timedelta(days=5)).strftime("%Y-%m-%d")
     r = client.post(
         f"/hazards/{hid}/plan",
@@ -102,21 +103,21 @@ def test_queue_keeps_planned_hazards_and_supervisor_sees_pending(client):
     planned = _open_hazard(client)
     client.post(f"/api/hazards/{planned}/plan", headers=h(OWNER_DIG), json={"action": "Toolbox talk"})
     pending = _pending(client)
-    client.post("/login", data={"user_id": OWNER_DIG})
+    login(client, OWNER_DIG)
     page = client.get("/queue").text
     assert f"/hazards/{planned}" in page
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     page = client.get("/queue").text
     assert f"/hazards/{pending}" in page and "Awaiting verification" in page
 
 
 def test_register_filter_offers_all_statuses(client):
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     page = client.get("/hazards?status=pending_verification").text
     for s in ("open", "planned", "pending_verification", "closed"):
         assert f">{s}<" in page or f'value="{s}"' in page
 
 
 def test_register_ignores_unknown_status_filter(client):
-    client.post("/login", data={"user_id": SUPERVISOR})
+    login(client, SUPERVISOR)
     assert client.get("/hazards?status=foo").status_code == 200

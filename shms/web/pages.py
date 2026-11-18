@@ -8,17 +8,17 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import escalate, risk, services, taxonomy
+from .. import auth, escalate, policy, risk, services, taxonomy
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User
 from ..settings import PACKAGE_DIR
-from .deps import COOKIE, current_user_optional, photo_file, save_photo
+from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo
 
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
@@ -40,12 +40,35 @@ def page_user(user: User | None = Depends(current_user_optional)) -> User:
     return user
 
 
-def render(request: Request, name: str, user: User | None, db: Session, **ctx) -> HTMLResponse:
+def render(request: Request, name: str, user: User | None, db: Session, status_code: int = 200, **ctx) -> HTMLResponse:
     unread = 0
     if user is not None:
         _escalate_on_page_load(db)
         unread = db.query(Notification).filter_by(user_id=user.id, read=False).count()
-    return templates.TemplateResponse(request, name, {"user": user, "unread": unread, **ctx})
+    token = request.cookies.get(auth.CSRF_COOKIE)
+    if not auth.csrf_valid(token, token):
+        token = auth.new_csrf_token()
+    resp = templates.TemplateResponse(
+        request, name, {"user": user, "unread": unread, "csrf_token": token, **ctx}, status_code=status_code
+    )
+    resp.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", secure=request.url.scheme == "https")
+    return resp
+
+
+class CsrfError(Exception):
+    pass
+
+
+async def csrf_protect(request: Request) -> None:
+    """Every HTML form POST must echo the CSRF cookie in its hidden csrf_token field (double-submit, signed)."""
+    if request.method == "POST":
+        form = await request.form()
+        if not auth.csrf_valid(request.cookies.get(auth.CSRF_COOKIE), form.get("csrf_token")):
+            raise CsrfError
+
+
+# Applies to every route declared below (FastAPI copies router dependencies when a route is added).
+router.dependencies.append(Depends(csrf_protect))
 
 
 def _escalate_on_page_load(db: Session) -> None:
@@ -59,9 +82,10 @@ def _escalate_on_page_load(db: Session) -> None:
         log.exception("Escalation check failed")
 
 
-def _hazard(db: Session, hazard_id: int) -> Hazard:
+def _hazard(db: Session, hazard_id: int, user: User | None = None) -> Hazard:
+    """The hazard, or 404 if it does not exist or this user may not see it (no hint that it exists)."""
     h = db.get(Hazard, hazard_id)
-    if h is None:
+    if h is None or (user is not None and not policy.can_view(user, h)):
         raise HTTPException(404, "Hazard not found")
     return h
 
@@ -71,21 +95,36 @@ def _hazard(db: Session, hazard_id: int) -> Hazard:
 
 @router.get("/login")
 def login_form(request: Request, db: Session = Depends(get_session)):
-    users = list(db.scalars(select(User).order_by(User.id)))
-    return render(request, "login.html", None, db, users=users)
+    return render(request, "login.html", None, db)
 
 
 @router.post("/login")
-def login(user_id: int = Form(...)):
+def login(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    db: Session = Depends(get_session),
+):
+    user = db.scalar(select(User).where(User.username == username.strip().lower()))
+    if user is None or not auth.check_password(password, user.password_hash):
+        # Same message whether the user exists or not.
+        return render(request, "login.html", None, db, status_code=401, error="Wrong username or password.")
     resp = RedirectResponse("/", status_code=303)
-    resp.set_cookie(COOKIE, str(user_id), httponly=True, samesite="lax")
+    resp.set_cookie(
+        auth.SESSION_COOKIE,
+        auth.sign_session(user.id),
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        max_age=auth.SESSION_SECONDS,
+    )
     return resp
 
 
-@router.get("/logout")
+@router.post("/logout")
 def logout():
     resp = RedirectResponse("/login", status_code=303)
-    resp.delete_cookie(COOKIE)
+    resp.delete_cookie(auth.SESSION_COOKIE)
     return resp
 
 
@@ -176,7 +215,7 @@ def confirm_form(
     db: Session = Depends(get_session),
     error: str | None = None,
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     if h.status != Status.DRAFT:
         return RedirectResponse(f"/hazards/{h.id}", status_code=303)
     return render(
@@ -204,7 +243,12 @@ async def confirm_submit(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
+    if h.status != Status.DRAFT:  # refuse before anything is stored (security review, Phase 1b)
+        return RedirectResponse(
+            f"/hazards/{h.id}?error=This report has already been confirmed and cannot be confirmed again.",
+            status_code=303,
+        )
     try:
         photo = await save_photo(closure_photo, prefix="closed_") if fixed_on_spot else None
         services.confirm(
@@ -287,7 +331,7 @@ def hazard_detail(
     created: int = 0,
     error: str | None = None,
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     if h.status == Status.DRAFT:
         return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
     return render(
@@ -328,7 +372,7 @@ def plan(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     try:
         due_at = datetime.strptime(due, "%Y-%m-%d").replace(hour=17) if due else None
     except ValueError:
@@ -338,19 +382,19 @@ def plan(
 
 @router.post("/hazards/{hazard_id}/verify")
 def verify(hazard_id: int, note: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     return _do(db, h, lambda: services.verify(db, h, user, note))
 
 
 @router.post("/hazards/{hazard_id}/reject")
 def reject(hazard_id: int, reason: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     return _do(db, h, lambda: services.reject(db, h, user, reason))
 
 
 @router.post("/hazards/{hazard_id}/reopen")
 def reopen(hazard_id: int, reason: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     return _do(db, h, lambda: services.reopen(db, h, user, reason))
 
 
@@ -362,7 +406,7 @@ async def close(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     try:
         name = await save_photo(photo, prefix="closed_")
         services.close(db, h, user, action, name)
@@ -391,3 +435,17 @@ def notifications(request: Request, user: User = Depends(page_user), db: Session
         n.read = True
     db.commit()
     return resp
+
+
+# ------------------------------------------------------------------ photos (replaces the public /uploads folder)
+
+
+@router.get("/photos/{name}")
+def photo(name: str, user: User = Depends(page_user), db: Session = Depends(get_session)):
+    if not PHOTO_NAME.match(name):
+        raise HTTPException(404, "Not found")
+    owner = db.scalar(select(Hazard).where((Hazard.photo_path == name) | (Hazard.closure_photo_path == name)))
+    path = photo_file(name)
+    if not policy.can_view_photo(user, owner) or not path.is_file():
+        raise HTTPException(404, "Not found")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})

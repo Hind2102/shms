@@ -26,6 +26,7 @@ ENV SHMS_DETECTOR=yolo \
     SHMS_YOLO_DEVICE=cpu \
     SHMS_DATABASE_URL=sqlite:////data/shms.db \
     SHMS_UPLOAD_DIR=/data/uploads \
+    SHMS_INSTANCE_DIR=/data/instance \
     SHMS_MAIL_OUTBOX=/data/outbox \
     YOLO_CONFIG_DIR=/tmp/ultralytics
 EXPOSE 8000

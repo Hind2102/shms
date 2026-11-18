@@ -48,6 +48,13 @@ class Settings:
     ai_release_file: Path = field(
         default_factory=lambda: Path(_env("AI_RELEASE_FILE", str(PACKAGE_DIR / "config" / "ai_release.json")))
     )
+    # Key that signs session cookies and CSRF tokens. If unset, a random key is created once in instance/secret_key
+    # (git-ignored). Set SHMS_SECRET_KEY in production.
+    secret_key: str = field(default_factory=lambda: _env("SECRET_KEY", ""))
+    # Folder for generated local state (the secret key file). Docker points it at the /data volume.
+    instance_dir: Path = field(default_factory=lambda: Path(_env("INSTANCE_DIR", str(PROJECT_DIR / "instance"))))
+    # Accept the X-User-Id header on the JSON API instead of a token. ONLY for tests and local scripts.
+    demo_header_auth: bool = field(default_factory=lambda: _env("DEMO_HEADER_AUTH", "0") == "1")
     # Test mail backend: every notification is also written as an .eml file here (no e-mail is sent).
     mail_outbox: Path = field(default_factory=lambda: Path(_env("MAIL_OUTBOX", str(PROJECT_DIR / "outbox"))))
     # Minimum AI confidence for a suggestion to be pre-selected in the report form.

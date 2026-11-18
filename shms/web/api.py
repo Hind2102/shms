@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import services
+from .. import policy, services
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Status, User
@@ -67,6 +67,8 @@ def hazard_out(h: Hazard) -> dict:
         "closed_at": h.closed_at.isoformat() if h.closed_at else None,
         "closure_action": h.closure_action,
         "closed_on_spot": h.closed_on_spot,
+        "photo_path": h.photo_path,
+        "closure_photo_path": h.closure_photo_path,
         "planned_action": h.planned_action,
         "action_owner_id": h.action_owner_id,
         "action_due_at": h.action_due_at.isoformat() if h.action_due_at else None,
@@ -86,9 +88,9 @@ def hazard_out(h: Hazard) -> dict:
     }
 
 
-def _get(db: Session, hazard_id: int) -> Hazard:
+def _get(db: Session, hazard_id: int, user: User | None = None) -> Hazard:
     h = db.get(Hazard, hazard_id)
-    if h is None:
+    if h is None or (user is not None and not policy.can_view(user, h)):
         raise HTTPException(404, "Hazard not found")
     return h
 
@@ -142,7 +144,10 @@ async def create_hazard(
 def confirm_hazard(
     hazard_id: int, body: ConfirmIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.confirm(db, _get(db, hazard_id), user, services.Confirmation(**body.model_dump()))
+    h = _get(db, hazard_id, user)
+    if h.status != Status.DRAFT:  # same rule as services.confirm, refused before any work (security review)
+        raise HTTPException(422, "Only a draft report can be confirmed; this one has already been confirmed")
+    h = services.confirm(db, h, user, services.Confirmation(**body.model_dump()))
     db.commit()
     return hazard_out(h)
 
@@ -151,7 +156,7 @@ def confirm_hazard(
 def close_hazard(
     hazard_id: int, body: CloseIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.close(db, _get(db, hazard_id), user, body.action)
+    h = services.close(db, _get(db, hazard_id, user), user, body.action)
     db.commit()
     return hazard_out(h)
 
@@ -161,7 +166,7 @@ def plan_hazard(
     hazard_id: int, body: PlanIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
     due = body.due.replace(tzinfo=None) if body.due else None
-    h = services.plan_action(db, _get(db, hazard_id), user, body.action, owner_id=body.owner_id, due=due)
+    h = services.plan_action(db, _get(db, hazard_id, user), user, body.action, owner_id=body.owner_id, due=due)
     db.commit()
     return hazard_out(h)
 
@@ -170,7 +175,7 @@ def plan_hazard(
 def verify_hazard(
     hazard_id: int, body: NoteIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.verify(db, _get(db, hazard_id), user, body.note)
+    h = services.verify(db, _get(db, hazard_id, user), user, body.note)
     db.commit()
     return hazard_out(h)
 
@@ -179,7 +184,7 @@ def verify_hazard(
 def reject_hazard(
     hazard_id: int, body: ReasonIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.reject(db, _get(db, hazard_id), user, body.reason)
+    h = services.reject(db, _get(db, hazard_id, user), user, body.reason)
     db.commit()
     return hazard_out(h)
 
@@ -188,14 +193,17 @@ def reject_hazard(
 def reopen_hazard(
     hazard_id: int, body: ReasonIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.reopen(db, _get(db, hazard_id), user, body.reason)
+    h = services.reopen(db, _get(db, hazard_id, user), user, body.reason)
     db.commit()
     return hazard_out(h)
 
 
 @router.get("/hazards")
 def list_hazards(
-    status: Status | None = None, area: str | None = None, db: Session = Depends(get_session)
+    status: Status | None = None,
+    area: str | None = None,
+    db: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> list[dict]:
     q = select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc())
     if status:
@@ -206,17 +214,17 @@ def list_hazards(
 
 
 @router.get("/hazards/{hazard_id}")
-def get_hazard(hazard_id: int, db: Session = Depends(get_session)) -> dict:
-    return hazard_out(_get(db, hazard_id))
+def get_hazard(hazard_id: int, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    return hazard_out(_get(db, hazard_id, user))
 
 
 @router.get("/monitoring")
-def monitoring(db: Session = Depends(get_session)) -> dict:
+def monitoring(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     return services.ai_monitoring(db)
 
 
 @router.get("/dashboard")
-def dashboard(db: Session = Depends(get_session)) -> dict:
+def dashboard(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     d = services.dashboard(db)
     d["areas"] = [{**{k: v for k, v in r.items() if k != "area"}, "code": r["area"].code} for r in d["areas"]]
     return d

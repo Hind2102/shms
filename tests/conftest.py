@@ -25,6 +25,8 @@ def settings(tmp_path):
         database_url="sqlite://",
         ai_release_file=tmp_path / "none.json",
         mail_outbox=tmp_path / "outbox",
+        # API tests identify users with the X-User-Id header; only allowed when explicitly enabled (tests/demo).
+        demo_header_auth=True,
     )
     get_detector.cache_clear()
     yield s
@@ -36,9 +38,36 @@ def app(settings):
     return create_app(database_url="sqlite://", seed_demo=True)
 
 
+class BrowserClient(TestClient):
+    """Behaves like a browser submitting the app's own forms: every non-API POST carries the CSRF token that the
+    page's hidden field would contain. CSRF rejection itself is tested with a plain TestClient (tests/test_auth.py)."""
+
+    def post(self, url, *args, **kwargs):
+        from shms import auth
+
+        if not str(url).startswith("/api") and "json" not in kwargs:
+            if not self.cookies.get(auth.CSRF_COOKIE):
+                self.get("/login")
+            data = dict(kwargs.get("data") or {})
+            data.setdefault("csrf_token", self.cookies.get(auth.CSRF_COOKIE))
+            kwargs["data"] = data
+        return super().post(url, *args, **kwargs)
+
+
+def login(client, user_id: int, password: str | None = None):
+    """Sign in through the real login form as the seeded user with this id."""
+    from shms import db as dbmod
+    from shms.models import User
+    from shms.seed import DEMO_PASSWORD
+
+    with dbmod.new_session() as s:
+        username = s.get(User, user_id).username
+    return client.post("/login", data={"username": username, "password": password or DEMO_PASSWORD})
+
+
 @pytest.fixture()
 def client(app):
-    return TestClient(app)
+    return BrowserClient(app)
 
 
 @pytest.fixture()
