@@ -14,7 +14,7 @@
         <tr><th>Risk</th><td>Consequence {{ h.consequence }} × Likelihood {{ h.likelihood }} = <strong>{{ h.risk_score }}</strong> {{ level(h.risk_level) }}</td></tr>
         <tr><th>Target close</th><td>{{ h.due_at | dt }}</td></tr>
         <tr><th>Assigned to</th><td>{{ h.assignee.name if h.assignee else '–' }}</td></tr>
-        <tr><th>AI</th><td>{% if h.ai_model %}{{ h.ai_model }} suggested <em>{{ h.ai_top_code | cat if h.ai_top_code else 'no PPE hazard' }}</em>
+        <tr><th>AI</th><td>{% if h.ai_model %}{% if h.ai_top_code %}{{ h.ai_model }} suggested <em>{{ h.ai_top_code | cat }}</em>{% elif h.ai_error %}{{ h.ai_model }} could not analyse the photo{% else %}{{ h.ai_model }} found none of the checked items missing{% endif %}
           {% if h.ai_accepted is not none %}– {{ 'accepted' if h.ai_accepted else 'corrected by reporter' }}{% endif %}{% else %}–{% endif %}</td></tr>
         {% if h.description %}<tr><th>Description</th><td>{{ h.description }}</td></tr>{% endif %}
         {% if h.planned_action %}<tr><th>Planned action</th><td>{{ h.planned_action }}{% if h.action_owner %}<br><span class="small muted">Action owner {{ h.action_owner.name }}{% if h.action_due_at %}, due {{ h.action_due_at | dt }}{% endif %}</span>{% endif %}</td></tr>{% endif %}

@@ -24,9 +24,10 @@
         <div style="display:flex;align-items:center">{{ (s.confidence*100)|round|int }}%<span class="bar"><i style="width:{{ (s.confidence*100)|round|int }}%"></i></span></div></div>
       {% endfor %}
     {% else %}
-      <div class="alert ok small">No missing PPE detected. If you can see missing PPE that the AI missed, choose it below – your correction is recorded.</div>
+      <div class="alert info small">The AI found none of the checked items missing ({{ h.area.check_codes | map('ppe') | join(', ') }}). This is not a confirmation that the scene is in order: if you can see missing PPE, choose it below – your correction is recorded.</div>
     {% endif %}
     {% for s in suggestions if not s.required %}<p class="muted small">Also seen, not checked here (not required in this area or not released): {{ s.code | cat }}</p>{% endfor %}
+    {% if h.area.unchecked_ppe %}<p class="muted small">Not checked by the AI here: {{ h.area.unchecked_ppe | join(', ') }}, and any hazard other than missing PPE.</p>{% endif %}
     {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. Checked against the PPE this area requires. AI evaluated on the SH17 held-out test set.</p>{% endif %}
   </div>
 </div>
