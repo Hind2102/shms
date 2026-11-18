@@ -1211,3 +1211,5 @@ suggestion", model `yolo:sh17_yolo9e` named; 0 server tracebacks. Script: `docs/
 | Implemented + tested | `uv pip install --python .venv/bin/python pytest-cov`, `pytest --cov=shms --cov=evaluation` | 288 passed, 6 warnings; 71% statement coverage; 110.62 s |
 | Implemented + tested | Clean GitHub clone, CPython 3.12 venv, README pip install, download_models.py --all, copy .env.example | Dependencies and both checksums OK; inline comment breaks configured YOLO path |
 | Planned | Human label-audit score | CSV absent; no score produced |
+
+Resolved review findings in the environment example, README, architecture and course mapping. Moved the weights comment above its setting so the documented copy command selects the downloaded YOLOv9e file. The original results, split, gate, thresholds and model configurations were preserved.

@@ -16,7 +16,7 @@ synthetic images only. No paid API is used.
 
 | | |
 |---|---|
-| **Team** | Hind Alhmoudi (sole member) – requirements, hazard taxonomy and risk matrix, architecture, all code, tests, evaluation, label audit, report |
+| **Team** | Hind Alhmoudi (sole member) – requirements, hazard taxonomy and risk matrix, architecture, all code, tests, evaluation, label-audit tooling and report preparation |
 | **Course** | Software Engineering and Programming – Master in Applied Artificial Intelligence |
 | **Tested on** | macOS 26.6 on an Apple M5 Pro (24 GB) with Python 3.12.14 (see `docs/verification.md`); GitHub Actions on Ubuntu and macOS with Python 3.11 and 3.12, plus a Docker build and smoke test, on every push and pull request |
 | **Paid APIs** | None |
@@ -54,7 +54,7 @@ evaluation/               offline evaluation on SH17
   external_hardhat.py     pre-registered external validation (hard hat) on an independent dataset
   conditions.py           EXPERIMENTAL unsafe-conditions experiment (synthetic data)
   metrics.py, sh17.py     metric functions and dataset reader
-  data/                   manifest, dataset stats, audit results (committed)
+  data/                   committed manifests and dataset statistics; local human audit pending
   results/                metrics.json per run, summary_full.md / summary_subset.md, figures (committed)
 scripts/download_models.py  downloads and checksums the SH17 YOLO weights
 tests/                    pytest suite (unit, workflow, API end-to-end, detectors, evaluation pipeline)
@@ -227,7 +227,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-284 tests, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
+288 tests at the Phase 6 baseline, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
@@ -378,9 +378,9 @@ them and never says what a liquid is.
 | Load: 8 concurrent users | no errors | ✅ 0 errors; p95 371 ms (YOLOv9e), 181 ms (YOLOv8s) (`load_test_*.json`) |
 | Train/test leakage | none | ✅ 0 file overlaps, 0 near-duplicates (pre-training overlap of YOLO/Qwen unknown) |
 | Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | simulated 97.2 % (lenient, not field data); real acceptance recorded per report on *AI monitoring* |
-| New report visible on dashboard | immediately (< 5 s; proposal: 5 min) | ✅ `tests/test_api.py::test_full_workflow_and_dashboard_update` |
+| New report visible on dashboard | visible on next dashboard request (proposal: within 5 min) | Functional visibility verified in `tests/test_api.py::test_full_workflow_and_dashboard_update`; elapsed time not separately measured |
 | Derived test labels agree with expert | report accuracy and κ | pending (`python -m evaluation.label_audit score`) |
-| Automated tests and lint | all pass | ✅ `pytest` (284), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
+| Automated tests and lint | all pass | ✅ `pytest` (288 at Phase 6 baseline), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
 
 Detection mAP50 (object level, 17 classes – a different quantity from the image-level results above) measured
 with the published weights was 63.6 (YOLOv9e) and 54.9 (YOLOv8s), 6–8 points below the SH17 paper (70.9 / 63.7)
@@ -407,7 +407,7 @@ cause unknown** (details in `docs/verification.md`).
   hi-vis vest, which no seeded area requires) cannot be reported in the app. Liquid on the floor and obstructed
   walkways can be reported only when the experimental flag is on.
 * Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions
-  (caustic spills, steam leaks, missing grating) have no real labelled dataset; the experimental check was tested on
+  (caustic spills, steam leaks, missing grating) lack a verified real-refinery test set in this project; the experimental check was tested on
   synthetic warehouse images only. Collecting real refinery photos labelled by ≥ 3 annotators, with their agreement
   measured, is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled
   by alarms and emergency response, and steam plumes in a refinery would cause frequent false alarms.
@@ -417,7 +417,7 @@ cause unknown** (details in `docs/verification.md`).
 
 | Item | Used for | Licence / terms (as stated by the source) |
 |---|---|---|
-| SH17 dataset (Ahmad & Rahimi 2024), Kaggle `mugheesahmad/sh17-dataset-for-ppe-detection` | evaluation (held-out split), label audit | CC BY-NC-SA 4.0; images from Pexels (Pexels licence notice applies); research and education only. Not redistributed here – downloaded by each user |
+| SH17 dataset (Ahmad & Rahimi 2024), Kaggle `mugheesahmad/sh17-dataset-for-ppe-detection` | evaluation (held-out split), label audit | CC BY-NC-SA 4.0; images from Pexels (Pexels licence notice applies); research and education only. Full dataset downloaded separately; three demonstration images included in data/samples |
 | SH17 YOLO weights (`yolo8s.pt`, `yolo9e.pt`, GitHub release v1 of `ahmadmughees/SH17dataset`) | the app's detector, evaluation | no licence is stated in the repository; used here for non-commercial academic evaluation only; not committed (downloaded and checksummed by `scripts/download_models.py`) |
 | Ultralytics YOLO | running the weights | AGPL-3.0 |
 | Qwen2.5-VL 7B via Ollama (`qwen2.5vl:7b`) | vision-language comparison | Apache 2.0 (`ollama show qwen2.5vl:7b --license`) |

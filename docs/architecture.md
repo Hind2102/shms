@@ -56,7 +56,7 @@ flowchart LR
 |---|---|---|
 | `web/pages.py`, `templates/` | HTML pages; no business rules | HTTP form posts → service calls |
 | `web/api.py` | JSON API for scripts and tests | `POST /api/hazards`, `/confirm`, `/close`, `GET /api/dashboard`, `POST /api/detect` |
-| `services.py` | Workflow (DRAFT → OPEN → CLOSED), permissions, routing to Area Owner, alerts, dashboard figures | Plain Python functions taking a DB session |
+| `services.py` | Workflow (draft, open, planned, pending verification, closed; reject and reopen), permissions, routing to Area Owner, alerts, dashboard figures | Plain Python functions taking a DB session |
 | `risk.py` | Consequence × likelihood scoring; likelihood from area history | Pure functions; definitions in `config/risk_matrix.json` |
 | `taxonomy.py` | Hazard categories; marks the AI-evaluated subset | `config/taxonomy.json` |
 | `detection/` | `HazardDetector.detect(photo) → DetectorResult` (suggestions, boxes, latency, error) | YOLO, Ollama and mock implementations are interchangeable via `SHMS_DETECTOR` |
@@ -77,10 +77,7 @@ flowchart LR
    measures the model, not a mismatch in definitions, and the rules are unit-tested separately.
 4. **Local models only.** Photos from a refinery are confidential; YOLO and Ollama run on the user's machine,
    so no images leave the site and no paid API is needed.
-5. **Only hazards the AI can detect and that were measured.** The hazard list contains exactly the four PPE
-   hazards with a public, peer-reviewed labelled test set (SH17). Each area lists the PPE it requires
-   (`Area.ai_checks`); the AI's suggestions are checked against that list, so a missing vest is only flagged
-   where vests are required.
+5. **Only hazards the AI can detect and that were measured.** The release gate enables three SH17 checks. Each area's configuration further limits which suggestions it displays. The vest check failed specificity. Two unsafe-condition suggestions are experimental and require explicit opt-in.
 6. **Likelihood is computed, not guessed.** It comes from the number of similar hazards in the same area in the
    last 90 days, which links individual cases (problem 1 in the proposal) and makes repeat hazards rise in risk.
 7. **Modular monolith, not microservices.** One team, one database and one deployment; modules have clear

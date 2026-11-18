@@ -2,12 +2,12 @@
 
 | Lecture / lab | Topic | Where it is applied in SHMS | Evidence |
 |---|---|---|---|
-| L1 Software engineering tools | Virtual environments, packaging, reproducible setup | `pyproject.toml` with pinned extras (`.[dev,yolo]`), `uv`/`venv` setup, `Makefile`, `.env.example` config template | README *Installation* |
+| L1 Software engineering tools | Virtual environments, packaging, reproducible setup | `pyproject.toml` with optional dependency groups (`.[dev,yolo]`), `uv`/`venv` setup, `Makefile`, `.env.example` config template | README *Installation* |
 | L2 SDLC vs MLOps vs LLMOps | Life-cycle of an ML application | Requirements → design → build → test → evaluate → deploy → monitor; the AI has its own loop (evaluate offline, monitor in use, re-evaluate on drift) | `docs/architecture.md`, `/monitoring` |
 | L3 Coding agents and Cursor | Working with agents safely | `AGENTS.md` rules for agents (no silent behaviour changes, never weaken tests, no secrets); agent work reviewed and tested before commit | `AGENTS.md`, git history |
 | L4 Tools and tests | Test pyramid; functional and non-functional testing; lint | Unit tests (risk matrix, rules, metrics), integration tests (workflow + database), end-to-end API/HTML tests; **robustness** test (dark, blur, JPEG, distance); **load** test (concurrent users); `ruff` lint + format | `tests/`, `evaluation/robustness.py`, `evaluation/load_test.py`, CI |
 | L4 Release process | Staging, release decision, rollback | Detector chosen by configuration (`SHMS_DETECTOR`), so a model can be swapped or rolled back without code changes; model name stored on every report | `.env.example`, `Hazard.ai_model` |
-| L5 Git and GitHub | Commits, branches, pull requests, releases | Git history, CI on every push (GitHub Actions), submission tagged as a release (`v1.0.0`) | GitHub repository |
+| L5 Git and GitHub | Commits, branches, pull requests, releases | Git history, CI on every push (GitHub Actions), fallback submission tagged `v1.1.1` | GitHub repository |
 | L6 Distributed training | Data / model parallelism | Not needed: SHMS reuses published SH17 weights (no training). Stated as a deliberate decision. | Report §2 |
 | L7 Databases and data engineering | Store, structure, query, constraints, data quality, leakage, label quality | Relational schema with foreign keys, **CHECK constraints** (1–5 levels, closed ⇒ action) and **indexes** matching the hot queries; **train/test leakage check** (file overlap + perceptual-hash near-duplicates); **label audit** of the test labels | `shms/models.py`, `evaluation/prepare_sh17.py`, `evaluation/label_audit.py` |
 | Cloud computing | Where the workload runs; online vs batch; managed vs self-hosted models | Online (request/response) serving; AI runs **self-hosted** (YOLO, Ollama) instead of a managed API because photos are confidential and no paid API is allowed | Report §2 |
