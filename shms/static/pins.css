@@ -1,0 +1,12 @@
+#pin-picker { margin: 1rem 0; }
+#pin-picker summary { cursor: pointer; padding: .65rem 0; font-weight: 650; }
+#report-map { display: block; max-height: 220px; width: 100%; background: #f1f2ee; border: 1px solid #839491; cursor: crosshair; }
+#report-map[hidden], #clear-pin[hidden], #pin-picker[hidden] { display: none; }
+.pin-fields { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; margin: .75rem 0; }
+.pin-fields input { width: 6.5rem; max-width: 100%; }
+.case-pin text { font: bold 13px system-ui, sans-serif; pointer-events: none; }
+.case-pin:focus-visible circle { stroke: #152d40; stroke-width: 5px; }
+.pin-index p { margin: .35rem 0; }
+.pin-index ul { padding-inline-start: 1.25rem; }
+.pin-index [id^=pin-group-] { padding: .5rem; }
+.pin-index [id^=pin-group-]:target { outline: 2px solid var(--accent); }

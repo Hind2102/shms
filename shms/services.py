@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from . import risk, taxonomy
 from .detection import DetectorResult
 from .models import Area, Hazard, HazardEvent, Role, Status, User, utcnow
+from .site_layout import UNITS
 
 # The safety workflow as a state machine. Every status change goes through _move(), which checks this table and
 # writes an audit event with the from/to status.
@@ -124,12 +125,26 @@ def find_by_idem_key(db: Session, reporter: User, key: str | None) -> Hazard | N
     return db.scalar(select(Hazard).where(Hazard.reporter_id == reporter.id, Hazard.idem_key == key))
 
 
-def replay_or_conflict(db: Session, reporter: User, area: Area, key: str | None) -> Hazard | None:
+def validate_pin(area: Area, x: int | None, y: int | None) -> None:
+    if x is None and y is None:
+        return
+    if type(x) is not int or type(y) is not int:
+        raise WorkflowError("Enter both map coordinates as whole numbers, or clear both to report by area.")
+    unit = next((u for u in UNITS if u.reporting and u.code == area.code), None)
+    if unit is None or not (unit.x <= x <= unit.x + unit.w and unit.y <= y <= unit.y + unit.h):
+        raise WorkflowError(f"Choose a point inside {area.name} or clear the pin.")
+
+
+def replay_or_conflict(
+    db: Session, reporter: User, area: Area, key: str | None, x: int | None = None, y: int | None = None
+) -> Hazard | None:
     """Idempotency (microservices lab): same key + same request -> the existing report; same key + a
     different request -> refuse, because one key must never mean two different reports."""
     existing = find_by_idem_key(db, reporter, key)
     if existing is not None and existing.area_id != area.id:
         raise IdempotencyConflict("This idempotency key was already used for a report in another area")
+    if existing is not None and (existing.x, existing.y) != (x, y):
+        raise IdempotencyConflict("This idempotency key was already used for a different location")
     return existing
 
 
@@ -150,9 +165,14 @@ def create_draft(
     at: datetime | None = None,
     idem_key: str | None = None,
     experimental: list[dict] | None = None,
+    x: int | None = None,
+    y: int | None = None,
 ) -> Hazard:
+    validate_pin(area, x, y)
     h = Hazard(
         area=area,
+        x=x,
+        y=y,
         reporter_id=reporter.id,
         status=Status.DRAFT,
         photo_path=photo_path,
@@ -635,6 +655,21 @@ OVERLAYS = ("open_risk", "overdue", "reports")
 WINDOWS = (30, 90, 180)
 
 
+def _pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
+    """Group nearby active cases within a unit. The highest-risk member anchors and colours each marker."""
+    pinned = (h for h in pool if h.status in ACTIVE and h.x is not None and h.y is not None)
+    groups: list[list[Hazard]] = []
+    for hazard in sorted(pinned, key=lambda h: (-(h.risk_score or 0), h.id)):
+        for group in groups:
+            anchor = group[0]
+            if hazard.area_id == anchor.area_id and (hazard.x - anchor.x) ** 2 + (hazard.y - anchor.y) ** 2 <= 30**2:
+                group.append(hazard)
+                break
+        else:
+            groups.append([hazard])
+    return groups
+
+
 def site_overview(
     db: Session,
     overlay: str = "open_risk",
@@ -709,4 +744,5 @@ def site_overview(
         "areas": rows,
         "site_total": total,
         "hazards_counted": len(pool),
+        "pin_groups": _pin_groups(pool),
     }

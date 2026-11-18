@@ -119,6 +119,7 @@ class Hazard(Base):
         CheckConstraint("risk_score IS NULL OR risk_score BETWEEN 1 AND 25", name="ck_risk_1_25"),
         CheckConstraint("status != 'CLOSED' OR closure_action IS NOT NULL", name="ck_closed_has_action"),
         CheckConstraint("status != 'PENDING_VERIFICATION' OR closure_action IS NOT NULL", name="ck_pending_has_action"),
+        CheckConstraint("(x IS NULL) = (y IS NULL)", name="ck_hazard_pin_pair"),
         UniqueConstraint("reporter_id", "idem_key", name="uq_reporter_idem_key"),
         # Indexes match the hot queries: likelihood look-up, dashboard / register filters.
         Index("ix_hazard_area_cat_time", "area_id", "category_code", "created_at"),
@@ -129,6 +130,9 @@ class Hazard(Base):
     # Idempotency key sent by the client: a double-tap or retry on poor site Wi-Fi returns the same report.
     idem_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     area_id: Mapped[int] = mapped_column(ForeignKey("areas.id"))
+    # Optional reporter-selected point in the illustrative site plan's SVG coordinates.
+    x: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    y: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     status: Mapped[Status] = mapped_column(Enum(Status), default=Status.DRAFT)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
