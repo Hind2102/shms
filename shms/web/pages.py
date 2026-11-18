@@ -222,9 +222,25 @@ async def report_submit(
     name = await save_photo(photo)
     if name is None:
         return render(request, "report.html", user, db, areas=areas, error="Please add a photo.", idem_key=idem_key)
-    h = services.create_draft(db, user, area, name, get_detector().detect(photo_file(name)), idem_key=idem_key or None)
+    h = services.create_draft(
+        db,
+        user,
+        area,
+        name,
+        get_detector().detect(photo_file(name)),
+        idem_key=idem_key or None,
+        experimental=_experimental(photo_file(name)),
+    )
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
+
+
+def _experimental(path) -> list[dict]:
+    """EXPERIMENTAL unsafe-condition observations, only when SHMS_EXPERIMENTAL_CONDITIONS=1."""
+    from ..detection import conditions_vlm
+    from ..settings import get_settings
+
+    return conditions_vlm.observe(path) if get_settings().experimental_conditions else []
 
 
 @router.get("/hazards/{hazard_id}/confirm")

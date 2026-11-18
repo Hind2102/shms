@@ -135,7 +135,17 @@ async def create_hazard(
     name = await save_photo(photo)
     if name is None:
         raise HTTPException(422, "A photo is required")
-    h = services.create_draft(db, user, area, name, get_detector().detect(photo_file(name)), idem_key=idempotency_key)
+    from .pages import _experimental
+
+    h = services.create_draft(
+        db,
+        user,
+        area,
+        name,
+        get_detector().detect(photo_file(name)),
+        idem_key=idempotency_key,
+        experimental=_experimental(photo_file(name)),
+    )
     db.commit()
     return {**hazard_out(h), "replayed": False}
 

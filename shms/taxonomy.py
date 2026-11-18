@@ -18,6 +18,9 @@ class Category:
     default_consequence: int
     why: str = ""
     ppe: str = ""
+    # EXPERIMENTAL categories (unsafe conditions) are never AI-released and only exist when
+    # SHMS_EXPERIMENTAL_CONDITIONS=1 (see docs/unsafe_conditions_plan.md).
+    experimental: bool = False
 
 
 @lru_cache(maxsize=1)
@@ -59,3 +62,12 @@ def grouped() -> dict[str, list[Category]]:
     for c in categories().values():
         out.setdefault(c.group, []).append(c)
     return out
+
+
+def experimental_codes() -> list[str]:
+    """Experimental hazard types, available only when the feature flag is on."""
+    from .settings import get_settings
+
+    if not get_settings().experimental_conditions:
+        return []
+    return [c.code for c in categories().values() if c.experimental]

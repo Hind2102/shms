@@ -149,6 +149,7 @@ def create_draft(
     result: DetectorResult | None,
     at: datetime | None = None,
     idem_key: str | None = None,
+    experimental: list[dict] | None = None,
 ) -> Hazard:
     h = Hazard(
         area=area,
@@ -165,7 +166,9 @@ def create_draft(
         h.ai_model = result.model
         h.ai_latency_ms = round(result.latency_ms, 1)
         h.ai_error = result.error
-        h.ai_suggestions = json.dumps([{**s.to_dict(), "required": s.code in required} for s in result.suggestions])
+        h.ai_suggestions = json.dumps(
+            [{**s.to_dict(), "required": s.code in required} for s in result.suggestions] + list(experimental or [])
+        )
         top = max((s for s in result.suggestions if s.code in required), key=lambda s: s.confidence, default=None)
         h.ai_top_code = top.code if top else None
     db.add(h)
@@ -199,7 +202,7 @@ def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime |
         raise PermissionDenied("Only the reporter can confirm this report")
     if c.category_code not in taxonomy.categories():
         raise WorkflowError(f"Unknown hazard category: {c.category_code!r}")
-    if c.category_code not in h.area.check_codes:
+    if c.category_code not in h.area.report_codes:
         raise WorkflowError(f"{taxonomy.get(c.category_code).name} is not a PPE requirement in {h.area.name}")
     if c.consequence not in risk.LEVELS:
         raise WorkflowError("Consequence must be 1-5")
