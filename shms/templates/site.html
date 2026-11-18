@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Site plan{% endblock %}
+{% block content %}
+{% set names = {'open_risk': 'Open risk', 'overdue': 'Overdue', 'reports': 'Reports'} %}
+<div class="board-head"><h1>Refinery plan view</h1></div>
+<p class="disclaimer">Illustrative layout – not an actual site plan. Areas and positions are synthesized for this project.</p>
+
+<form class="filters plan-filters" method="get" action="/site">
+  <fieldset class="seg"><legend>Show</legend>
+    {% for key, label in names.items() %}
+    <label><input type="radio" name="overlay" value="{{ key }}" {% if v.overlay == key %}checked{% endif %} onchange="this.form.submit()"> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+  <div><label for="w">Reported in the last</label>
+    <select id="w" name="window" onchange="this.form.submit()">{% for d in windows %}<option value="{{ d }}" {% if v.window_days == d %}selected{% endif %}>{{ d }} days</option>{% endfor %}</select></div>
+  <div><label for="lv">Risk level</label>
+    <select id="lv" name="level" onchange="this.form.submit()">
+      <option value="">All levels</option>
+      <option value="High" {% if v.min_level == 'High' %}selected{% endif %}>High and Extreme</option>
+      <option value="Extreme" {% if v.min_level == 'Extreme' %}selected{% endif %}>Extreme only</option>
+    </select></div>
+  <noscript><button class="btn secondary" type="submit">Apply</button></noscript>
+</form>
+
+<div class="plan" data-scale="{{ v.scale }}">
+  <div class="plan-tools" aria-label="Zoom">
+    <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+    <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+    <button type="button" data-zoom="reset">Reset view</button>
+  </div>
+  <svg id="plan" viewBox="0 0 1000 590" role="img" aria-label="{{ names[v.overlay] }} by area on the illustrative refinery layout">
+    <defs>
+      <pattern id="none" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="10" height="10" fill="#eceeec"/><line x1="0" y1="0" x2="0" y2="10" stroke="#d4d8d6" stroke-width="4"/>
+      </pattern>
+    </defs>
+    <rect x="0" y="0" width="1000" height="590" fill="#e9ebe8"/>
+    <g class="flow" stroke="#9aa39f" stroke-width="4" fill="none" stroke-dasharray="8 6">
+      <path d="M220 155 H240"/><path d="M420 155 H440"/><path d="M640 155 H660"/><path d="M810 155 H830"/>
+      <path d="M905 270 V300"/><path d="M660 425 H640"/><path d="M360 425 H380"/>
+    </g>
+    {% for a in v.areas %}
+    <a href="/areas/{{ a.code }}" class="area{% if a.value and a.ratio > 0.55 %} dark{% endif %}">
+      <rect x="{{ a.x }}" y="{{ a.y }}" width="{{ a.w }}" height="{{ a.h }}"
+            {% if a.value %}class="lit" style="--t: {{ '%.2f' % (0.18 + 0.82 * a.ratio) }}"{% else %}fill="url(#none)"{% endif %}/>
+      <text x="{{ a.x + 12 }}" y="{{ a.y + 26 }}" class="code">{{ a.code }}</text>
+      <text x="{{ a.x + 12 }}" y="{{ a.y + 46 }}" class="name">{{ a.name }}</text>
+      {% if a.value %}<text x="{{ a.x + 12 }}" y="{{ a.y + a.h - 16 }}" class="val">{{ a.value }}</text>
+      {% else %}<text x="{{ a.x + 12 }}" y="{{ a.y + a.h - 18 }}" class="empty">{{ a.label }}</text>{% endif %}
+      <title>{{ a.name }}: {{ a.label }}{% if a.value %} ({{ a.count }} hazard{{ '' if a.count == 1 else 's' }}){% endif %}</title>
+    </a>
+    {% endfor %}
+  </svg>
+</div>
+
+<div class="basis">
+  <p><strong>Calculation:</strong> {{ v.basis }}{% if v.min_level %} Only {{ 'High and Extreme' if v.min_level == 'High' else 'Extreme' }} hazards.{% endif %}</p>
+  <p>Site total: <strong>{{ v.site_total }}</strong> from {{ v.hazards_counted }} hazard{{ '' if v.hazards_counted == 1 else 's' }}.
+    Shading is relative to the area with the highest value; a hatched area has nothing recorded for this view, which is not a statement that it is in order.</p>
+</div>
+
+<script>
+(() => {
+  const svg = document.getElementById('plan');
+  const full = [0, 0, 1000, 590];
+  let vb = full.slice();
+  const set = () => svg.setAttribute('viewBox', vb.map(n => Math.round(n)).join(' '));
+  const zoom = (f, cx = vb[0] + vb[2] / 2, cy = vb[1] + vb[3] / 2) => {
+    const w = Math.min(full[2], Math.max(150, vb[2] * f)), h = w * full[3] / full[2];
+    vb = [cx - (cx - vb[0]) * w / vb[2], cy - (cy - vb[1]) * h / vb[3], w, h];
+    set();
+  };
+  document.querySelectorAll('[data-zoom]').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.zoom === 'reset') { vb = full.slice(); set(); } else zoom(b.dataset.zoom === 'in' ? 0.7 : 1 / 0.7);
+  }));
+  const pt = e => { const r = svg.getBoundingClientRect(); return [vb[0] + (e.clientX - r.left) / r.width * vb[2], vb[1] + (e.clientY - r.top) / r.height * vb[3]]; };
+  svg.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = pt(e); zoom(e.deltaY < 0 ? 0.85 : 1 / 0.85, x, y); }, { passive: false });
+  let drag = null, moved = false;
+  svg.addEventListener('pointerdown', e => { moved = false; if (vb[2] < full[2]) drag = [e.clientX, e.clientY, vb[0], vb[1]]; });
+  svg.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (Math.abs(e.clientX - drag[0]) + Math.abs(e.clientY - drag[1]) > 4) moved = true;
+    const r = svg.getBoundingClientRect();
+    vb[0] = drag[2] - (e.clientX - drag[0]) / r.width * vb[2]; vb[1] = drag[3] - (e.clientY - drag[1]) / r.height * vb[3]; set();
+  });
+  svg.addEventListener('pointerup', () => { drag = null; });
+  // a drag to pan must not also open the area under the pointer
+  svg.addEventListener('click', e => { if (moved) { e.preventDefault(); moved = false; } }, true);
+})();
+</script>
+{% endblock %}

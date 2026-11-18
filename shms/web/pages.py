@@ -132,6 +132,26 @@ def logout():
 
 
 @router.get("/")
+def home(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
+    """Role-specific home: the list this person has to act on first."""
+    return render(request, "home.html", user, db, home=services.role_home(db, user))
+
+
+@router.get("/site")
+def site_plan(
+    request: Request,
+    overlay: str = "open_risk",
+    window: str = "90",
+    level: str = "",
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
+    window_days = int(window) if window.isdigit() else 90
+    view = services.site_overview(db, overlay=overlay, window_days=window_days, min_level=level or None)
+    return render(request, "site.html", user, db, v=view, windows=services.WINDOWS)
+
+
+@router.get("/dashboard")
 def dashboard(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
     d = services.dashboard(db)
     recent = list(

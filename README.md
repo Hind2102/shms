@@ -111,7 +111,9 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_INSTANCE_DIR` | `instance` | Where that generated key is kept (Docker: `/data/instance`) |
 | `SHMS_DEMO_HEADER_AUTH` | `0` | `1` lets the API accept an `X-User-Id` header instead of a token – tests and local scripts only |
 
-Risk-matrix definitions, bands and target close-out times are in `shms/config/risk_matrix.json`; hazard
+The risk-matrix page separates what follows the ADOSH-SF guideline (the 5 × 5 consequence × likelihood structure)
+from what this project defined (level wording, bands, deadlines, and the history-based likelihood, which is a
+**project heuristic**, not a validated likelihood). Risk-matrix definitions, bands and target close-out times are in `shms/config/risk_matrix.json`; hazard
 categories are in `shms/config/taxonomy.json`. Both can be changed without code changes.
 
 ## Usage
@@ -151,9 +153,15 @@ Main workflow:
    the audit trail with from/to status, who and when.
    `draft → open → planned → pending verification → closed`, with `pending verification → open` (reject) and
    `closed → open` (reopen).
-4. **Monitor** – the dashboard shows KPIs, the heat map (click an area for its live hazards, required PPE and
-   what the AI checks there),
-   weekly trend, repeat hotspots and the hazard register with filters.
+4. **Monitor** – each role starts on its own **home page**: the reporter sees their reports and closures to
+   check; the Area Owner their open hazards by deadline; the supervisor the verification queue, urgent and escalated
+   hazards; the manager site priorities, overdue actions and closure performance (verified closures by the target
+   date, median days to verified closure). The **site plan** (`/site`) is a zoomable plan view of the
+   *illustrative* refinery layout with filters (time window, risk level) and three overlays – open risk, overdue,
+   report volume – each stating its calculation, window and site total; an area with nothing recorded is hatched and
+   labelled as such, never as "safe", and report volume is shown in a neutral colour because it is not a measure of
+   danger. The dashboard (`/dashboard`) keeps the KPIs, trend, repeat hotspots and the hazard register.
+   Screenshots (desktop and phone): `docs/screenshots/`.
 
 **Overdue escalation** (project rule): an open or planned hazard past its target date is escalated to the safety
 supervisors (level 1) and, 7 days later, to the manager (level 2), once each. It runs on page loads (at most once a
@@ -207,7 +215,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-208 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+265 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
 cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
 constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the

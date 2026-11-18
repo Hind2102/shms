@@ -1,8 +1,11 @@
 :root {
-  --ink: #1d2733; --muted: #5f6b7a; --line: #dde2e8; --bg: #f4f6f8; --card: #fff;
-  --brand: #1f3a5f; --accent: #e8710a; --accent-dark: #c25e05;
+  /* Alumina refinery palette: control-room slate, alumina off-white, bauxite red for actions,
+     signal yellow only for focus/selection. Risk colours are semantic and unchanged. */
+  --ink: #1f2a2e; --muted: #66727a; --line: #d9ddda; --bg: #f5f6f4; --card: #fff;
+  --brand: #1f2a2e; --accent: #9a3b1b; --accent-dark: #7c2f15; --signal: #e7b416;
   --low: #2e7d32; --medium: #f9a825; --high: #ef6c00; --extreme: #c62828;
-  --radius: 10px;
+  --radius: 4px;
+  --display: "DIN Alternate", "DIN Next", Bahnschrift, "Roboto Condensed", "Arial Narrow", sans-serif;
 }
 * { box-sizing: border-box; }
 body { margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
@@ -35,7 +38,7 @@ h2 { font-size: 17px; margin: 0 0 10px; }
 .btn.block { display: block; width: 100%; text-align: center; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; }
 .lvl { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; }
 .lvl.Low { background: var(--low); } .lvl.Medium { background: var(--medium); color: #3b2d00; }
 .lvl.High { background: var(--high); } .lvl.Extreme { background: var(--extreme); }
@@ -73,3 +76,52 @@ textarea { min-height: 80px; }
 .hide { display: none; }
 
 .linkbtn { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+
+/* ---- Phase 3: typography, focus, role home pages, plan view, matrix sources ---- */
+h1, h2, h3, .kpi .v, .facts dd, .plan .val { font-family: var(--display); letter-spacing: .2px; }
+h1 { font-size: 26px; font-weight: 700; }
+h3 { font-size: 15px; margin: 14px 0 8px; }
+:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
+.btn.big { font-size: 17px; padding: 13px 22px; }
+.board-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.panel { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--line); padding: 14px 16px; margin: 0 0 16px; }
+.panel.attention { border-top-color: var(--accent); }
+.panel h2 { font-size: 17px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+.worklist tr.late td { background: #fbf1ec; }
+.late-tag { color: var(--accent); font-size: 12px; }
+.facts { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 0; }
+.facts dt { color: var(--muted); } .facts dd { margin: 0; font-size: 20px; text-align: right; }
+.disclaimer { display: inline-block; border-left: 4px solid var(--signal); background: #fffaea; padding: 6px 10px; margin: 0 0 14px; }
+.plan-filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.seg { border: 0; padding: 0; margin: 0; display: flex; gap: 0; }
+.seg legend { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.seg label { border: 1px solid var(--line); background: var(--card); padding: 7px 12px; cursor: pointer; margin: 0 -1px 0 0; }
+.seg input { position: absolute; opacity: 0; }
+.seg label:has(input:checked) { background: var(--ink); color: #fff; border-color: var(--ink); }
+.seg label:has(input:focus-visible) { outline: 3px solid var(--signal); }
+.plan { position: relative; background: var(--card); border: 1px solid var(--line); margin-top: 12px; touch-action: none; }
+.plan svg { display: block; width: 100%; height: auto; cursor: grab; }
+.plan-tools { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px; z-index: 1; }
+.plan-tools button { font: 600 15px/1 var(--display); background: var(--card); border: 1px solid var(--line); padding: 7px 10px; cursor: pointer; }
+.plan .area rect { stroke: var(--ink); stroke-width: 2; }
+.plan .area:hover rect, .plan .area:focus rect { stroke: var(--signal); stroke-width: 4; }
+.plan[data-scale="risk"] rect.lit { fill: rgb(154 59 27 / var(--t)); }
+.plan[data-scale="neutral"] rect.lit { fill: rgb(70 96 112 / var(--t)); }
+.plan text { fill: var(--ink); pointer-events: none; }
+.plan .code { font: 700 17px var(--display); } .plan .name { font-size: 12px; }
+.plan .val { font-size: 30px; font-weight: 700; } .plan .empty { font-size: 12px; fill: var(--muted); }
+.basis { max-width: 80ch; } .basis p { margin: 8px 0; }
+.panel.source.official { border-top-color: var(--signal); } .panel.source.project { border-top-color: var(--ink); }
+@media (max-width: 600px) { h1 { font-size: 22px; } .plan .name { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+.plan .area.dark text { fill: #fff; }
+.plan-filters select { min-width: 150px; width: auto; }
+.panel { overflow-x: auto; }
+@media (max-width: 600px) {
+  .worklist th, .worklist td { padding: 6px 4px; font-size: 13px; }
+  header.top nav { gap: 10px; }
+  header.top nav a { font-size: 13px; }
+}
+@media (max-width: 600px) { .plan-tools { position: static; justify-content: flex-end; padding: 6px; border-bottom: 1px solid var(--line); } }

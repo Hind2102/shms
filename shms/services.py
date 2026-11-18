@@ -559,3 +559,151 @@ def ai_monitoring(db: Session, now: datetime | None = None) -> dict:
         "weeks": weeks,
         "corrections": [{"ai": a, "reporter": b, "n": n} for (a, b), n in corrections.most_common(8)],
     }
+
+
+# ---------------------------------------------------------------- role home pages (Phase 3)
+
+HIGH_LEVELS = ("High", "Extreme")
+LEVEL_ORDER = {"Low": 1, "Medium": 2, "High": 3, "Extreme": 4}
+
+
+def role_home(db: Session, user: User, now: datetime | None = None) -> dict:
+    """What each role needs to act on first. Every list is computed on the server from the same data as the
+    dashboard; nothing here is a rating of how safe an area is."""
+    now = now or utcnow()
+    active = list(db.scalars(select(Hazard).where(Hazard.status.in_(ACTIVE))))
+    by_risk = sorted(active, key=lambda h: (-(h.risk_score or 0), h.due_at or now))
+    out: dict = {"role": user.role.value, "now": now}
+    if user.role == Role.REPORTER:
+        mine = db.scalars(select(Hazard).where(Hazard.reporter_id == user.id).order_by(Hazard.created_at.desc()))
+        out["my_reports"] = list(mine.all())[:20]
+        out["to_verify"] = [h for h in active if h.status == Status.PENDING_VERIFICATION and h.reporter_id == user.id]
+    elif user.role == Role.AREA_OWNER:
+        mine = [h for h in active if h.status in AWAITING_ACTION and user.id in (h.assignee_id, h.action_owner_id)]
+        out["my_work"] = sorted(mine, key=lambda h: h.due_at or now)
+        out["due_soon"] = [h for h in out["my_work"] if h.due_at and h.due_at <= now + timedelta(days=3)]
+        out["waiting_verification"] = [
+            h for h in active if h.status == Status.PENDING_VERIFICATION and h.closed_by_id == user.id
+        ]
+    elif user.role == Role.SUPERVISOR:
+        out["to_verify"] = sorted(
+            (h for h in active if h.status == Status.PENDING_VERIFICATION and h.closed_by_id != user.id),
+            key=lambda h: h.closed_at or now,
+        )
+        out["urgent"] = [h for h in by_risk if h.risk_level in HIGH_LEVELS]
+        out["escalated"] = sorted(
+            (h for h in active if (h.escalation_level or 0) > 0), key=lambda h: -(h.escalation_level or 0)
+        )
+    else:  # manager
+        out["priorities"] = by_risk[:8]
+        out["overdue"] = [h for h in by_risk if h.status in AWAITING_ACTION and h.due_at and h.due_at < now]
+        out["closure"] = closure_performance(db, now)
+        out["weeks"] = dashboard(db, now)["weeks"]
+    return out
+
+
+def closure_performance(db: Session, now: datetime | None = None, window_days: int = 90) -> dict:
+    """Verified closures in the window: how many, how many by their target date, median days to verified close."""
+    now = now or utcnow()
+    since = now - timedelta(days=window_days)
+    done = [
+        h
+        for h in db.scalars(select(Hazard).where(Hazard.status == Status.CLOSED, Hazard.verified_at.is_not(None)))
+        if h.verified_at >= since
+    ]
+    on_time = sum(1 for h in done if h.closed_at and h.due_at and h.closed_at <= h.due_at)
+    days = [(h.verified_at - h.created_at).total_seconds() / 86400 for h in done]
+    reopened = db.scalar(
+        select(func.count()).select_from(HazardEvent).where(HazardEvent.kind == "reopened", HazardEvent.at >= since)
+    )
+    return {
+        "window_days": window_days,
+        "verified_closures": len(done),
+        "on_time": on_time,
+        "on_time_share": on_time / len(done) if done else None,
+        "median_days_to_verified_close": round(median(days), 1) if days else None,
+        "reopened": reopened,
+    }
+
+
+# ---------------------------------------------------------------- refinery plan view (Phase 3)
+
+OVERLAYS = ("open_risk", "overdue", "reports")
+WINDOWS = (30, 90, 180)
+
+
+def site_overview(
+    db: Session,
+    overlay: str = "open_risk",
+    window_days: int = 90,
+    min_level: str | None = None,
+    now: datetime | None = None,
+) -> dict:
+    """Per-area values for the plan view. Each overlay states its calculation, time window and denominator.
+    An area with nothing recorded is labelled as such – never as safe – and report volume is not shown as danger."""
+    now = now or utcnow()
+    overlay = overlay if overlay in OVERLAYS else "open_risk"
+    window_days = window_days if window_days in WINDOWS else 90
+    since = now - timedelta(days=window_days)
+    floor = LEVEL_ORDER.get(min_level or "", 0)
+
+    def level_ok(h: Hazard) -> bool:
+        return LEVEL_ORDER.get(h.risk_level or "", 0) >= floor
+
+    confirmed = [h for h in db.scalars(select(Hazard).where(Hazard.status != Status.DRAFT)) if level_ok(h)]
+    if overlay == "open_risk":
+        pool = [h for h in confirmed if h.status in ACTIVE and h.created_at >= since]
+        value = lambda hs: sum(h.risk_score or 0 for h in hs)  # noqa: E731
+        basis = (
+            f"Sum of risk scores (consequence × likelihood) of active hazards – open, planned or awaiting "
+            f"verification – reported in the last {window_days} days, per area."
+        )
+        empty = "No recorded hazards in this window"
+        scale = "risk"
+    elif overlay == "overdue":
+        pool = [h for h in confirmed if h.status in AWAITING_ACTION and h.due_at and h.due_at < now]
+        value = len
+        basis = "Number of open or planned hazards past their target close date (any report date), per area."
+        empty = "No overdue hazards"
+        scale = "risk"
+    else:
+        pool = [h for h in confirmed if h.created_at >= since]
+        value = len
+        basis = (
+            f"Number of confirmed reports in the last {window_days} days, per area. Report volume reflects how much "
+            "people report – it is not a measure of danger."
+        )
+        empty = "No reports in this window"
+        scale = "neutral"
+    areas = list(db.scalars(select(Area).order_by(Area.id)))
+    rows = []
+    for a in areas:
+        hs = [h for h in pool if h.area_id == a.id]
+        v = value(hs)
+        rows.append(
+            {
+                "code": a.code,
+                "name": a.name,
+                "x": a.x,
+                "y": a.y,
+                "w": a.w,
+                "h": a.h,
+                "value": v,
+                "count": len(hs),
+                "label": f"{v}" if v else empty,
+            }
+        )
+    total = sum(r["value"] for r in rows)
+    peak = max([r["value"] for r in rows] + [1])
+    for r in rows:
+        r["ratio"] = r["value"] / peak
+    return {
+        "overlay": overlay,
+        "window_days": window_days,
+        "min_level": min_level if floor else None,
+        "basis": basis,
+        "scale": scale,
+        "areas": rows,
+        "site_total": total,
+        "hazards_counted": len(pool),
+    }

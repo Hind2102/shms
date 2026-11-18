@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import level, status %}
+{% block title %}Home{% endblock %}
+{% block content %}
+{% macro hazard_rows(items, empty, show) -%}
+<table class="worklist">
+  <tr><th>#</th><th>Area</th><th>Hazard</th><th>Risk</th>{% if 'due' in show %}<th>Target date</th>{% endif %}<th>Status</th></tr>
+  {% for h in items %}
+  <tr{% if 'due' in show and h.due_at and h.due_at < home.now %} class="late"{% endif %}>
+    <td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.area.code }}</td><td>{{ h.category_code | cat if h.category_code else 'Not confirmed yet' }}</td>
+    <td>{% if h.risk_level %}{{ level(h.risk_level) }} {{ h.risk_score }}{% else %}–{% endif %}</td>
+    {% if 'due' in show %}<td>{{ h.due_at | dt }}{% if h.due_at and h.due_at < home.now %} <strong class="late-tag">overdue</strong>{% endif %}</td>{% endif %}
+    <td>{{ status(h.status) }}{% if h.escalation_level %} <span class="small">escalated to level {{ h.escalation_level }}</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="muted">{{ empty }}</td></tr>{% endfor %}
+</table>
+{%- endmacro %}
+
+{% if home.role == 'reporter' %}
+<section class="board">
+  <div class="board-head"><h1>Your reports</h1><a class="btn big" href="/report">Report a hazard</a></div>
+  <p class="muted">Seen something unsafe? A photo and two taps is enough – the area owner is told straight away.</p>
+  {% if home.to_verify %}
+  <div class="panel attention"><h2>Closures to check</h2>
+    <p class="small">These were closed by the area owner. Look at the closing note and photo, then verify or reject.</p>
+    {{ hazard_rows(home.to_verify, '', []) }}</div>
+  {% endif %}
+  <div class="panel">{{ hazard_rows(home.my_reports, 'You have not reported anything yet.', []) }}</div>
+</section>
+
+{% elif home.role == 'area_owner' %}
+<section class="board">
+  <div class="board-head"><h1>Your open hazards</h1><a class="btn secondary" href="/queue">Open my queue</a></div>
+  <p class="muted">Sorted by target close date. Plan an action, then close it with what was done; a supervisor or the reporter verifies it.</p>
+  {% if home.due_soon %}<div class="panel attention"><h2>Due within 3 days or overdue</h2>{{ hazard_rows(home.due_soon, '', ['due']) }}</div>{% endif %}
+  <div class="panel">{{ hazard_rows(home.my_work, 'Nothing is waiting for you.', ['due']) }}</div>
+  <div class="panel"><h2>Closed by you, waiting for verification</h2>{{ hazard_rows(home.waiting_verification, 'None.', []) }}</div>
+</section>
+
+{% elif home.role == 'supervisor' %}
+<section class="board">
+  <div class="board-head"><h1>Waiting for your verification</h1><a class="btn secondary" href="/site">Site plan</a></div>
+  <p class="muted">A closure is only final when someone other than the person who closed it has checked it.</p>
+  <div class="panel attention">{{ hazard_rows(home.to_verify, 'No closures are waiting.', []) }}</div>
+  <div class="cols">
+    <div class="panel"><h2>Urgent: High and Extreme, still active</h2>{{ hazard_rows(home.urgent[:10], 'None.', ['due']) }}</div>
+    <div class="panel"><h2>Escalated (past target date)</h2>{{ hazard_rows(home.escalated[:10], 'None.', ['due']) }}</div>
+  </div>
+</section>
+
+{% else %}
+<section class="board">
+  <div class="board-head"><h1>Site priorities</h1><a class="btn secondary" href="/site">Site plan</a></div>
+  <p class="muted">The highest-risk hazards that are still active, then what is overdue and how closures are performing.</p>
+  <div class="panel attention">{{ hazard_rows(home.priorities, 'No active hazards are recorded.', ['due']) }}</div>
+  <div class="cols">
+    <div class="panel"><h2>Overdue actions ({{ home.overdue | length }})</h2>{{ hazard_rows(home.overdue[:10], 'None.', ['due']) }}</div>
+    <div class="panel"><h2>Closure performance, last {{ home.closure.window_days }} days</h2>
+      {% set c = home.closure %}
+      <dl class="facts">
+        <dt>Verified closures</dt><dd>{{ c.verified_closures }}</dd>
+        <dt>Closed by the target date</dt><dd>{% if c.verified_closures %}{{ c.on_time }} of {{ c.verified_closures }} ({{ (100 * c.on_time_share) | round | int }} %){% else %}–{% endif %}</dd>
+        <dt>Median days from report to verified closure</dt><dd>{{ c.median_days_to_verified_close if c.median_days_to_verified_close is not none else '–' }}</dd>
+        <dt>Reopened</dt><dd>{{ c.reopened }}</dd>
+      </dl>
+      <p class="small muted">Counts only closures verified in the window. Hazards closed before verification existed are not included.</p>
+    </div>
+  </div>
+  <div class="panel"><h2>Reported and verified closed per week</h2>{% from "_macros.html" import trend %}{{ trend(home.weeks) }}</div>
+</section>
+{% endif %}
+<p class="small muted">Full figures are on the <a href="/dashboard">site dashboard</a> and in the <a href="/hazards">hazard register</a>.</p>
+{% endblock %}
