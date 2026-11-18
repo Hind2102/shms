@@ -270,7 +270,7 @@ python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --split
 python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v2 --subset
 python -m evaluation.evaluate --root $SH17 --detector ollama --prompt v1 --subset   # first prompt, for comparison
 python -m evaluation.compare && python -m evaluation.compare --only-subset
-python -m evaluation.release_gate --run yolo_sh17_yolo9e          # decides which hazard types the app uses
+python -m evaluation.release_gate --run yolo_sh17_yolo9e --dry-run  # inspect the decision and preserve owner notes
 python -m evaluation.acceptance --run yolo_sh17_yolo9e            # SIMULATED reporter acceptance (proposal criterion)
 ```
 
@@ -336,8 +336,8 @@ in the app) and latency (≤ 20 s). The specificity threshold was added after th
 photos, so the test subset is not untouched for its design.
 
 **Simulated reporter acceptance** (the proposal's ≥ 80 % criterion, `evaluation/acceptance.py`): if a reporter keeps
-the AI's top suggestion whenever it names a violation that is really in the photo, 97.2 % of YOLOv9e suggestions would
-be accepted (1 450 / 1 492). This is a **simulation** and lenient by construction; real acceptance is recorded per
+the AI's top suggestion whenever it names a violation that is really in the photo, the simulated acceptance rate is
+97.2 % over photos with a released violation (1 450 / 1 492, including 27 photos with no suggestion in the denominator). This is a **simulation** and lenient by construction; real acceptance is recorded per
 report and shown on *AI monitoring*.
 
 ### External validation and stricter checks (Phase 2)

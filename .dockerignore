@@ -14,3 +14,10 @@ evaluation
 tests
 runs
 .DS_Store
+
+# Local-only records and authentication state are excluded from the build context.
+backups/
+instance/
+outbox/
+*.db-*
+*.bak
