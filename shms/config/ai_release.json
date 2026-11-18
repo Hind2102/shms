@@ -49,5 +49,11 @@
     "min_specificity": 0.8,
     "max_latency_p95_ms": 20000
   },
-  "decided_at": "2026-11-17T19:42:11+00:00"
+  "decided_at": "2026-11-17T19:42:11+00:00",
+  "notes": {
+    "no_hard_hat": {
+      "label": "validated on SH17 only – failed external validation (Hard Hat Workers): unverified suggestion",
+      "evidence": "External validation, pre-registered (docs/external_validation_plan.md) and run once: precision 0.281, recall 0.977, specificity 0.445 on 5 000 Hard Hat Workers images (evaluation/results/external_hardhat_yolo_sh17_yolo9e/). Kept enabled by the project owner's decision of 2026-11-18. Added by hand: re-running evaluation/release_gate.py rewrites this file and drops this note, so re-add it."
+    }
+  }
 }

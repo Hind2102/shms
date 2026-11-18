@@ -20,6 +20,7 @@ synthetic images only. No paid API is used.
 | **Course** | Software Engineering and Programming – Master in Applied Artificial Intelligence |
 | **Tested on** | macOS 26.6 on an Apple M5 Pro (24 GB) with Python 3.12.14 (see `docs/verification.md`); GitHub Actions on Ubuntu and macOS with Python 3.11 and 3.12, plus a Docker build and smoke test, on every push and pull request |
 | **Paid APIs** | None |
+| **Licence** | GNU AGPL-3.0 (`LICENSE`), because the app uses Ultralytics YOLO (AGPL-3.0) |
 
 ---
 
@@ -311,7 +312,7 @@ correctly left alone), **MCC** (0 = no better than always answering "violation")
 
 | Hazard | Model | Precision | Recall | Specificity | MCC | F1 (always-yes F1) | Release gate |
 |---|---|---:|---:|---:|---:|---:|---|
-| No hard hat | YOLOv9e | 0.964 | 0.968 | 0.887 | 0.859 | 0.966 (0.864) | ✅ approved |
+| No hard hat | YOLOv9e | 0.964 | 0.968 | 0.887 | 0.859 | 0.966 (0.864) | ✅ approved – *validated on SH17 only – failed external validation (Hard Hat Workers): unverified suggestion* |
 | No eye / face protection | YOLOv9e | 0.959 | 0.957 | 0.934 | 0.891 | 0.958 (0.761) | ✅ approved |
 | No gloves | YOLOv9e | 0.965 | 0.957 | 0.885 | 0.833 | 0.961 (0.870) | ✅ approved |
 | No hi-vis vest | YOLOv9e | 0.950 | 0.970 | **0.582** | 0.599 | 0.960 (0.942) | ❌ rejected |
@@ -345,7 +346,11 @@ report and shown on *AI monitoring*.
   any image was downloaded, run once on 5 000 images of the independent *Hard Hat Workers* dataset (CC0): precision
   **0.281**, recall 0.977, specificity **0.445** (`evaluation/results/external_hardhat_yolo_sh17_yolo9e/`). The model
   misses most hard hats in these small (416 px) photos (it detects about 39 % of them), so it flags compliant workers.
-  The app's release decision is unchanged, as pre-registered; the SH17 results above do not transfer to this data.
+  The SH17 results above do not transfer to this data. **Owner decision (2026-11-18):** the hard-hat check stays
+  enabled, but the app labels it everywhere it appears (confirm page, area page, hazard page) as "validated on SH17
+  only – failed external validation (Hard Hat Workers): unverified suggestion"; the label comes from the `notes`
+  field of `shms/config/ai_release.json`. The release-gate code and results are unchanged; re-running the gate
+  rewrites that file and drops the note, which must then be re-added.
   Eye protection and gloves have no external validation (no public labelled set was found that maps to them).
 * **Stricter label analysis on SH17** (`evaluation/label_rule_audit.py`): on photos where the relevant body part is
   labelled, specificity is lower than in the released figures – hard hat 0.750 (64 negatives), eye protection 0.828,
@@ -390,7 +395,7 @@ cause unknown** (details in `docs/verification.md`).
 | **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, plan view, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
 | **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic test data only; flag off by default); the vision-language model as a PPE detector |
-| **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves; a licence for this project's code |
+| **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
 
 ## Data, privacy and limitations
 
@@ -418,7 +423,7 @@ cause unknown** (details in `docs/verification.md`).
 | Qwen2.5-VL 7B via Ollama (`qwen2.5vl:7b`) | vision-language comparison | Apache 2.0 (`ollama show qwen2.5vl:7b --license`) |
 | Hard Hat Workers (Make ML), Hugging Face `Voxel51/hard-hat-detection` | external validation of the hard-hat check | CC0 1.0. Not redistributed here |
 | Warehouse Safety Hazard Detection (J. S. Sohal), Hugging Face `Jsohal174/warehouse-safety-hazard-dataset` | experimental unsafe-conditions test | CC BY 4.0; synthetic images (Blender + Google Gemini). Not redistributed here |
-| This project's code | – | written by the author for the course; no licence file has been chosen yet |
+| This project's code | – | GNU AGPL-3.0 (`LICENSE`), chosen because the app depends on Ultralytics (AGPL-3.0) |
 
 ## Acknowledgements
 

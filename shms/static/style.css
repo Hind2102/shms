@@ -125,3 +125,4 @@ h3 { font-size: 15px; margin: 14px 0 8px; }
   header.top nav a { font-size: 13px; }
 }
 @media (max-width: 600px) { .plan-tools { position: static; justify-content: flex-end; padding: 6px; border-bottom: 1px solid var(--line); } }
+.caveat { color: var(--accent-dark); }

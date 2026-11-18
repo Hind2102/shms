@@ -71,3 +71,10 @@ def experimental_codes() -> list[str]:
     if not get_settings().experimental_conditions:
         return []
     return [c.code for c in categories().values() if c.experimental]
+
+
+def release_note(code: str) -> str | None:
+    """Caveat attached to a released hazard type in the release file (e.g. failed external validation)."""
+    r = release() or {}
+    note = (r.get("notes") or {}).get(code)
+    return note.get("label") if isinstance(note, dict) else None

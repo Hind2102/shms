@@ -9,6 +9,8 @@ description = "Site Hazard Management System: AI-assisted hazard reporting, ADOS
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Hind Alhmoudi" }]
+license = { text = "AGPL-3.0-only" }
+classifiers = ["License :: OSI Approved :: GNU Affero General Public License v3"]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
