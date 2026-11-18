@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
@@ -30,6 +31,20 @@ class CloseIn(BaseModel):
     action: str
 
 
+class PlanIn(BaseModel):
+    action: str
+    owner_id: int | None = None
+    due: datetime | None = None
+
+
+class NoteIn(BaseModel):
+    note: str = ""
+
+
+class ReasonIn(BaseModel):
+    reason: str
+
+
 def hazard_out(h: Hazard) -> dict:
     return {
         "id": h.id,
@@ -52,7 +67,22 @@ def hazard_out(h: Hazard) -> dict:
         "closed_at": h.closed_at.isoformat() if h.closed_at else None,
         "closure_action": h.closure_action,
         "closed_on_spot": h.closed_on_spot,
-        "events": [{"kind": e.kind, "actor_id": e.actor_id, "note": e.note, "at": e.at.isoformat()} for e in h.events],
+        "planned_action": h.planned_action,
+        "action_owner_id": h.action_owner_id,
+        "action_due_at": h.action_due_at.isoformat() if h.action_due_at else None,
+        "verified_at": h.verified_at.isoformat() if h.verified_at else None,
+        "verified_by_id": h.verified_by_id,
+        "events": [
+            {
+                "kind": e.kind,
+                "actor_id": e.actor_id,
+                "note": e.note,
+                "at": e.at.isoformat(),
+                "from_status": e.from_status,
+                "to_status": e.to_status,
+            }
+            for e in h.events
+        ],
     }
 
 
@@ -122,6 +152,43 @@ def close_hazard(
     hazard_id: int, body: CloseIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
     h = services.close(db, _get(db, hazard_id), user, body.action)
+    db.commit()
+    return hazard_out(h)
+
+
+@router.post("/hazards/{hazard_id}/plan")
+def plan_hazard(
+    hazard_id: int, body: PlanIn, user: User = Depends(current_user), db: Session = Depends(get_session)
+) -> dict:
+    due = body.due.replace(tzinfo=None) if body.due else None
+    h = services.plan_action(db, _get(db, hazard_id), user, body.action, owner_id=body.owner_id, due=due)
+    db.commit()
+    return hazard_out(h)
+
+
+@router.post("/hazards/{hazard_id}/verify")
+def verify_hazard(
+    hazard_id: int, body: NoteIn, user: User = Depends(current_user), db: Session = Depends(get_session)
+) -> dict:
+    h = services.verify(db, _get(db, hazard_id), user, body.note)
+    db.commit()
+    return hazard_out(h)
+
+
+@router.post("/hazards/{hazard_id}/reject")
+def reject_hazard(
+    hazard_id: int, body: ReasonIn, user: User = Depends(current_user), db: Session = Depends(get_session)
+) -> dict:
+    h = services.reject(db, _get(db, hazard_id), user, body.reason)
+    db.commit()
+    return hazard_out(h)
+
+
+@router.post("/hazards/{hazard_id}/reopen")
+def reopen_hazard(
+    hazard_id: int, body: ReasonIn, user: User = Depends(current_user), db: Session = Depends(get_session)
+) -> dict:
+    h = services.reopen(db, _get(db, hazard_id), user, body.reason)
     db.commit()
     return hazard_out(h)
 

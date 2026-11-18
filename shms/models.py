@@ -40,9 +40,11 @@ class Role(str, enum.Enum):
 
 
 class Status(str, enum.Enum):
-    DRAFT = "draft"  # photo uploaded and AI has run; reporter has not confirmed yet
-    OPEN = "open"  # confirmed and routed to the Area Owner
-    CLOSED = "closed"  # action taken and documented
+    DRAFT = "draft"  # observation: photo uploaded and AI has run; reporter has not confirmed yet
+    OPEN = "open"  # human-confirmed hazard, assigned to the Area Owner
+    PLANNED = "planned"  # corrective action planned with an action owner and a deadline
+    PENDING_VERIFICATION = "pending_verification"  # closed by the owner, waiting for an independent check
+    CLOSED = "closed"  # closure verified by a supervisor or the reporter
 
 
 class User(Base):
@@ -50,6 +52,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[Role] = mapped_column(Enum(Role))
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     areas: Mapped[list[Area]] = relationship(back_populates="owner")
 
@@ -77,6 +80,18 @@ class Area(Base):
         return [p.strip() for p in self.required_ppe.split(",") if p.strip()]
 
     @property
+    def unchecked_ppe(self) -> list[str]:
+        """Required PPE items that no released AI check covers (the AI checks presence, not the type of PPE)."""
+        covered = {
+            "no_hard_hat": ("hard hat", "helmet"),
+            "no_eye_protection": ("glasses", "goggles", "face shield", "visor"),
+            "no_gloves": ("glove",),
+            "no_hi_vis_vest": ("hi-vis", "vest"),
+        }
+        words = [w for code in self.check_codes for w in covered.get(code, ())]
+        return [p for p in self.ppe_list if not any(w in p.lower() for w in words)]
+
+    @property
     def check_codes(self) -> list[str]:
         """PPE this area requires that the AI is released to check (area rule ∩ release gate)."""
         from . import taxonomy
@@ -93,6 +108,7 @@ class Hazard(Base):
         CheckConstraint("likelihood IS NULL OR likelihood BETWEEN 1 AND 5", name="ck_likelihood_1_5"),
         CheckConstraint("risk_score IS NULL OR risk_score BETWEEN 1 AND 25", name="ck_risk_1_25"),
         CheckConstraint("status != 'CLOSED' OR closure_action IS NOT NULL", name="ck_closed_has_action"),
+        CheckConstraint("status != 'PENDING_VERIFICATION' OR closure_action IS NOT NULL", name="ck_pending_has_action"),
         UniqueConstraint("reporter_id", "idem_key", name="uq_reporter_idem_key"),
         # Indexes match the hot queries: likelihood look-up, dashboard / register filters.
         Index("ix_hazard_area_cat_time", "area_id", "category_code", "created_at"),
@@ -136,10 +152,20 @@ class Hazard(Base):
     closure_photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     closed_on_spot: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Action plan and independent verification of the closure
+    action_owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    action_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Overdue escalation: 0 = none, 1 = supervisors notified, 2 = managers notified (see shms/escalate.py)
+    escalation_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
     area: Mapped[Area] = relationship(back_populates="hazards")
     reporter: Mapped[User] = relationship(foreign_keys=[reporter_id])
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
     closed_by: Mapped[User | None] = relationship(foreign_keys=[closed_by_id])
+    action_owner: Mapped[User | None] = relationship(foreign_keys=[action_owner_id])
+    verified_by: Mapped[User | None] = relationship(foreign_keys=[verified_by_id])
     events: Mapped[list[HazardEvent]] = relationship(
         back_populates="hazard", order_by="HazardEvent.at", cascade="all, delete-orphan"
     )
@@ -152,8 +178,11 @@ class HazardEvent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     hazard_id: Mapped[int] = mapped_column(ForeignKey("hazards.id"))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    kind: Mapped[str] = mapped_column(String(30))  # reported, confirmed, assigned, planned, closed, alerted
+    kind: Mapped[str] = mapped_column(String(30))  # reported, confirmed, assigned, planned, closed, verified, ...
     note: Mapped[str] = mapped_column(Text, default="")
+    # Set for every status change (state-machine transition); empty for events that do not change status.
+    from_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    to_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     hazard: Mapped[Hazard] = relationship(back_populates="events")

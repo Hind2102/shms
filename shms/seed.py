@@ -123,7 +123,8 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     rng = random.Random(rng_seed)
     now = now or utcnow()
 
-    users = [User(name=n, role=r) for n, r in USERS]
+    # Demo addresses use the reserved .example domain: the test outbox can never deliver real mail.
+    users = [User(name=n, role=r, email=f"{n.split()[0].lower()}@shms.example") for n, r in USERS]
     db.add_all(users)
     db.flush()
     areas = [
@@ -144,6 +145,7 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     db.flush()
 
     reporters = [u for u in users if u.role == Role.REPORTER]
+    supervisor = next(u for u in users if u.role == Role.SUPERVISOR)
     area_w = [a[-1] for a in AREAS]
     times = sorted(now - timedelta(days=rng.uniform(0, 180), hours=rng.uniform(0, 12)) for _ in range(n_history))
 
@@ -168,12 +170,18 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
             ),
             at=t,
         )
+        close_at = t if on_spot else None
         if not on_spot:
             # Older hazards are mostly closed; recent ones are more likely still open.
             age = (now - t).days
             if rng.random() < min(0.97, 0.35 + age / 60):
                 close_at = min(now, t + timedelta(days=rng.uniform(0.2, 1.6) * (h.due_at - t).days + 0.1))
                 services.close(db, h, area.owner, ACTIONS[cat], at=close_at)
+        if close_at is not None:
+            # The safety supervisor verifies closures a few days later; recent ones are still waiting.
+            verify_at = close_at + timedelta(days=rng.uniform(0.5, 3))
+            if verify_at < now:
+                services.verify(db, h, supervisor, "Checked on site (synthetic)", at=verify_at)
     db.commit()
 
 

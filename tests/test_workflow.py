@@ -37,9 +37,10 @@ def test_confirmed_report_is_routed_to_area_owner(empty_db):
     assert [e.kind for e in h.events] == ["reported", "confirmed", "assigned"]
 
 
-def test_fixed_on_spot_closes_immediately_and_records_how(empty_db):
+def test_fixed_on_spot_records_how_and_awaits_verification(empty_db):
+    # Requirement change (workflow v2): a closure is only final after independent verification.
     h = report(empty_db, fixed_on_spot=True, closure_action="Issued hard hat")
-    assert h.status == Status.CLOSED and h.closed_on_spot
+    assert h.status == Status.PENDING_VERIFICATION and h.closed_on_spot
     assert h.closure_action == "Issued hard hat" and h.closed_at is not None
 
 
@@ -96,7 +97,7 @@ def test_owner_closes_with_documented_action(empty_db):
     owner = empty_db.get(User, h.area.owner_id)
     services.plan_action(empty_db, h, owner, "Toolbox talk on Monday")
     services.close(empty_db, h, owner, "Hard hat issued; crew briefed")
-    assert h.status == Status.CLOSED and h.closed_by_id == owner.id
+    assert h.status == Status.PENDING_VERIFICATION and h.closed_by_id == owner.id
     assert [e.kind for e in h.events][-2:] == ["planned", "closed"]
 
 
@@ -115,7 +116,7 @@ def test_only_owner_or_supervisor_can_close(empty_db):
     with pytest.raises(PermissionDenied):
         services.close(empty_db, h, other_owner, "done")
     services.close(empty_db, h, roles[Role.SUPERVISOR][0], "done by supervisor")
-    assert h.status == Status.CLOSED
+    assert h.status == Status.PENDING_VERIFICATION
 
 
 def test_closed_hazard_cannot_be_closed_again(empty_db):
@@ -131,8 +132,9 @@ def test_only_reporter_confirms(empty_db):
         services.confirm(empty_db, h, roles[Role.AREA_OWNER][0], Confirmation("no_gloves", 2))
 
 
-def test_transition_table_has_no_way_out_of_closed():
-    assert services.ALLOWED_TRANSITIONS[Status.CLOSED] == set()
+def test_closed_hazard_can_only_be_reopened():
+    # Requirement change (workflow v2): a verified closure can be reopened with a reason, nothing else.
+    assert services.ALLOWED_TRANSITIONS[Status.CLOSED] == {Status.OPEN}
 
 
 def test_dashboard_counts_new_report_immediately(empty_db):

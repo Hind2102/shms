@@ -45,8 +45,11 @@ def test_full_workflow_and_dashboard_update(client):
     assert elapsed < 5  # success criterion: report visible in seconds, not minutes
 
     r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(OWNER_DIG), json={"action": "Hard hat issued"})
-    assert r.status_code == 200 and r.json()["status"] == "closed"
+    # Requirement change (workflow v2): the owner's closure waits for independent verification.
+    assert r.status_code == 200 and r.json()["status"] == "pending_verification"
     assert [e["kind"] for e in r.json()["events"]][-1] == "closed"
+    r = client.post(f"/api/hazards/{hz['id']}/verify", headers=h(SUPERVISOR), json={"note": "Checked on site"})
+    assert r.status_code == 200 and r.json()["status"] == "closed" and r.json()["verified_by_id"] == SUPERVISOR
 
 
 def test_reporter_can_correct_ai(client):
