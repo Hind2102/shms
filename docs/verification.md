@@ -1192,3 +1192,11 @@ reviewed the synthesized layout. **Readiness:** software, tests, CI, Docker and 
    table, licences table and status table updated.
 
 Suite: 288 passed; ruff clean.
+
+### Screenshot of the confirm page (2026-11-18)
+
+`docs/screenshots/desktop_confirm.png` (1366 px, full page): signed in as `ahmed`, report in Digestion, photo
+`data/samples/sh17_pexels-photo-7888728__…jpg` uploaded through the real form; app with `SHMS_DETECTOR=yolo`,
+`models/sh17_yolo9e.pt` on `mps`, scratch database. Checked in the page: 5 detection boxes drawn, the hard-hat
+suggestion carries "AI check validated on SH17 only – failed external validation (Hard Hat Workers): unverified
+suggestion", model `yolo:sh17_yolo9e` named; 0 server tracebacks. Script: `docs/screenshots/shoot_confirm.py`.
