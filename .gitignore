@@ -35,3 +35,6 @@ outbox/
 
 # Generated secret key for signing sessions (never commit)
 instance/
+
+# Local cache of SH17 image hashes (re-computed when missing)
+evaluation/results/*/sh17_dhash_cache.json
