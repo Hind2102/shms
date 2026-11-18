@@ -3,6 +3,7 @@ file to a local outbox folder (SHMS_MAIL_OUTBOX, default ./outbox). Nothing is s
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime
 from email.message import EmailMessage
@@ -13,6 +14,7 @@ from .models import Hazard, Notification, User, utcnow
 from .settings import get_settings
 
 SENDER = "SHMS <no-reply@shms.example>"
+log = logging.getLogger("shms")
 
 
 def _write_eml(user: User, subject: str, body: str, at: datetime) -> None:
@@ -35,4 +37,7 @@ def send(
     at = at or utcnow()
     for u in users:
         db.add(Notification(user_id=u.id, hazard=hazard, message=subject, created_at=at))
-        _write_eml(u, subject, body or subject, at)
+        try:
+            _write_eml(u, subject, body or subject, at)
+        except OSError:  # a mail problem must never stop a hazard report or a workflow step
+            log.exception("Could not write notification e-mail to the outbox")
