@@ -1013,3 +1013,39 @@ Status 2026-11-18: **not done** (`evaluation/data/label_audit_results.csv` absen
 Optional and separate: `evaluation/data/label_rule_gallery.html` shows examples of each disagreement category (green =
 labels, red = model) to judge "no person box ≠ no person visible", occlusion and PPE-not-required scenes. It is not a
 substitute for the audit and its impressions should not be reported as numbers.
+
+### P2.1 External validation on untouched data – hard hat check (pre-registered, run once)
+
+| Step | Evidence |
+|---|---|
+| Dataset chosen | Hard Hat Workers (Make ML), Hugging Face `Voxel51/hard-hat-detection`, **CC0**, 5 000 images (mostly 416 × 416 px), classes helmet / head (= head without hard hat) / person; not peer-reviewed; collection and annotation process undocumented |
+| Plan committed **before** any image download or model run | `docs/external_validation_plan.md`, commit `22d9a6e` (2026-11-18 09:28 +04), pushed to GitHub. Only `samples.json` (labels) had been read |
+| Script committed before the run | `evaluation/external_hardhat.py` + 3 tests, commit `1cc01a9` |
+| Images downloaded | `uvx --from huggingface_hub hf download Voxel51/hard-hat-detection --repo-type dataset --include "data/*"` → 5 000 PNG, 1.2 GB, 0 missing; folder `~/Desktop/Final SEP/datasets/hardhat_workers` (outside git) |
+| Run (once) | `python -m evaluation.external_hardhat --root …/hardhat_workers --sh17 …/sh17 --device mps` at code `023c947`; 0 errors; results commit `e151bea` |
+
+Only `no_hard_hat` can be evaluated (no labels for eyes, gloves or vests). Leakage: **1** image is a dHash
+near-duplicate (≤ 4 bits) of an SH17 image.
+
+| Analysis | Pos / Neg | TP | FP | FN | TN | Precision [95% CI] | Recall [95% CI] | Specificity [95% CI] | MCC | F1 | Always-yes F1 |
+|---|---|---:|---:|---:|---:|---|---|---|---:|---:|---:|
+| **Primary** (rule engine on the labels) | 908 / 4 092 | 887 | 2 271 | 21 | 1 821 | **0.281** [0.27–0.30] | 0.977 [0.97–0.99] | **0.445** [0.43–0.46] | 0.337 | 0.436 | 0.307 |
+| Sensitivity: any `head` box | 920 / 4 080 | 898 | 2 260 | 22 | 1 820 | 0.284 | 0.976 | 0.446 | 0.339 | 0.440 | 0.311 |
+| Without the near-duplicate | 908 / 4 091 | 887 | 2 271 | 21 | 1 820 | 0.281 | 0.977 | 0.445 | 0.337 | 0.436 | 0.307 |
+
+**Verdict (pre-registered thresholds P ≥ 0.80, R ≥ 0.75, Spec ≥ 0.80): FAIL** on precision and specificity. Recall
+passes. The threshold sweep (report only) has specificity between 0.41 and 0.46 at every threshold from 0.10 to 0.70,
+so no operating threshold would have passed.
+
+Diagnostic (after the verdict; changes nothing): of the 2 271 false alarms, the model detected **no** hard hat in
+876, fewer hard hats than labelled in 1 337, and all hard hats but judged a head uncovered by the rule's geometry in
+58. On the 4 092 compliant images the labels contain 16 604 hard hats; the model detects 6 428 (≈ 39 %). The failure
+is therefore mainly **hard-hat detection** on this data (small, low-resolution heads in 416 px photos), not the rule.
+A plausible contributor – not tested – is that hard hats are rare in SH17 (154 helmet boxes vs 2 427 heads in its test
+split).
+
+Interpretation: the SH17 hold-out result (precision 0.964, specificity 0.887) does **not** transfer to this
+independent dataset. Together with the stricter SH17 analysis (P2.2: specificity 0.750 on images with a labelled head),
+the evidence says the released hard-hat check over-reports violations whenever many workers do wear hard hats and the
+images are small. As pre-registered, the app's release decision is unchanged; this is a documented limitation and a
+decision for the owner (Handover). Status labels: external validation – implemented+tested (run once); verdict – FAIL.
