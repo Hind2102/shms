@@ -347,6 +347,17 @@ cause unknown** (details in `docs/verification.md`).
   by alarms and emergency response, and steam plumes in a refinery would cause frequent false alarms.
 * SH17 images come from Pexels (manufacturing settings), not refineries, so field performance may differ.
 
+## Licences of data and models
+
+| Item | Used for | Licence / terms (as stated by the source) |
+|---|---|---|
+| SH17 dataset (Ahmad & Rahimi 2024), Kaggle `mugheesahmad/sh17-dataset-for-ppe-detection` | evaluation (held-out split), label audit | CC BY-NC-SA 4.0; images from Pexels (Pexels licence notice applies); research and education only. Not redistributed here – downloaded by each user |
+| SH17 YOLO weights (`yolo8s.pt`, `yolo9e.pt`, GitHub release v1 of `ahmadmughees/SH17dataset`) | the app's detector, evaluation | no licence is stated in the repository; used here for non-commercial academic evaluation only; not committed (downloaded and checksummed by `scripts/download_models.py`) |
+| Ultralytics YOLO | running the weights | AGPL-3.0 |
+| Qwen2.5-VL 7B via Ollama (`qwen2.5vl:7b`) | vision-language comparison | Apache 2.0 (`ollama show qwen2.5vl:7b --license`) |
+| Hard Hat Workers (Make ML), Hugging Face `Voxel51/hard-hat-detection` | external validation of the hard-hat check | CC0 1.0. Not redistributed here |
+| This project's code | – | written by the author for the course; no licence file has been chosen yet |
+
 ## Acknowledgements
 
 SH17 dataset and YOLO weights: H. M. Ahmad and A. Rahimi, <https://github.com/ahmadmughees/SH17dataset>.
