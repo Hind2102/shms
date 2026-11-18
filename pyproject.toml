@@ -17,6 +17,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pillow>=10.0",
     "httpx>=0.27",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -28,7 +29,7 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 include = ["shms*"]
 
 [tool.setuptools.package-data]
-shms = ["templates/*.html", "static/*", "config/*.json"]
+shms = ["templates/*.html", "static/*", "config/*.json", "migrations/script.py.mako"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

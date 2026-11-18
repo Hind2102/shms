@@ -239,5 +239,5 @@ def test_old_database_gives_clear_message(tmp_path):
     con.commit()
     con.close()
     dbmod.init_engine(f"sqlite:///{path}")
-    with pytest.raises(dbmod.SchemaMismatch, match="Move the file aside"):
+    with pytest.raises(dbmod.SchemaMismatch, match="alembic upgrade head"):
         dbmod.create_all()

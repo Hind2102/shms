@@ -27,6 +27,7 @@ shms/                     the web application (Python package)
   main.py, asgi.py        app factory and ASGI entry point
   settings.py             configuration from SHMS_* environment variables / .env
   models.py, db.py        SQLAlchemy data model (users, areas, hazards, events, notifications)
+  migrations/             Alembic migrations (`alembic upgrade head`; configuration in alembic.ini)
   services.py             workflow state machine, routing, alerts, dashboard queries
   risk.py, taxonomy.py    risk matrix and hazard categories (data in shms/config/*.json)
   detection/              HazardDetector interface + YOLO, Ollama and mock implementations, PPE rules
@@ -146,8 +147,18 @@ check *healthy*, runs as non-root). Compose publishes port 8000; if that port is
 `"8765:8000"` in `docker-compose.yml`.
 
 To reset the demo: stop the server and move `shms.db` and `uploads/` aside (e.g. into `backups/`, which git
-ignores), or point `SHMS_DATABASE_URL` at a new file such as `sqlite:///shms_demo.db`. After upgrading SHMS, do the
-same with an old `shms.db`: the app refuses to start on an outdated schema and says so.
+ignores), or point `SHMS_DATABASE_URL` at a new file such as `sqlite:///shms_demo.db`.
+
+**Upgrading an existing database.** Schema changes are Alembic migrations (`shms/migrations/`). After pulling a new
+version, back up the database file and run
+
+```bash
+cp shms.db backups/shms_$(date +%F).db     # rollback = put this copy back (and check out the older code)
+alembic upgrade head                        # migrates the database in SHMS_DATABASE_URL, keeps all rows
+```
+
+The app refuses to start on a database that is not at the newest migration and prints this instruction. Databases
+created before migrations existed (no `alembic_version` table) are recognised and upgraded too.
 
 ## Testing
 

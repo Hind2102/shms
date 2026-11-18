@@ -729,3 +729,47 @@ Real acceptance is recorded per report in the app (`ai_accepted`) and shown on `
 The pushed history contains the committer e-mail configured for this repository on all commits and, in six commit
 messages written by the course-update patches, a `Claude-Session:` link (only openable by its owner). The secret scan
 (8.3) found no credentials.
+
+---
+
+# Phase 1b (part 1) – Alembic migrations (branch `feature/migrations`, 2026-11-18)
+
+Status: **implemented+tested**.
+
+- `alembic.ini` (root) + `shms/migrations/` (inside the package, so the Docker image has them). The URL comes from
+  `SHMS_DATABASE_URL`/`.env`. `alembic` added to `pyproject.toml` and the Dockerfile's dependency list.
+- `0001_baseline`: the original schema (`de90451`), created only if tables are missing.
+- `0002_course_upgrade`: `idem_key`, `uq_reporter_idem_key`, four CHECK constraints, three indexes (SQLite batch
+  mode), each only if missing – so both an unstamped old database and an unstamped database from `b2f307b`–`aa90777`
+  upgrade with the same command.
+- `shms/db.py`: `schema_status()` (`empty`/`current`/`outdated`), `migrate_to_head(url)`; `create_all()` creates
+  a new database and stamps it at head, and refuses an outdated one with "Back up the file, then run
+  `alembic upgrade head`".
+- Tests `tests/test_migrations.py` (4): old-schema fixture upgraded with identical counts and joins; outdated message;
+  new DB at head; migrated schema == model schema (`alembic.autogenerate.compare_metadata` → no differences).
+  TDD note: the two migration scripts were written before their tests; to show the tests can catch a broken
+  migration, 0002 was mutated (no `idem_key`) → 2 tests failed; restored → 4 passed.
+- Bug found and fixed during this task (caught by the existing `test_database_rejects_invalid_values`): stamping a
+  new database through the migration environment left SQLite foreign-key enforcement switched off on the shared
+  connection (`PRAGMA foreign_keys` cannot be changed inside a transaction). Fix: stamp directly with
+  `MigrationContext.stamp`, and run migrations on a private engine that is disposed afterwards. Suite: 125 passed.
+
+Verification on copies (originals untouched; backup SHA-256 `a3d05d76…` before and after):
+
+```bash
+cp backups/shms_2026-11-17.db $TMP/mig_old.db; cp shms_demo.old.db $TMP/mig_demo.db
+SHMS_DATABASE_URL=sqlite:///$TMP/mig_old.db alembic upgrade head
+```
+
+| Copy of | Rows users/areas/hazards/events/notifications | Hazard+relationship hash | Events hash | FK violations after | Version after |
+|---|---|---|---|---:|---|
+| `backups/shms_2026-11-17.db` (pre-`b2f307b` schema) | 9 / 9 / 240 / 1 010 / 200 – identical | `a27eb9105fa4ac2a` = | `de70e25fcb9cdd8f` = | 0 | `0002_course_upgrade` |
+| `shms_demo.old.db` (current schema, unstamped) | 9 / 9 / 241 / 1 017 / 196 – identical | `c145c8747adb93cf` = | `1057d4660c52a33b` = | 0 | `0002_course_upgrade` |
+
+The hash covers, per hazard: id, status, area id and code, reporter id and name, assignee, closer, category, risk
+score, closure action, number of events and of notifications. The app refuses the unmigrated copy with the new
+message and starts on the migrated copy.
+
+**Rollback path:** migrations are applied to a file that was copied first; to roll back, stop the app, put the copy
+back and check out the code version that matches it (the old file needs code ≤ `aa90777`). `alembic downgrade` is
+implemented for 0002 but restoring the copy is the documented path.
