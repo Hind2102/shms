@@ -19,6 +19,7 @@ datasets/
 evaluation/data/sh17_test_abs.txt
 evaluation/data/sh17_eval.yaml
 evaluation/data/label_audit.html
+evaluation/data/label_rule_gallery.html
 runs/
 
 # OS / editors
