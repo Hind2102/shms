@@ -41,6 +41,8 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
 .lvl.High { background: var(--high); } .lvl.Extreme { background: var(--extreme); }
 .st { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; background: #e7ecf2; }
 .st.open { background: #fff1e0; color: #8a4b00; } .st.closed { background: #e6f4e7; color: #1f5f22; }
+.st.planned { background: #e8f0fb; color: #1d4f91; } .st.pending_verification { background: #f3e8fb; color: #5b2a86; }
+.timeline li.verified::before { background: var(--low); } .timeline li.rejected::before, .timeline li.reopened::before { background: var(--extreme); }
 .muted { color: var(--muted); } .small { font-size: 13px; }
 label { display: block; font-weight: 600; margin: 12px 0 4px; }
 input[type=text], select, textarea, input[type=file] { width: 100%; padding: 10px; border: 1px solid #c5cdd6; border-radius: 8px; font: inherit; background: #fff; }

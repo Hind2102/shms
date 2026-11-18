@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from .. import services
 from ..db import get_session
-from ..models import Hazard, Status
+from ..models import Hazard
 
 router = APIRouter(include_in_schema=False)
 _lock = threading.Lock()
@@ -75,7 +75,7 @@ def metrics(db: Session = Depends(get_session)) -> str:
     for status, n in db.execute(select(Hazard.status, func.count()).group_by(Hazard.status)):
         lines.append(f'shms_hazards{{status="{status.value}"}} {n}')
     open_high = db.scalar(
-        select(func.count()).where(Hazard.status == Status.OPEN, Hazard.risk_level.in_(["High", "Extreme"]))
+        select(func.count()).where(Hazard.status.in_(services.ACTIVE), Hazard.risk_level.in_(["High", "Extreme"]))
     )
     lines += ["# TYPE shms_hazards_open_high gauge", f"shms_hazards_open_high {open_high}"]
     m = services.ai_monitoring(db)

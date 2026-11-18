@@ -40,9 +40,11 @@ class Role(str, enum.Enum):
 
 
 class Status(str, enum.Enum):
-    DRAFT = "draft"  # photo uploaded and AI has run; reporter has not confirmed yet
-    OPEN = "open"  # confirmed and routed to the Area Owner
-    CLOSED = "closed"  # action taken and documented
+    DRAFT = "draft"  # observation: photo uploaded and AI has run; reporter has not confirmed yet
+    OPEN = "open"  # human-confirmed hazard, assigned to the Area Owner
+    PLANNED = "planned"  # corrective action planned with an action owner and a deadline
+    PENDING_VERIFICATION = "pending_verification"  # closed by the owner, waiting for an independent check
+    CLOSED = "closed"  # closure verified by a supervisor or the reporter
 
 
 class User(Base):
@@ -93,6 +95,7 @@ class Hazard(Base):
         CheckConstraint("likelihood IS NULL OR likelihood BETWEEN 1 AND 5", name="ck_likelihood_1_5"),
         CheckConstraint("risk_score IS NULL OR risk_score BETWEEN 1 AND 25", name="ck_risk_1_25"),
         CheckConstraint("status != 'CLOSED' OR closure_action IS NOT NULL", name="ck_closed_has_action"),
+        CheckConstraint("status != 'PENDING_VERIFICATION' OR closure_action IS NOT NULL", name="ck_pending_has_action"),
         UniqueConstraint("reporter_id", "idem_key", name="uq_reporter_idem_key"),
         # Indexes match the hot queries: likelihood look-up, dashboard / register filters.
         Index("ix_hazard_area_cat_time", "area_id", "category_code", "created_at"),
@@ -136,10 +139,18 @@ class Hazard(Base):
     closure_photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     closed_on_spot: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Action plan and independent verification of the closure
+    action_owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    action_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
     area: Mapped[Area] = relationship(back_populates="hazards")
     reporter: Mapped[User] = relationship(foreign_keys=[reporter_id])
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
     closed_by: Mapped[User | None] = relationship(foreign_keys=[closed_by_id])
+    action_owner: Mapped[User | None] = relationship(foreign_keys=[action_owner_id])
+    verified_by: Mapped[User | None] = relationship(foreign_keys=[verified_by_id])
     events: Mapped[list[HazardEvent]] = relationship(
         back_populates="hazard", order_by="HazardEvent.at", cascade="all, delete-orphan"
     )
@@ -152,8 +163,11 @@ class HazardEvent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     hazard_id: Mapped[int] = mapped_column(ForeignKey("hazards.id"))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    kind: Mapped[str] = mapped_column(String(30))  # reported, confirmed, assigned, planned, closed, alerted
+    kind: Mapped[str] = mapped_column(String(30))  # reported, confirmed, assigned, planned, closed, verified, ...
     note: Mapped[str] = mapped_column(Text, default="")
+    # Set for every status change (state-machine transition); empty for events that do not change status.
+    from_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    to_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     hazard: Mapped[Hazard] = relationship(back_populates="events")

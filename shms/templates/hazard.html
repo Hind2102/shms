@@ -17,11 +17,13 @@
         <tr><th>AI</th><td>{% if h.ai_model %}{{ h.ai_model }} suggested <em>{{ h.ai_top_code | cat if h.ai_top_code else 'no PPE hazard' }}</em>
           {% if h.ai_accepted is not none %}– {{ 'accepted' if h.ai_accepted else 'corrected by reporter' }}{% endif %}{% else %}–{% endif %}</td></tr>
         {% if h.description %}<tr><th>Description</th><td>{{ h.description }}</td></tr>{% endif %}
-        {% if h.planned_action %}<tr><th>Planned action</th><td>{{ h.planned_action }}</td></tr>{% endif %}
-        {% if h.status.value == 'closed' %}
+        {% if h.planned_action %}<tr><th>Planned action</th><td>{{ h.planned_action }}{% if h.action_owner %}<br><span class="small muted">Action owner {{ h.action_owner.name }}{% if h.action_due_at %}, due {{ h.action_due_at | dt }}{% endif %}</span>{% endif %}</td></tr>{% endif %}
+        {% if h.status.value in ('pending_verification', 'closed') %}
         <tr><th>Closed</th><td>{{ h.closed_at | dt }} by {{ h.closed_by.name }}{% if h.closed_on_spot %} (fixed on the spot){% endif %}</td></tr>
         <tr><th>How it was closed</th><td>{{ h.closure_action }}</td></tr>
         {% endif %}
+        {% if h.status.value == 'pending_verification' %}<tr><th>Verification</th><td><strong>Awaiting verification</strong> by a safety supervisor or the reporter (not the person who closed it).</td></tr>{% endif %}
+        {% if h.status.value == 'closed' %}<tr><th>Verified</th><td>{% if h.verified_at %}{{ h.verified_at | dt }} by {{ h.verified_by.name }}{% else %}Closed before the verification step existed (no verification recorded).{% endif %}</td></tr>{% endif %}
       </table>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
@@ -30,22 +32,52 @@
     </div>
   </div>
   <div>
-    {% if h.status.value == 'open' and can_act %}
+    {% if h.status.value in ('open', 'planned') and can_act %}
+    {% if h.status.value == 'open' %}
     <form class="card" method="post" action="/hazards/{{ h.id }}/plan">
       <h2>Plan action</h2>
-      <textarea name="planned_action" required placeholder="What will be done, by whom">{{ h.planned_action or '' }}</textarea>
+      <label for="pa">What will be done</label>
+      <textarea id="pa" name="planned_action" required placeholder="The corrective action">{{ h.planned_action or '' }}</textarea>
+      <label for="po">Action owner</label>
+      <select id="po" name="owner_id">{% for u in owners %}<option value="{{ u.id }}" {% if u.id == h.area.owner_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select>
+      <label for="pd">Deadline (default: target close date from the risk band)</label>
+      <input id="pd" type="date" name="due" value="{{ h.due_at.strftime('%Y-%m-%d') if h.due_at else '' }}">
       <br><br><button class="btn secondary" type="submit">Save plan</button>
     </form>
+    {% endif %}
     <form class="card" method="post" action="/hazards/{{ h.id }}/close" enctype="multipart/form-data">
       <h2>Close hazard</h2>
       <label for="action">Action taken (required)</label>
       <textarea id="action" name="action" required placeholder="Describe the control put in place and how you checked it works"></textarea>
       <label for="cp">Closing photo</label>
       <input id="cp" type="file" name="photo" accept="image/*" capture="environment">
-      <br><br><button class="btn" type="submit">Close hazard</button>
+      <p class="muted small">A safety supervisor or the reporter then verifies the closure.</p>
+      <button class="btn" type="submit">Close hazard</button>
     </form>
-    {% elif h.status.value == 'open' %}
-    <div class="alert info small">Only {{ h.area.owner.name }} or a safety supervisor can close this hazard.</div>
+    {% elif h.status.value in ('open', 'planned') %}
+    <div class="alert info small">Only {{ h.area.owner.name }} or a safety supervisor can plan and close this hazard.</div>
+    {% elif h.status.value == 'pending_verification' and can_verify %}
+    <form class="card" method="post" action="/hazards/{{ h.id }}/verify">
+      <h2>Verify closure</h2>
+      <label for="vn">What you checked</label>
+      <textarea id="vn" name="note" placeholder="e.g. checked on site, closing photo shows the hard hat"></textarea>
+      <br><br><button class="btn" type="submit">Verify and close</button>
+    </form>
+    <form class="card" method="post" action="/hazards/{{ h.id }}/reject">
+      <h2>Reject closure</h2>
+      <label for="rr">Reason (required)</label>
+      <textarea id="rr" name="reason" required placeholder="Why the closure is not sufficient"></textarea>
+      <br><br><button class="btn secondary" type="submit">Reject – back to open</button>
+    </form>
+    {% elif h.status.value == 'pending_verification' %}
+    <div class="alert info small">Awaiting verification by a safety supervisor or the reporter.</div>
+    {% elif h.status.value == 'closed' and can_reopen %}
+    <form class="card" method="post" action="/hazards/{{ h.id }}/reopen">
+      <h2>Reopen</h2>
+      <label for="ro">Reason (required)</label>
+      <textarea id="ro" name="reason" required placeholder="e.g. the hazard has come back"></textarea>
+      <br><br><button class="btn secondary" type="submit">Reopen</button>
+    </form>
     {% endif %}
     <div class="card">
       <h2>Audit trail</h2>

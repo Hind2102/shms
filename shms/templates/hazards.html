@@ -5,7 +5,7 @@
 <h1>Hazard register</h1>
 <form class="card filters" method="get">
   <div><label>Status</label><select name="status"><option value="">All</option>
-    {% for s in ('open','closed') %}<option {% if f.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+    {% for s in ('open','planned','pending_verification','closed') %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s | replace('_', ' ') }}</option>{% endfor %}</select></div>
   <div><label>Area</label><select name="area"><option value="">All</option>
     {% for a in areas %}<option value="{{ a.code }}" {% if f.area == a.code %}selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></div>
   <div><label>Risk level</label><select name="level"><option value="">All</option>

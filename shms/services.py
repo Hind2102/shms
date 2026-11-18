@@ -24,11 +24,19 @@ from . import risk, taxonomy
 from .detection import DetectorResult
 from .models import Area, Hazard, HazardEvent, Notification, Role, Status, User, utcnow
 
+# The safety workflow as a state machine. Every status change goes through _move(), which checks this table and
+# writes an audit event with the from/to status.
 ALLOWED_TRANSITIONS: dict[Status, set[Status]] = {
-    Status.DRAFT: {Status.OPEN, Status.CLOSED},
-    Status.OPEN: {Status.CLOSED},
-    Status.CLOSED: set(),
+    Status.DRAFT: {Status.OPEN, Status.PENDING_VERIFICATION},  # confirm (routed) / confirm "fixed on the spot"
+    Status.OPEN: {Status.PLANNED, Status.PENDING_VERIFICATION},  # plan action / close
+    Status.PLANNED: {Status.PENDING_VERIFICATION},  # close
+    Status.PENDING_VERIFICATION: {Status.CLOSED, Status.OPEN},  # verify / reject
+    Status.CLOSED: {Status.OPEN},  # reopen
 }
+# Hazards that still need work (shown as "open" on dashboards and queues).
+ACTIVE: frozenset[Status] = frozenset({Status.OPEN, Status.PLANNED, Status.PENDING_VERIFICATION})
+# Hazards waiting for the owner's action (these can become overdue and escalate).
+AWAITING_ACTION: frozenset[Status] = frozenset({Status.OPEN, Status.PLANNED})
 
 
 class WorkflowError(ValueError):
@@ -42,14 +50,37 @@ class PermissionDenied(PermissionError):
 # ---------------------------------------------------------------- helpers
 
 
-def _transition(h: Hazard, new: Status) -> None:
+def _check_move(h: Hazard, new: Status) -> None:
     if new not in ALLOWED_TRANSITIONS[h.status]:
         raise WorkflowError(f"Cannot move hazard #{h.id} from {h.status.value} to {new.value}")
+
+
+def _move(db: Session, h: Hazard, actor: User, new: Status, kind: str, note: str = "", at: datetime | None = None):
+    """The only place a hazard's status changes: checked against the table and recorded with from/to."""
+    _check_move(h, new)
+    old = h.status
     h.status = new
+    db.add(
+        HazardEvent(
+            hazard=h,
+            actor_id=actor.id,
+            kind=kind,
+            note=note,
+            at=at or utcnow(),
+            from_status=old.value,
+            to_status=new.value,
+        )
+    )
 
 
 def _event(db: Session, h: Hazard, actor: User, kind: str, note: str = "", at: datetime | None = None) -> None:
     db.add(HazardEvent(hazard=h, actor_id=actor.id, kind=kind, note=note, at=at or utcnow()))
+
+
+def _clear_closure(h: Hazard) -> None:
+    h.closed_at = h.closed_by_id = h.closure_action = h.closure_photo_path = None
+    h.closed_on_spot = False
+    h.verified_at = h.verified_by_id = None
 
 
 def can_act_on(user: User, h: Hazard) -> bool:
@@ -176,16 +207,15 @@ def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime |
     )
 
     if c.fixed_on_spot:
-        _transition(h, Status.CLOSED)
         h.closed_on_spot = True
         h.closed_at, h.closed_by_id = now, actor.id
         h.closure_action = c.closure_action.strip()
         h.closure_photo_path = c.closure_photo_path
-        _event(db, h, actor, "closed", f"Fixed on the spot: {h.closure_action}", at=now)
-    else:
-        _transition(h, Status.OPEN)
         h.assignee_id = h.area.owner_id
-        _event(db, h, actor, "assigned", f"Routed to Area Owner {h.area.owner.name}", at=now)
+        _move(db, h, actor, Status.PENDING_VERIFICATION, "closed", f"Fixed on the spot: {h.closure_action}", at=now)
+    else:
+        h.assignee_id = h.area.owner_id
+        _move(db, h, actor, Status.OPEN, "assigned", f"Routed to Area Owner {h.area.owner.name}", at=now)
 
     if risk.is_alert_level(r.level):
         _alert(db, h, actor, now)
@@ -209,15 +239,32 @@ def _alert(db: Session, h: Hazard, actor: User, now: datetime) -> None:
 # ---------------------------------------------------------------- stage 2: close and document
 
 
-def plan_action(db: Session, h: Hazard, actor: User, planned_action: str) -> Hazard:
-    if h.status != Status.OPEN:
-        raise WorkflowError("Actions can only be planned for open hazards")
+def plan_action(
+    db: Session,
+    h: Hazard,
+    actor: User,
+    planned_action: str,
+    owner_id: int | None = None,
+    due: datetime | None = None,
+    at: datetime | None = None,
+) -> Hazard:
+    """OPEN -> PLANNED: a corrective action with an action owner (default: Area Owner) and a deadline
+    (default: the target date from the risk band)."""
     if not can_act_on(actor, h):
         raise PermissionDenied("Only the Area Owner or a supervisor can plan actions")
+    _check_move(h, Status.PLANNED)
     if not planned_action.strip():
         raise WorkflowError("Planned action cannot be empty")
-    h.planned_action = planned_action.strip()
-    _event(db, h, actor, "planned", h.planned_action)
+    now = at or utcnow()
+    owner = db.get(User, owner_id) if owner_id is not None else h.area.owner
+    if owner is None:
+        raise WorkflowError("Unknown action owner")
+    due = due or h.due_at
+    if due is not None and due <= now:
+        raise WorkflowError("The action deadline must be in the future")
+    h.planned_action, h.action_owner_id, h.action_due_at = planned_action.strip(), owner.id, due
+    note = f"{h.planned_action} (owner {owner.name}, due {due:%Y-%m-%d})" if due else h.planned_action
+    _move(db, h, actor, Status.PLANNED, "planned", note, at=now)
     db.flush()
     return h
 
@@ -225,15 +272,56 @@ def plan_action(db: Session, h: Hazard, actor: User, planned_action: str) -> Haz
 def close(
     db: Session, h: Hazard, actor: User, action: str, photo_path: str | None = None, at: datetime | None = None
 ) -> Hazard:
+    """OPEN/PLANNED -> PENDING_VERIFICATION: the owner documents what was done; someone else verifies it."""
     if not can_act_on(actor, h):
         raise PermissionDenied("Only the Area Owner or a supervisor can close this hazard")
+    _check_move(h, Status.PENDING_VERIFICATION)
     if not action.strip():
         raise WorkflowError("Describe the action taken to close the hazard")
     now = at or utcnow()
-    _transition(h, Status.CLOSED)
     h.closed_at, h.closed_by_id = now, actor.id
     h.closure_action, h.closure_photo_path = action.strip(), photo_path
-    _event(db, h, actor, "closed", h.closure_action, at=now)
+    _move(db, h, actor, Status.PENDING_VERIFICATION, "closed", h.closure_action, at=now)
+    db.flush()
+    return h
+
+
+def can_verify(user: User, h: Hazard) -> bool:
+    """A supervisor or the reporter, but never the person who closed it (four-eyes principle)."""
+    return user.role == Role.SUPERVISOR or user.id == h.reporter_id
+
+
+def verify(db: Session, h: Hazard, actor: User, note: str = "", at: datetime | None = None) -> Hazard:
+    """PENDING_VERIFICATION -> CLOSED."""
+    if not can_verify(actor, h) or actor.id == h.closed_by_id:
+        raise PermissionDenied("A supervisor or the reporter, not the person who closed it, must verify the closure")
+    now = at or utcnow()
+    _move(db, h, actor, Status.CLOSED, "verified", note.strip() or "Closure verified", at=now)
+    h.verified_at, h.verified_by_id = now, actor.id
+    db.flush()
+    return h
+
+
+def reject(db: Session, h: Hazard, actor: User, reason: str, at: datetime | None = None) -> Hazard:
+    """PENDING_VERIFICATION -> OPEN: the closure was not good enough. A reason is mandatory."""
+    if not can_verify(actor, h) or actor.id == h.closed_by_id:
+        raise PermissionDenied("A supervisor or the reporter, not the person who closed it, must review the closure")
+    if not reason.strip():
+        raise WorkflowError("Give a reason for rejecting the closure")
+    _move(db, h, actor, Status.OPEN, "rejected", reason.strip(), at=at)
+    _clear_closure(h)
+    db.flush()
+    return h
+
+
+def reopen(db: Session, h: Hazard, actor: User, reason: str, at: datetime | None = None) -> Hazard:
+    """CLOSED -> OPEN, e.g. when the hazard recurs. A reason is mandatory; the earlier closure stays in the audit trail."""
+    if not can_verify(actor, h):
+        raise PermissionDenied("Only a supervisor or the reporter can reopen a hazard")
+    if not reason.strip():
+        raise WorkflowError("Give a reason for reopening the hazard")
+    _move(db, h, actor, Status.OPEN, "reopened", reason.strip(), at=at)
+    _clear_closure(h)
     db.flush()
     return h
 
@@ -242,24 +330,26 @@ def close(
 
 
 def _open(db: Session):
-    return select(Hazard).where(Hazard.status == Status.OPEN)
+    return select(Hazard).where(Hazard.status.in_(ACTIVE))
 
 
 def dashboard(db: Session, now: datetime | None = None) -> dict:
     now = now or utcnow()
     since90 = now - timedelta(days=90)
     confirmed = list(db.scalars(select(Hazard).where(Hazard.status != Status.DRAFT)))
-    open_ = [h for h in confirmed if h.status == Status.OPEN]
-    closed90 = [h for h in confirmed if h.status == Status.CLOSED and h.closed_at and h.closed_at >= since90]
+    open_ = [h for h in confirmed if h.status in ACTIVE]
+    verified = [h for h in confirmed if h.status == Status.CLOSED and h.closed_at]  # closure performance: verified only
+    closed90 = [h for h in verified if h.closed_at >= since90]
     days_to_close = [(h.closed_at - h.created_at).total_seconds() / 86400 for h in closed90]
 
     ai_judged = [h for h in confirmed if h.ai_accepted is not None]
     kpis = {
         "open": len(open_),
         "open_high": sum(1 for h in open_ if h.risk_level in ("High", "Extreme")),
-        "overdue": sum(1 for h in open_ if h.due_at and h.due_at < now),
+        "overdue": sum(1 for h in open_ if h.status in AWAITING_ACTION and h.due_at and h.due_at < now),
+        "pending_verification": sum(1 for h in open_ if h.status == Status.PENDING_VERIFICATION),
         "reported_30d": sum(1 for h in confirmed if h.created_at >= now - timedelta(days=30)),
-        "closed_30d": sum(1 for h in confirmed if h.closed_at and h.closed_at >= now - timedelta(days=30)),
+        "closed_30d": sum(1 for h in verified if h.closed_at >= now - timedelta(days=30)),
         "median_days_to_close": round(median(days_to_close), 1) if days_to_close else None,
         "ai_acceptance": round(100 * sum(h.ai_accepted for h in ai_judged) / len(ai_judged)) if ai_judged else None,
     }
@@ -292,7 +382,7 @@ def dashboard(db: Session, now: datetime | None = None) -> dict:
             {
                 "label": ws.strftime("%d %b"),
                 "reported": sum(1 for h in confirmed if ws <= h.created_at < we),
-                "closed": sum(1 for h in confirmed if h.closed_at and ws <= h.closed_at < we),
+                "closed": sum(1 for h in verified if ws <= h.closed_at < we),
             }
         )
 
@@ -309,7 +399,7 @@ def dashboard(db: Session, now: datetime | None = None) -> dict:
 
 def area_overview(db: Session, area: Area) -> dict:
     """What a field operator sees before entering an area."""
-    open_ = sorted((h for h in area.hazards if h.status == Status.OPEN), key=lambda h: h.risk_score or 0, reverse=True)
+    open_ = sorted((h for h in area.hazards if h.status in ACTIVE), key=lambda h: h.risk_score or 0, reverse=True)
     recent_closed = sorted(
         (h for h in area.hazards if h.status == Status.CLOSED), key=lambda h: h.closed_at, reverse=True
     )[:5]

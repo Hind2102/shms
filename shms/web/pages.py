@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -228,7 +229,7 @@ def hazard_list(
     db: Session = Depends(get_session),
 ):
     q = select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc())
-    if status:
+    if status in {s.value for s in Status if s != Status.DRAFT}:
         q = q.where(Hazard.status == Status(status))
     if area:
         q = q.join(Area).where(Area.code == area)
@@ -251,11 +252,16 @@ def hazard_list(
 
 @router.get("/queue")
 def my_queue(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
-    q = select(Hazard).where(Hazard.status == Status.OPEN)
+    q = select(Hazard).where(Hazard.status.in_(services.AWAITING_ACTION))
     if user.role != Role.SUPERVISOR:
         q = q.where(Hazard.assignee_id == user.id)
     hazards = sorted(db.scalars(q), key=lambda h: (-(h.risk_score or 0), h.due_at))
-    return render(request, "queue.html", user, db, hazards=hazards)
+    # Closures this user may verify: supervisors all, reporters their own reports; never one they closed themselves.
+    pq = select(Hazard).where(Hazard.status == Status.PENDING_VERIFICATION)
+    if user.role != Role.SUPERVISOR:
+        pq = pq.where(Hazard.reporter_id == user.id)
+    to_verify = [h for h in db.scalars(pq.order_by(Hazard.closed_at)) if h.closed_by_id != user.id]
+    return render(request, "queue.html", user, db, hazards=hazards, to_verify=to_verify)
 
 
 @router.get("/hazards/{hazard_id}")
@@ -277,24 +283,61 @@ def hazard_detail(
         db,
         h=h,
         can_act=services.can_act_on(user, h),
+        can_verify=services.can_verify(user, h) and user.id != h.closed_by_id,
+        can_reopen=services.can_verify(user, h),
+        owners=list(
+            db.scalars(select(User).where(User.role.in_([Role.AREA_OWNER, Role.SUPERVISOR])).order_by(User.id))
+        ),
         suggestions=json.loads(h.ai_suggestions or "[]"),
         created=created,
         error=error,
     )
 
 
-@router.post("/hazards/{hazard_id}/plan")
-def plan(
-    hazard_id: int, planned_action: str = Form(...), user: User = Depends(page_user), db: Session = Depends(get_session)
-):
-    h = _hazard(db, hazard_id)
+def _do(db: Session, h: Hazard, fn) -> RedirectResponse:
+    """Run one workflow step; show the rule that refused it instead of failing."""
     try:
-        services.plan_action(db, h, user, planned_action)
+        fn()
     except (services.WorkflowError, services.PermissionDenied) as exc:
         db.rollback()
         return RedirectResponse(f"/hazards/{h.id}?error={exc}", status_code=303)
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}", status_code=303)
+
+
+@router.post("/hazards/{hazard_id}/plan")
+def plan(
+    hazard_id: int,
+    planned_action: str = Form(...),
+    owner_id: int | None = Form(None),
+    due: str = Form(""),
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
+    h = _hazard(db, hazard_id)
+    try:
+        due_at = datetime.strptime(due, "%Y-%m-%d").replace(hour=17) if due else None
+    except ValueError:
+        return RedirectResponse(f"/hazards/{h.id}?error=Invalid deadline date", status_code=303)
+    return _do(db, h, lambda: services.plan_action(db, h, user, planned_action, owner_id=owner_id, due=due_at))
+
+
+@router.post("/hazards/{hazard_id}/verify")
+def verify(hazard_id: int, note: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
+    h = _hazard(db, hazard_id)
+    return _do(db, h, lambda: services.verify(db, h, user, note))
+
+
+@router.post("/hazards/{hazard_id}/reject")
+def reject(hazard_id: int, reason: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
+    h = _hazard(db, hazard_id)
+    return _do(db, h, lambda: services.reject(db, h, user, reason))
+
+
+@router.post("/hazards/{hazard_id}/reopen")
+def reopen(hazard_id: int, reason: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
+    h = _hazard(db, hazard_id)
+    return _do(db, h, lambda: services.reopen(db, h, user, reason))
 
 
 @router.post("/hazards/{hazard_id}/close")
