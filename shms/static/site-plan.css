@@ -7,6 +7,7 @@
 #plan.is-zoomed { touch-action: none; cursor: grab; }
 #plan.is-zoomed:active { cursor: grabbing; }
 .base-drawing text, .metric-label { font-family: var(--display),sans-serif; fill: #223a3d; }
+.base-drawing .lot-name, .base-drawing .lot-caption { paint-order: stroke; stroke: #edf1e9; stroke-width: 3px; stroke-linejoin: round; }
 .lot-name { font-size: 14px; font-weight: 700; }
 .lot-caption, .map-note { font-size: 11px; }
 .metric-label { font-size: 12px; font-weight: 700; paint-order: stroke; stroke: #f9faf2; stroke-width: 2.4px; stroke-linejoin: round; }

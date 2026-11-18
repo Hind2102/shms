@@ -230,7 +230,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-288 tests at the Phase 6 baseline, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
+305 tests, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
@@ -385,7 +385,7 @@ them and never says what a liquid is.
 | Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | simulated 97.2 % (lenient, not field data); real acceptance recorded per report on *AI monitoring* |
 | New report visible on dashboard | visible on next dashboard request (proposal: within 5 min) | Functional visibility verified in `tests/test_api.py::test_full_workflow_and_dashboard_update`; elapsed time not separately measured |
 | Derived test labels agree with expert | report accuracy and κ | pending (`python -m evaluation.label_audit score`) |
-| Automated tests and lint | all pass | ✅ `pytest` (288 at Phase 6 baseline), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
+| Automated tests and lint | all pass | ✅ `pytest` (305 in Phase 6), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
 
 Detection mAP50 (object level, 17 classes – a different quantity from the image-level results above) measured
 with the published weights was 63.6 (YOLOv9e) and 54.9 (YOLOv8s), 6–8 points below the SH17 paper (70.9 / 63.7)
