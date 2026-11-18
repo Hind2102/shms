@@ -20,7 +20,7 @@
       <p class="muted">No photo, so no AI suggestion.</p>
     {% elif req %}
       {% for s in req %}
-      <div class="sugg"><div><strong>{{ s.code | cat }}</strong><br><span class="muted small">{{ s.explanation }}</span></div>
+      <div class="sugg"><div><strong>{{ s.code | cat }}</strong>{% set note = taxonomy.release_note(s.code) %}{% if note %}<br><span class="caveat small">AI check {{ note }}</span>{% endif %}<br><span class="muted small">{{ s.explanation }}</span></div>
         <div style="display:flex;align-items:center">{{ (s.confidence*100)|round|int }}%<span class="bar"><i style="width:{{ (s.confidence*100)|round|int }}%"></i></span></div></div>
       {% endfor %}
     {% else %}
@@ -44,7 +44,7 @@
   <label for="cat">Hazard type</label>
   <select id="cat" name="category_code" required>
     {% for code in h.area.report_codes %}{% set c = taxonomy.get(code) %}
-      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if c.experimental %} (experimental){% endif %}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
+      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if c.experimental %} (experimental){% endif %}{% if taxonomy.release_note(c.code) %} (AI: unverified suggestion){% endif %}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
     {% endfor %}
   </select>
   <p class="muted small">PPE required in {{ h.area.name }}: {{ h.area.check_codes | map('ppe') | join(', ') }}.</p>

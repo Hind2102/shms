@@ -1174,3 +1174,21 @@ the external failure (recommended: keep as an "experimental suggestion" with the
 release); (4) choose a code licence; (5) new Kaggle token (old one was typed into a chat); (6) say whether a supervisor
 reviewed the synthesized layout. **Readiness:** software, tests, CI, Docker and documentation are submission-ready at
 `v1.1.0`; the report must state the external-validation failure and the pending label audit.
+
+---
+
+# Owner decisions applied (branch `feature/hardhat-label-licence`, 2026-11-18)
+
+1. **Hard hat stays enabled, labelled as unverified.** `shms/config/ai_release.json` gains a `notes` field (not read
+   by the gate): `no_hard_hat.label` = "validated on SH17 only – failed external validation (Hard Hat Workers):
+   unverified suggestion", with the evidence pointer. `taxonomy.release_note()` reads it; the confirm page (suggestion
+   and drop-down), the area page and the hazard page show it; README results table and external-validation section
+   say the same. Gate code, `release_gate.json` and all results unchanged: `python -m evaluation.release_gate --dry-run`
+   gives the identical decision (3 approved, vest rejected); `test_shipped_release_matches_shipped_results` still
+   passes. Caveat recorded in the file: re-running the gate rewrites `ai_release.json` and drops the note.
+   Tests: `tests/test_release_notes.py` (4, failed first).
+2. **Licence AGPL-3.0.** `LICENSE` = official text from https://www.gnu.org/licenses/agpl-3.0.txt (34 523 bytes,
+   SHA-256 prefix `0d96a4ff68ad6d4b`); `pyproject.toml` `license = { text = "AGPL-3.0-only" }` + classifier; README
+   table, licences table and status table updated.
+
+Suite: 288 passed; ruff clean.
