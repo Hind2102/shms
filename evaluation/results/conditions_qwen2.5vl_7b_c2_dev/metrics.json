@@ -1,0 +1,205 @@
+{
+  "plan": "docs/unsafe_conditions_plan.md",
+  "dataset": "Jsohal174/warehouse-safety-hazard-dataset (CC BY 4.0, synthetic)",
+  "split": "dev",
+  "prompt": "c2",
+  "model": "qwen2.5vl:7b",
+  "images": 60,
+  "errors": 0,
+  "hazards": {
+    "spill": {
+      "tp": 18,
+      "fp": 0,
+      "fn": 2,
+      "tn": 40,
+      "precision": 1.0,
+      "recall": 0.9,
+      "specificity": 1.0,
+      "f1": 0.9473684210526316,
+      "accuracy": 0.9666666666666667,
+      "balanced_accuracy": 0.95,
+      "mcc": 0.9258200997725514,
+      "support": 20,
+      "n": 60,
+      "precision_ci95": [
+        1.0,
+        1.0
+      ],
+      "recall_ci95": [
+        0.75,
+        1.0
+      ],
+      "specificity_ci95": [
+        1.0,
+        1.0
+      ],
+      "f1_ci95": [
+        0.8571428571428571,
+        1.0
+      ],
+      "mcc_ci95": [
+        0.8112457445926347,
+        1.0
+      ],
+      "baseline_always_yes": {
+        "precision": 0.3333333333333333,
+        "recall": 1.0,
+        "specificity": 0.0,
+        "f1": 0.5,
+        "mcc": 0.0
+      },
+      "positives": 20,
+      "negatives": 40,
+      "pass": true
+    },
+    "obstruction": {
+      "tp": 17,
+      "fp": 0,
+      "fn": 4,
+      "tn": 39,
+      "precision": 1.0,
+      "recall": 0.8095238095238095,
+      "specificity": 1.0,
+      "f1": 0.8947368421052632,
+      "accuracy": 0.9333333333333333,
+      "balanced_accuracy": 0.9047619047619048,
+      "mcc": 0.8568659574886787,
+      "support": 21,
+      "n": 60,
+      "precision_ci95": [
+        1.0,
+        1.0
+      ],
+      "recall_ci95": [
+        0.6470588235294118,
+        0.9583333333333334
+      ],
+      "specificity_ci95": [
+        1.0,
+        1.0
+      ],
+      "f1_ci95": [
+        0.7857142857142858,
+        0.9787234042553191
+      ],
+      "mcc_ci95": [
+        0.7344887229975191,
+        0.965625409997289
+      ],
+      "baseline_always_yes": {
+        "precision": 0.35,
+        "recall": 1.0,
+        "specificity": 0.0,
+        "f1": 0.5185185185185185,
+        "mcc": 0.0
+      },
+      "positives": 21,
+      "negatives": 39,
+      "pass": true
+    }
+  },
+  "sensitivity_without_ambiguous": {
+    "spill": {
+      "tp": 18,
+      "fp": 0,
+      "fn": 2,
+      "tn": 35,
+      "precision": 1.0,
+      "recall": 0.9,
+      "specificity": 1.0,
+      "f1": 0.9473684210526316,
+      "accuracy": 0.9636363636363636,
+      "balanced_accuracy": 0.95,
+      "mcc": 0.9226870278438684,
+      "support": 20,
+      "n": 55,
+      "precision_ci95": [
+        1.0,
+        1.0
+      ],
+      "recall_ci95": [
+        0.75,
+        1.0
+      ],
+      "specificity_ci95": [
+        1.0,
+        1.0
+      ],
+      "f1_ci95": [
+        0.8571428571428571,
+        1.0
+      ],
+      "mcc_ci95": [
+        0.8003267306650412,
+        1.0
+      ],
+      "baseline_always_yes": {
+        "precision": 0.36363636363636365,
+        "recall": 1.0,
+        "specificity": 0.0,
+        "f1": 0.5333333333333333,
+        "mcc": 0.0
+      },
+      "positives": 20,
+      "negatives": 35,
+      "pass": true
+    },
+    "obstruction": {
+      "tp": 17,
+      "fp": 0,
+      "fn": 4,
+      "tn": 38,
+      "precision": 1.0,
+      "recall": 0.8095238095238095,
+      "specificity": 1.0,
+      "f1": 0.8947368421052632,
+      "accuracy": 0.9322033898305084,
+      "balanced_accuracy": 0.9047619047619048,
+      "mcc": 0.8558190836005443,
+      "support": 21,
+      "n": 59,
+      "precision_ci95": [
+        1.0,
+        1.0
+      ],
+      "recall_ci95": [
+        0.625,
+        0.9583333333333334
+      ],
+      "specificity_ci95": [
+        1.0,
+        1.0
+      ],
+      "f1_ci95": [
+        0.7692307692307693,
+        0.9787234042553191
+      ],
+      "mcc_ci95": [
+        0.7151133921002155,
+        0.9652527974385586
+      ],
+      "baseline_always_yes": {
+        "precision": 0.3559322033898305,
+        "recall": 1.0,
+        "specificity": 0.0,
+        "f1": 0.525,
+        "mcc": 0.0
+      },
+      "positives": 21,
+      "negatives": 38,
+      "pass": true
+    }
+  },
+  "latency": {
+    "n": 59,
+    "mean_ms": 3110.5271186440677,
+    "p50_ms": 3116.8,
+    "p95_ms": 3421.3,
+    "max_ms": 3538.3
+  },
+  "environment": {
+    "python": "3.12.14",
+    "date": "2026-11-18T10:15:34+00:00"
+  },
+  "mean_mcc": 0.891343028630615
+}

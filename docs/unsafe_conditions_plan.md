@@ -78,3 +78,9 @@ resamples, seed 0), always-yes F1, latency p50/p95.
    noise seen in the metadata text: `spill/forklift_0066.jpg` is labelled spill but its description says "the scene is
    essentially safe".
 4. Dev split (unchanged rule): 20 spill, 20 obstacle, 20 safe from `train/metadata.csv`, seed 42.
+
+## Addendum B (2026-11-18, before the test run): prompt frozen
+
+Dev results (60 train images): `c1` mean MCC 0.853 (spill 1.000, obstruction 0.706); `c2` mean MCC 0.891 (spill
+0.926, obstruction 0.857). **`c2` is frozen** (highest mean MCC). `c3` was not used. Next and only step: one run of
+`c2` on the 186 test images.
