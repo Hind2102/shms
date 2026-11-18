@@ -22,6 +22,19 @@ PROMPTS = {
   narrows the way through? Objects stored properly on racks or beside the walkway do not count.
 
 Do not guess what the liquid is. Answer each question with true or false, then one short sentence about what you saw.""",
+    # c2 (after dev run of c1: fallen boxes and debris were called "clear walkway"): ask about anything lying on the
+    # walkway floor that should not be there, whether or not people could still get past.
+    "c2": """You are checking one photo of an industrial site for two housekeeping conditions. Look carefully at the
+whole floor area, including the far end of aisles.
+
+- floor_liquid_visible: is there liquid, a puddle, a wet patch or a fluid trail on the floor (any colour)?
+- walkway_visible: can you see a walkway, aisle or passage that people or vehicles use?
+- walkway_obstructed: is anything lying on the floor of that walkway that should not be there – fallen or dropped
+  boxes, a broken pallet, scattered debris or packaging, tools, or equipment left standing in the aisle? Count it even
+  if people could still walk around it. Goods stored neatly on racks or in marked storage spaces beside the walkway do
+  not count.
+
+Do not guess what the liquid is. Answer each question with true or false, then one short sentence about what you saw.""",
 }
 
 SCHEMA = {
