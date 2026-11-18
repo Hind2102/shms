@@ -107,3 +107,16 @@ def test_opening_a_page_escalates_overdue_hazards(client, db):
 def test_demo_users_have_non_deliverable_example_addresses(db):
     emails = [u.email for u in db.scalars(select(User))]
     assert emails and all(e and e.endswith("@shms.example") for e in emails)
+
+
+def test_unwritable_outbox_never_blocks_a_report(empty_db, tmp_path):
+    from shms.settings import override_settings
+
+    blocker = tmp_path / "not-a-folder"
+    blocker.write_text("a file where the outbox folder should be")
+    override_settings(mail_outbox=blocker / "outbox")
+    users(empty_db)[Role.SUPERVISOR][0].email = "sara@shms.example"
+    for _ in range(4):
+        h = report(empty_db, code="no_eye_protection", consequence=5)
+    assert h.risk_level == "High" and h.status == Status.OPEN
+    assert users(empty_db)[Role.SUPERVISOR][0].id in _notified(empty_db, h)  # in-app notification still created
