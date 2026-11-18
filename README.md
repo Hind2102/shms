@@ -109,6 +109,7 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_MAIL_OUTBOX` | `outbox` | Test mail backend: notifications are written here as `.eml` files (nothing is sent) |
 | `SHMS_SECRET_KEY` | generated | Signs session cookies and CSRF tokens. If unset, a random key is created once in `instance/secret_key` (git-ignored) |
 | `SHMS_INSTANCE_DIR` | `instance` | Where that generated key is kept (Docker: `/data/instance`) |
+| `SHMS_EXPERIMENTAL_CONDITIONS` | `0` | `1` enables the EXPERIMENTAL unsafe-condition check (liquid on the floor, obstructed walkway; needs Ollama) |
 | `SHMS_DEMO_HEADER_AUTH` | `0` | `1` lets the API accept an `X-User-Id` header instead of a token – tests and local scripts only |
 
 The risk-matrix page separates what follows the ADOSH-SF guideline (the 5 × 5 consequence × likelihood structure)
@@ -331,6 +332,16 @@ tuning on the test set, prompts are developed on a **dev set of 100 training-spl
 * **Stricter label analysis on SH17** (`evaluation/label_rule_audit.py`): on photos where the relevant body part is
   labelled, specificity is lower than in the released figures – hard hat 0.750 (64 negatives), eye protection 0.828,
   gloves 0.636 (only 11 negatives). Much of the released specificity comes from photos without any person.
+
+### Experimental: unsafe conditions (off by default)
+
+Spilled liquid on the floor and objects obstructing a walkway were tested with the local vision-language model on a
+**synthetic** warehouse dataset (CC BY 4.0) under a pre-registered plan (`docs/unsafe_conditions_plan.md`): prompt
+tuned on 60 training images, then run once on 186 test images – liquid on the floor: precision 0.976, recall 0.932,
+specificity 0.993; obstruction: precision 0.826, recall 0.792, specificity 0.942. Because the images are synthetic,
+this is **not** validation for real sites and is never part of the release gate. With `SHMS_EXPERIMENTAL_CONDITIONS=1`
+the report form shows an "Experimental check" note and offers the two types for manual choice; the AI never pre-selects
+them and never says what a liquid is.
 
 ### Success criteria
 
