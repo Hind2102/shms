@@ -928,3 +928,27 @@ re-confirm of open/planned/pending/closed × reporter/supervisor × with/without
 category, risk fields, due date, closure and verification fields, escalation level and event count unchanged; API
 (2) → 422 unchanged; page (2) → 303 with message, unchanged; every other action from every wrong state (19) →
 `WorkflowError`, unchanged; escalation touches only open/planned (1). Suite: 248 passed; ruff clean.
+
+---
+
+# Phase 3 – Interface and refinery overview (branch `feature/ui`, 2026-11-18)
+
+Skills used: frontend-design (design plan reviewed against generic defaults before building). Status of each item:
+**implemented+tested** unless stated.
+
+| Requirement | Implementation | Evidence |
+|---|---|---|
+| Role-specific home pages | `/` → `services.role_home`: reporter (my reports, closures to check), Area Owner (my open hazards by target date, due within 3 days, waiting for verification), supervisor (verification queue, urgent High/Extreme, escalated), manager (site priorities, overdue, closure performance in 90 days with its denominator, weekly trend). Old dashboard moved to `/dashboard`. | `tests/test_home_and_map.py` (role data + one page test per role) |
+| Interactive 2D overview | `/site`: SVG of the synthesized layout, zoom (buttons, wheel), pan (drag; a drag never opens an area), filters time window 30/90/180 days and risk level, overlays open risk / overdue / report volume; unknown filter values fall back to defaults | `test_plan_view_*`, overlay unit tests |
+| Overlay honesty | each overlay prints "Calculation: …", the window and the site total with hazard count; shading relative to the highest area; areas with nothing recorded are hatched and labelled "No recorded hazards in this window" (never "safe"); report volume uses a neutral grey scale and says it "is not a measure of danger"; page labelled "Illustrative layout – not an actual site plan" | `test_areas_without_hazards_are_labelled_no_records_never_safe`, `test_report_volume_overlay_is_neutral_and_says_it_is_not_danger`, page text test (no "safe") |
+| Risk matrix page | two sections: "From the ADOSH-SF guideline" (only the 5 × 5 consequence × likelihood structure with defined levels and level-dependent response – band wording and deadlines **not yet checked** against the official text: owner action) and "Defined by this project" (matrix, bands, target days, consequence wording, likelihood labelled "a project heuristic, not a validated likelihood") | `test_risk_matrix_page_separates_guidance_from_project_choices` |
+| Look and responsiveness | palette from the subject (control-room slate, alumina off-white, bauxite red for actions, signal yellow for focus), DIN-style system font for headings and numbers, no web fonts (no external requests); visible keyboard focus; reduced motion respected | screenshots below |
+
+Screenshots: Playwright 1.55 headless Chromium, signed in through the real login form, desktop 1366 px (full page)
+and phone 390 px; script `docs/screenshots/shoot.py`. First pass: phone home pages for manager, supervisor and owner
+were 10–47 px wider than the screen (work-list tables) and the plan view's zoom buttons covered an area on phones;
+dark plan areas had low text contrast. After fixes: all 14 pages "fit" (page width = viewport), 0 server tracebacks.
+Kept: `docs/screenshots/{desktop_manager_home,desktop_site_open_risk,desktop_matrix,phone_supervisor_home,phone_site_open_risk,phone_reporter_home}.png`.
+
+Requirement change: `/` is now the role home page; `tests/test_errors.py` opens `/dashboard` (the route that calls
+`services.dashboard`). Suite: 265 passed; ruff clean.

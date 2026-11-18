@@ -11,8 +11,10 @@
   <a class="logo" href="/"><span class="tri"></span>SHMS</a>
   {% if user %}
   <nav>
-    <a href="/">Dashboard</a>
-    <a href="/report"><strong>+ Report hazard</strong></a>
+    <a href="/">Home</a>
+    <a href="/report"><strong>Report hazard</strong></a>
+    <a href="/site">Site plan</a>
+    <a href="/dashboard">Dashboard</a>
     <a href="/hazards">Hazards</a>
     {% if user.role.value in ('area_owner', 'supervisor') %}<a href="/queue">My queue</a>{% endif %}
     <a href="/matrix">Risk matrix</a>

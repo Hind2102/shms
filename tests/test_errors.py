@@ -18,7 +18,7 @@ def test_unexpected_error_shows_generic_page_and_logs_details(app, monkeypatch, 
 
     monkeypatch.setattr(services, "dashboard", boom)
     with caplog.at_level(logging.ERROR, logger="shms"):
-        r = c.get("/")
+        r = c.get("/dashboard")  # the page that uses services.dashboard
     assert r.status_code == 500
     assert "secret internal detail" not in r.text and "Traceback" not in r.text
     assert "Something went wrong" in r.text
