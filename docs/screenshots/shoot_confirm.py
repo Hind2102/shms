@@ -7,6 +7,7 @@
 """
 
 import sys
+
 from playwright.sync_api import sync_playwright
 
 out, photo = sys.argv[1], sys.argv[2]
