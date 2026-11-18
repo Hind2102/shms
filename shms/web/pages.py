@@ -13,10 +13,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import auth, escalate, policy, risk, services, taxonomy
+from .. import auth, escalate, policy, risk, services, site_layout, taxonomy
 from ..db import get_session
 from ..detection import get_detector
-from ..models import Area, Hazard, Notification, Role, Status, User
+from ..models import Area, Hazard, Notification, Role, Status, User, utcnow
 from ..settings import PACKAGE_DIR
 from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo
 
@@ -148,10 +148,8 @@ def site_plan(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    window_days = int(window) if window.isdigit() else 90
+    window_days = next((days for days in services.WINDOWS if str(days) == window), 90)
     view = services.site_overview(db, overlay=overlay, window_days=window_days, min_level=level or None)
-    from .. import site_layout
-    from ..models import utcnow
 
     selected = next((u for u in site_layout.UNITS if u.code == unit and u.reporting), None)
     area = db.scalar(select(Area).where(Area.code == unit)) if selected else None

@@ -6,12 +6,13 @@
         data/samples/sh17_pexels-photo-7888728__no_hard_hat_no_eye_protection_no_gloves_no_hi_vis_vest.jpg
 """
 
+import os
 import sys
 
 from playwright.sync_api import sync_playwright
 
 out, photo = sys.argv[1], sys.argv[2]
-B = "http://127.0.0.1:8765"
+B = os.environ.get("SHMS_SCREENSHOT_URL", "http://127.0.0.1:8765")
 with sync_playwright() as p:
     br = p.chromium.launch()
     pg = br.new_context(viewport={"width": 1366, "height": 900}).new_page()
@@ -31,5 +32,6 @@ with sync_playwright() as p:
     label = pg.get_by_text("unverified suggestion").count()
     model = pg.get_by_text("sh17_yolo9e").count()
     print("url", pg.url, "| boxes drawn", boxes, "| label occurrences", label, "| model named", model)
+    assert boxes and label and model, "Missing real-model evidence on the confirmation page"
     pg.screenshot(path=out, full_page=True)
     br.close()

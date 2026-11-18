@@ -50,6 +50,7 @@
 
 <div class="card">
   <h2>Latest reports</h2>
+  <div class="table-scroll">
   <table>
     <tr><th>#</th><th>Reported</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Status</th></tr>
     {% for h in recent %}
@@ -57,5 +58,6 @@
         <td>{{ h.category_code | cat }}</td><td>{{ level(h.risk_level) }} {{ h.risk_score }}</td><td>{{ status(h.status) }}</td></tr>
     {% endfor %}
   </table>
+  </div>
 </div>
 {% endblock %}

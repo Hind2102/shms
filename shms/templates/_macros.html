@@ -18,7 +18,7 @@
 {% macro heatmap(rows) -%}
 {% set colors = {'Low': '#2e7d32', 'Medium': '#f9a825', 'High': '#ef6c00', 'Extreme': '#c62828'} %}
 <div class="heatmap">
-<svg viewBox="0 0 1000 590" role="img" aria-label="Refinery heat map of open hazard risk by area">
+<svg viewBox="0 0 1000 590" role="group" aria-label="Refinery heat map of open hazard risk by area">
   <rect x="0" y="0" width="1000" height="590" fill="#eef1f4" rx="10"/>
   <!-- Bayer process flow (synthesized layout) -->
   <g stroke="#9aa6b2" stroke-width="4" fill="none" stroke-dasharray="8 6">
@@ -26,7 +26,7 @@
     <path d="M905 270 V300"/><path d="M660 425 H640"/><path d="M360 425 H380"/>
   </g>
   {% for r in rows %}{% set a = r.area %}
-  <a href="/areas/{{ a.code }}">
+  <a href="/areas/{{ a.code }}" aria-label="{{ a.name }}: {{ r.open }} open, total open risk {{ r.heat }}">
     <rect x="{{ a.x }}" y="{{ a.y }}" width="{{ a.w }}" height="{{ a.h }}" rx="8"
           fill="{{ colors[r.worst_level] if r.worst_level else '#cfd8dc' }}"
           fill-opacity="{{ (0.25 + 0.75 * r.heat_ratio) if r.worst_level else 0.6 }}" stroke="#1f3a5f" stroke-width="2"/>

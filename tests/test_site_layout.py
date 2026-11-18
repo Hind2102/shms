@@ -1,9 +1,13 @@
 from datetime import timedelta
 from itertools import combinations
 
+import pytest
+from sqlalchemy import select
+
 from shms import site_layout
-from shms.models import Status, utcnow
+from shms.models import Area, Hazard, Status, utcnow
 from shms.seed import AREAS
+from shms.services import ACTIVE
 from tests.conftest import login
 from tests.test_workflow import report
 
@@ -47,10 +51,6 @@ def test_lots_do_not_overlap():
 
 def test_entry_panel_and_routing_ignore_display_filters(client, db):
     login(client, 9)
-    from sqlalchemy import select
-
-    from shms.models import Area, Hazard
-    from shms.services import ACTIVE
 
     area = db.scalar(select(Area).where(Area.code == "DIG"))
     hazard = db.scalar(select(Hazard).where(Hazard.area_id == area.id, Hazard.status.in_(ACTIVE)))
@@ -62,3 +62,13 @@ def test_entry_panel_and_routing_ignore_display_filters(client, db):
     assert "The destination has active High or Extreme" in page.text
     assert "Recent verified closures" in page.text and "Required PPE" in page.text
     assert 'id="walk-route"' not in page.text
+
+
+@pytest.mark.parametrize("user_id", [1, 4, 8, 9], ids=["reporter", "owner", "supervisor", "manager"])
+def test_every_role_can_check_entry_conditions(client, user_id):
+    login(client, user_id)
+    page = client.get("/site", params={"unit": "DIG", "route": "1"})
+    assert page.status_code == 200
+    assert 'id="unit-detail"' in page.text
+    assert "Chemical gloves" in page.text
+    assert "follow site rules and permits" in page.text
