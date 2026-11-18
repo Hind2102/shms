@@ -61,3 +61,20 @@ resamples, seed 0), always-yes F1, latency p50/p95.
 
 `evaluation/results/conditions_qwen2.5vl_7b_<prompt>_dev/`, `…_test/` (predictions.jsonl, metrics.json);
 `docs/verification.md` → Phase 4.
+
+## Addendum A (2026-11-18, before any model run; images downloaded, not yet viewed or processed)
+
+1. **Label source corrected.** The `train.jsonl`/`test.jsonl` files on the dataset page describe a different version of
+   the dataset: their file names (`.png`) and counts do not match the downloadable images (`.jpg`). The labels that
+   match the files are `train/metadata.csv` and `test/metadata.csv` (0 missing files). These are used instead.
+   Test split by category: spill 43, obstacle 44, safe 48, forklift_violation 30, improper_stacking 21 (186).
+   Train: spill 170, obstacle 160, safe 205, forklift_violation 108, improper_stacking 84 (727).
+2. **The `quality` flag is not in `metadata.csv`**, so the "questionable" sensitivity analysis of §3 is replaced by:
+3. **Ambiguity sensitivity analysis (pre-registered now):** `metadata.csv` has an `accept_also` field naming
+   alternative acceptable labels. For each hazard, images whose `accept_also` lists that hazard although the label says
+   it is absent are **ambiguous** (test: 14 such images for spill and 2 for obstruction; positives under §3: spill 44,
+   obstruction 48).
+   Primary analysis: labels as in §3. Sensitivity analysis: ambiguous images removed for that hazard. Example of label
+   noise seen in the metadata text: `spill/forklift_0066.jpg` is labelled spill but its description says "the scene is
+   essentially safe".
+4. Dev split (unchanged rule): 20 spill, 20 obstacle, 20 safe from `train/metadata.csv`, seed 42.
