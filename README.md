@@ -4,18 +4,21 @@ AI-assisted web platform for reporting PPE non-compliance from a photo, scoring 
 likelihood risk matrix, routing it to the accountable Area Owner, documenting **how** each case was closed, and
 showing site-wide risk on a live dashboard and heat map of a (synthesized) alumina refinery.
 
-**Every hazard type in the app is detected by AI and passed a release gate on labelled data.** The AI checks a
-photo against the PPE that the area requires: **hard hat**, **eye / face protection** (caustic splash) and
-**gloves**. A fourth check, the **hi-vis vest**, was evaluated and *not* released because it wrongly flags too many
-compliant workers. Evaluation uses the held-out split of the public, peer-reviewed **SH17** dataset with
-precision, recall, specificity and MCC (see [Evaluation](#evaluation)). Two local AI back-ends are compared: **YOLO** detectors trained on SH17, and a
-**vision-language model served by Ollama** (`qwen2.5vl:7b`). No paid API is used.
+The AI checks a photo against the PPE that the area requires: **hard hat**, **eye / face protection** (caustic
+splash) and **gloves**. These three passed a release gate on the held-out split of the public, peer-reviewed **SH17**
+dataset; a fourth check, the **hi-vis vest**, was evaluated and *not* released. Every AI suggestion is confirmed by a
+person, and every closure is verified by someone other than the person who closed it. **Read the evaluation with its
+limits:** on an independent dataset the hard-hat check over-reported violations badly (precision 0.28), and the
+stricter SH17 analysis shows similar weaknesses – see [External validation](#external-validation-and-stricter-checks-phase-2).
+Two local AI back-ends are compared: **YOLO** detectors trained on SH17 and a **vision-language model served by Ollama**
+(`qwen2.5vl:7b`). An **experimental**, off-by-default check for spilled liquid and obstructed walkways was tested on
+synthetic images only. No paid API is used.
 
 | | |
 |---|---|
 | **Team** | Hind Alhmoudi (sole member) – requirements, hazard taxonomy and risk matrix, architecture, all code, tests, evaluation, label audit, report |
 | **Course** | Software Engineering and Programming – Master in Applied Artificial Intelligence |
-| **Tested on** | macOS 26.6 on an Apple M5 Pro (24 GB) with Python 3.12.14 (verified 2026-11-17, see `docs/verification.md`). The GitHub Actions workflow (Ubuntu + macOS, Python 3.11 and 3.12) runs once the code is pushed. |
+| **Tested on** | macOS 26.6 on an Apple M5 Pro (24 GB) with Python 3.12.14 (see `docs/verification.md`); GitHub Actions on Ubuntu and macOS with Python 3.11 and 3.12, plus a Docker build and smoke test, on every push and pull request |
 | **Paid APIs** | None |
 
 ---
@@ -44,6 +47,11 @@ evaluation/               offline evaluation on SH17
   label_audit.py          expert audit of the ground-truth labels (accuracy, Cohen's kappa)
   robustness.py           F1 on dark / blurred / compressed / distant versions of the test photos
   load_test.py            throughput and latency of the running service with concurrent users
+  acceptance.py           SIMULATED reporter acceptance on the held-out split
+  release_gate.py         decides which hazard types the app may use
+  label_rule_audit.py     why model and derived labels disagree; stricter-label sensitivity analysis
+  external_hardhat.py     pre-registered external validation (hard hat) on an independent dataset
+  conditions.py           EXPERIMENTAL unsafe-conditions experiment (synthetic data)
   metrics.py, sh17.py     metric functions and dataset reader
   data/                   manifest, dataset stats, audit results (committed)
   results/                metrics.json per run, summary_full.md / summary_subset.md, figures (committed)
@@ -52,6 +60,8 @@ tests/                    pytest suite (unit, workflow, API end-to-end, detector
 docs/architecture.md      architecture diagram, component responsibilities, design decisions
 docs/requirements.md      user stories and data model, each story linked to code and tests
 docs/verification.md      verification log: every command, number and decision behind the results
+docs/*_plan.md            pre-registered plans (external validation, unsafe conditions), committed before the runs
+docs/screenshots/         desktop and phone screenshots of the main pages
 docs/course_mapping.md    which course lecture is applied where
 Dockerfile, docker-compose.yml   container build (non-root, health check) and Compose stack (+ optional Ollama)
 AGENTS.md                 rules for coding agents working in this repository
@@ -72,7 +82,7 @@ data/samples/             small sample photos for trying the app
 
 ## Installation
 
-Repository: <https://github.com/Hind2102/shms> (created; code not pushed yet – **pending**).
+Repository: <https://github.com/Hind2102/shms>.
 
 ```bash
 git clone https://github.com/Hind2102/shms.git
@@ -140,7 +150,7 @@ A database upgraded from an older version has usernames but no passwords: set on
 
 Main workflow:
 
-1. **Report** – as *Ahmed (Operator)*: *+ Report hazard* → choose area → take/upload a photo (try
+1. **Report** – as *Ahmed (Operator)*: *Report hazard* → choose area → take/upload a photo (try
    `data/samples/`). The AI checks it against the PPE that area requires and marks what it found.
 2. **Confirm and score** – keep or correct the suggested PPE hazard (or choose one yourself if the AI found nothing
    or failed – the page lists what the AI does *not* check), choose the worst credible consequence. Likelihood is
@@ -216,11 +226,13 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-265 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
-cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
-constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
-end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the
-metric functions against hand-computed values, and the evaluation pipeline on a miniature fake dataset.
+284 tests, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
+GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
+PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
+upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
+per role, sign-in, CSRF, API tokens, upload checks, escalation and the test mail outbox, the role home pages and plan
+view, the HTTP API end-to-end, the detectors (Ollama mocked at HTTP level), the metric functions against
+hand-computed values, the evaluation pipeline on miniature fake datasets, and the experimental feature flag.
 GitHub Actions runs lint (`ruff`) and the suite on Ubuntu and macOS with Python 3.11 and 3.12, then builds the
 Docker image and smoke-tests the running container.
 
@@ -317,9 +329,15 @@ targets were set for this evaluation; the proposal's own AI criteria are reporte
 in the app) and latency (≤ 20 s). The specificity threshold was added after the first test results.
 
 **Vision-language model.** With prompt v1 (refinery framing) Qwen2.5-VL 7B missed two thirds of violations
-(recall ≈ 0.33, MCC 0.13–0.25). Prompt v2 removes the framing and asks about each person separately. To avoid
-tuning on the test set, prompts are developed on a **dev set of 100 training-split images**
-(`--split dev`) and only the final prompt is run once on the test subset.
+(recall ≈ 0.33, MCC 0.13–0.25). Prompt v2 removes the framing and asks about each person separately; developed on a
+**dev set of 100 training-split images** and run once on the 300-photo test subset, it reached a macro MCC of 0.731
+(YOLOv9e 0.823 on the same photos) at 5.6 s per photo (p50). Prompt v2 was written after seeing v1 fail on test
+photos, so the test subset is not untouched for its design.
+
+**Simulated reporter acceptance** (the proposal's ≥ 80 % criterion, `evaluation/acceptance.py`): if a reporter keeps
+the AI's top suggestion whenever it names a violation that is really in the photo, 97.2 % of YOLOv9e suggestions would
+be accepted (1 450 / 1 492). This is a **simulation** and lenient by construction; real acceptance is recorded per
+report and shown on *AI monitoring*.
 
 ### External validation and stricter checks (Phase 2)
 
@@ -348,21 +366,31 @@ them and never says what a liquid is.
 | Criterion | Target | Result |
 |---|---|---|
 | Precision / recall per released hazard (held-out SH17) | ≥ 0.80 / ≥ 0.75 | ✅ 0.96 / 0.96–0.97 (YOLOv9e) |
+| Same check on an independent dataset (hard hat only) | ≥ 0.80 / ≥ 0.75 / spec ≥ 0.80 | ❌ precision 0.281, recall 0.977, specificity 0.445 |
 | Specificity per released hazard | ≥ 0.80 | ✅ 0.885–0.934; vest 0.582 ❌ → not released |
 | AI latency per photo, p95 | ≤ 20 s | ✅ 0.15 s (YOLOv9e) |
 | Robustness: F1 drop on dark / blurred / compressed / distant photos | report | ≤ 0.031 (YOLOv8s, `robustness_*.json`) |
 | Load: 8 concurrent users | no errors | ✅ 0 errors; p95 371 ms (YOLOv9e), 181 ms (YOLOv8s) (`load_test_*.json`) |
 | Train/test leakage | none | ✅ 0 file overlaps, 0 near-duplicates (pre-training overlap of YOLO/Qwen unknown) |
-| Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | not measurable offline; recorded per report and shown on *AI monitoring* |
+| Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | simulated 97.2 % (lenient, not field data); real acceptance recorded per report on *AI monitoring* |
 | New report visible on dashboard | immediately (< 5 s; proposal: 5 min) | ✅ `tests/test_api.py::test_full_workflow_and_dashboard_update` |
 | Derived test labels agree with expert | report accuracy and κ | pending (`python -m evaluation.label_audit score`) |
-| Automated tests and lint | all pass | ✅ locally: `pytest` (120), `ruff`; CI and Docker smoke test run after the first push |
+| Automated tests and lint | all pass | ✅ `pytest` (284), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
 
 Detection mAP50 (object level, 17 classes – a different quantity from the image-level results above) measured
 with the published weights was 63.6 (YOLOv9e) and 54.9 (YOLOv8s), 6–8 points below the SH17 paper (70.9 / 63.7)
 on a split with the same 1,620 images and 15,358 boxes. Device, batch size, image size and the ultralytics
 version that saved the weights (8.2.38: 65.0 / 55.9) were tested and do not explain the gap. **Not reproduced;
 cause unknown** (details in `docs/verification.md`).
+
+## What is implemented, simulated, experimental or planned
+
+| Status | What |
+|---|---|
+| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, plan view, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
+| **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
+| **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic test data only; flag off by default); the vision-language model as a PPE detector |
+| **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves; a licence for this project's code |
 
 ## Data, privacy and limitations
 
@@ -371,10 +399,12 @@ cause unknown** (details in `docs/verification.md`).
 * Demo accounts share one documented demo password; a deployment would use the company's single sign-on and set
   `SHMS_SECRET_KEY`. Uploaded photos are checked (JPEG/PNG/WebP, ≤ 20 MB, ≤ 40 megapixels) and re-encoded.
 * The hazard list contains only the PPE checks that passed the release gate, so other hazards (including a missing
-  hi-vis vest, which no seeded area requires, and unsafe conditions) cannot currently be reported in the app, not even manually.
+  hi-vis vest, which no seeded area requires) cannot be reported in the app. Liquid on the floor and obstructed
+  walkways can be reported only when the experimental flag is on.
 * Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions
-  (caustic spills, steam leaks, missing grating) have no such dataset; collecting one with ≥ 3 annotators and
-  measuring their agreement is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled
+  (caustic spills, steam leaks, missing grating) have no real labelled dataset; the experimental check was tested on
+  synthetic warehouse images only. Collecting real refinery photos labelled by ≥ 3 annotators, with their agreement
+  measured, is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled
   by alarms and emergency response, and steam plumes in a refinery would cause frequent false alarms.
 * SH17 images come from Pexels (manufacturing settings), not refineries, so field performance may differ.
 
@@ -387,6 +417,7 @@ cause unknown** (details in `docs/verification.md`).
 | Ultralytics YOLO | running the weights | AGPL-3.0 |
 | Qwen2.5-VL 7B via Ollama (`qwen2.5vl:7b`) | vision-language comparison | Apache 2.0 (`ollama show qwen2.5vl:7b --license`) |
 | Hard Hat Workers (Make ML), Hugging Face `Voxel51/hard-hat-detection` | external validation of the hard-hat check | CC0 1.0. Not redistributed here |
+| Warehouse Safety Hazard Detection (J. S. Sohal), Hugging Face `Jsohal174/warehouse-safety-hazard-dataset` | experimental unsafe-conditions test | CC BY 4.0; synthetic images (Blender + Google Gemini). Not redistributed here |
 | This project's code | – | written by the author for the course; no licence file has been chosen yet |
 
 ## Acknowledgements

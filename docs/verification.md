@@ -1130,3 +1130,47 @@ test; one model, one run; obstruction passes only on point estimates.
   refused; flag on: fixed wording, not pre-selected, model text hidden, failure non-blocking, PPE suggestion unchanged,
   experimental type confirmable. Requirement change: `test_taxonomy_contains_only_ai_detected_hazards_plus_flagged_experimental_ones`.
 - Suite: 284 passed; ruff clean.
+
+---
+
+# Phase 5 – Freeze (branch `feature/freeze`, 2026-11-18)
+
+| Check | Result |
+|---|---|
+| Full suite (local) | 284 passed; ruff check and format clean |
+| CI | every phase PR merged only after GitHub Actions passed on all 5 jobs (Ubuntu/macOS × Python 3.11/3.12 + Docker build and smoke test); test step ≈ 1 min 53 s on Ubuntu (PR #7) – README now says "about 2 minutes" instead of "under a minute" |
+| Fresh clone following the README | `git clone https://github.com/Hind2102/shms.git` at `d3a72c2` into a new folder; Python 3.12 venv; `pip install -e ".[dev,yolo]" matplotlib`; `python scripts/download_models.py --all` (real download: both "checksum OK"); `cp .env.example .env`; `pytest` → **284 passed** (YOLO tests ran); `ruff` clean; `uvicorn … --port 8765`; sign-in as `sara` / documented demo password through the form (CSRF) → home "Waiting for your verification"; `/site`, `/dashboard`, `/matrix`, `/hazards`, `/queue` → 200; 0 tracebacks |
+| Docker | built and smoke-tested by CI on every PR (incl. token creation in the container and 401 without token); local run verified in Phase 1b |
+| Git hygiene | no `.env`, Kaggle token, `*.db`, uploads, outbox, `instance/`, backups, weights, datasets or generated galleries tracked now or in history; regex secret scan over all history: 0 hits |
+| README | brought in line with all phases (opening claim now states the external failure, repository live, 284 tests and real CI time, VLM v2 and simulated acceptance results, experimental feature, warehouse dataset licence, status table) |
+
+## Final status table
+
+| Status | Items |
+|---|---|
+| **Implemented + tested** | photo report with AI suggestion and manual fallback; 5 × 5 risk scoring; workflow with plan/close/verify/reject/reopen, four-eyes verification and from/to audit trail; overdue escalation; notifications; scrypt sign-in, signed sessions, CSRF, hashed API tokens, per-object authorisation, safe uploads, generic errors; Alembic migrations (old DB upgraded with identical rows); role home pages, plan view, dashboard, risk-matrix page; AI monitoring, `/metrics`; release gate; offline evaluation on SH17; pre-registered external validation; label-rule audit; Docker; CI |
+| **Simulated** | synthesized people, areas, layout and history; simulated reporter acceptance; e-mail outbox (never sent); demo accounts with a documented password |
+| **Experimental** | unsafe-condition check (liquid on floor, obstructed walkway) – synthetic test data, flag off by default; VLM as PPE detector |
+| **Planned / not done** | label audit clicks (owner); ADOSH-SF band confirmation (owner); single sign-on; real refinery photos with ≥ 3 annotators; external validation of eye protection and gloves; licence for the project code |
+
+## Handover (updated 2026-11-18)
+
+**Verified:** every phase above, with commands, numbers and commits. **Uncertain:** detection mAP vs the SH17 paper
+(not reproduced, cause unknown); field performance – the hard-hat check failed external validation (precision 0.281,
+specificity 0.445); label quality until the audit is done; selection bias of decisions made after seeing test results
+(YOLOv9e, specificity threshold, VLM prompt v2); synthetic-only evidence for the experimental check.
+
+**Fixed (each with a failing test first):** re-confirm and wrong-state bypasses (security review, medium); foreign-key
+switch leaking after database creation; Docker start-up crash (outbox permission); `/hazards?status=` 500; plan-form
+`NameError`; owner queue dropping planned hazards; phone layout overflow and plan-view contrast.
+
+**Backups and evidence:** `shms.db` untouched; `backups/shms_2026-11-17.db` (identical SHA-256); `backups/env_before_2026-11-17.bak`;
+`backups/evidence_results_c19e9be/` (+ `.sha256`), `backups/evidence_data_c19e9be/`; `shms_demo.old.db`; tags `v1.0.0`
+(fallback) and `v1.1.0` (this freeze).
+
+**Remaining before 1 December (owner):** (1) label audit, 1–1.5 h, then `python -m evaluation.label_audit score`
+(agent, 10 min); (2) confirm risk bands against the ADOSH-SF guideline, ~30 min; (3) decide the hard-hat release after
+the external failure (recommended: keep as an "experimental suggestion" with the failure stated, or remove from the
+release); (4) choose a code licence; (5) new Kaggle token (old one was typed into a chat); (6) say whether a supervisor
+reviewed the synthesized layout. **Readiness:** software, tests, CI, Docker and documentation are submission-ready at
+`v1.1.0`; the report must state the external-validation failure and the pending label audit.
