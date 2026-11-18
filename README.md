@@ -27,6 +27,7 @@ shms/                     the web application (Python package)
   main.py, asgi.py        app factory and ASGI entry point
   settings.py             configuration from SHMS_* environment variables / .env
   models.py, db.py        SQLAlchemy data model (users, areas, hazards, events, notifications)
+  escalate.py, notify.py  overdue escalation (CLI + page-load check) and notifications with a test mail outbox
   migrations/             Alembic migrations (`alembic upgrade head`; configuration in alembic.ini)
   services.py             workflow state machine, routing, alerts, dashboard queries
   risk.py, taxonomy.py    risk matrix and hazard categories (data in shms/config/*.json)
@@ -103,6 +104,7 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_AI_RELEASE_FILE` | `shms/config/ai_release.json` | Release-gate decision: which hazard types the app may use |
 | `SHMS_DATABASE_URL` | `sqlite:///shms.db` | Any SQLAlchemy URL |
 | `SHMS_UPLOAD_DIR` | `uploads` | Where photos are stored |
+| `SHMS_MAIL_OUTBOX` | `outbox` | Test mail backend: notifications are written here as `.eml` files (nothing is sent) |
 
 Risk-matrix definitions, bands and target close-out times are in `shms/config/risk_matrix.json`; hazard
 categories are in `shms/config/taxonomy.json`. Both can be changed without code changes.
@@ -120,15 +122,27 @@ Main workflow:
 
 1. **Report** – as *Ahmed (Operator)*: *+ Report hazard* → choose area → take/upload a photo (try
    `data/samples/`). The AI checks it against the PPE that area requires and marks what it found.
-2. **Confirm and score** – keep or correct the suggested PPE hazard, choose the worst credible consequence.
-   Likelihood is computed from the area's history and the risk level is shown. Tick *I already fixed it on the
-   spot* to close it immediately with the action taken and a closing photo.
-3. **Route and close** – otherwise the hazard goes to the Area Owner (e.g. *Khalid* for Digestion). High and
-   Extreme hazards alert the safety supervisor (*Sara*). The owner plans an action and closes the hazard with a
-   description of the control and a closing photo. Every step is kept in the audit trail.
+2. **Confirm and score** – keep or correct the suggested PPE hazard (or choose one yourself if the AI found nothing
+   or failed – the page lists what the AI does *not* check), choose the worst credible consequence. Likelihood is
+   computed from the area's history and the risk level and target close date are shown. Tick *I already fixed it
+   on the spot* to record the action taken and a closing photo.
+3. **Plan, close, verify** – the hazard goes to the Area Owner (e.g. *Khalid* for Digestion); High and Extreme
+   hazards alert the safety supervisor (*Sara*). The owner plans an action (action owner + deadline) and closes it
+   with what was done. A closure is final only after **verification** by the supervisor or the reporter – never
+   by the person who closed it; they can also **reject** it (back to open, reason required). A verified hazard can
+   be **reopened** with a reason. Every status change is a rule in `services.ALLOWED_TRANSITIONS` and is kept in
+   the audit trail with from/to status, who and when.
+   `draft → open → planned → pending verification → closed`, with `pending verification → open` (reject) and
+   `closed → open` (reopen).
 4. **Monitor** – the dashboard shows KPIs, the heat map (click an area for its live hazards, required PPE and
    what the AI checks there),
    weekly trend, repeat hotspots and the hazard register with filters.
+
+**Overdue escalation** (project rule): an open or planned hazard past its target date is escalated to the safety
+supervisors (level 1) and, 7 days later, to the manager (level 2), once each. It runs on page loads (at most once a
+minute) and can be scheduled, e.g. with cron: `python -m shms.escalate`. Notifications appear in the app and are
+also written as `.eml` files to `outbox/` – a **test mail backend**; no e-mail is ever sent (demo addresses use the
+reserved `shms.example` domain).
 
 Supervisors and the manager also see **AI monitoring** (latency, errors and reporter acceptance against the SLOs
 in `shms/config/slo.json`). The JSON API is documented at <http://127.0.0.1:8000/docs>; Prometheus metrics are at
@@ -166,7 +180,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-121 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
+172 tests, under a minute, no model or GPU needed (the YOLO tests run automatically when the weights are present). They
 cover every cell of the risk matrix, the PPE rules, area-specific PPE checks, idempotent reporting, database
 constraints, AI monitoring and `/metrics`, the workflow state machine and permissions, the HTTP API
 end-to-end (report → confirm → route → close → dashboard), the detectors (Ollama mocked at HTTP level), the

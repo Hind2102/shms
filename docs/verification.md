@@ -773,3 +773,70 @@ message and starts on the migrated copy.
 **Rollback path:** migrations are applied to a file that was copied first; to roll back, stop the app, put the copy
 back and check out the code version that matches it (the old file needs code ≤ `aa90777`). `alembic downgrade` is
 implemented for 0002 but restoring the copy is the documented path.
+
+---
+
+# Phase 1 – Safety workflow (branch `feature/workflow`, 2026-11-18)
+
+Plan: `docs/superpowers/plans/2026-11-18-phase1-workflow-security.md`. All items below: **implemented+tested**.
+
+### P1.1 State machine (`shms/services.py`)
+
+| From | To | Action (event kind) | Who (server-side check) |
+|---|---|---|---|
+| draft | open | confirm → routed (`assigned`) | reporter or supervisor |
+| draft | pending_verification | confirm "fixed on the spot" (`closed`) | reporter |
+| open | planned | plan: text + action owner + deadline > now (`planned`) | Area Owner of the area, assignee, supervisor |
+| open, planned | pending_verification | close with action (+ photo) (`closed`) | same as plan |
+| pending_verification | closed | verify with note (`verified`) | supervisor or reporter, **not the closer** |
+| pending_verification | open | reject, reason required (`rejected`) | supervisor or reporter, not the closer |
+| closed | open | reopen, reason required (`reopened`); new target date, escalation reset | supervisor or reporter |
+
+- One table `ALLOWED_TRANSITIONS`; the only status writer is `_move()`, which records `from_status`, `to_status`,
+  actor, time and note on a `HazardEvent`. Managers are read-only (no action allowed).
+- AI fields are never written after the draft (`test_ai_suggestion_is_preserved_through_the_lifecycle`).
+- Dashboards: "open" = open + planned + pending; closure statistics count verified closures only.
+- Migration `0003_workflow` (+ `0004_escalation`). Legacy closed rows keep `closed` with no verification and are
+  labelled "Closed before the verification step existed" – nothing is invented. Upgrade of a copy of
+  `backups/shms_2026-11-17.db` to `0004_escalation`: counts and relationship hashes identical, 0 FK violations.
+- Requirement changes (old tests updated, named in commit `9491d30`): close → pending_verification instead of
+  closed; fixed-on-the-spot → pending_verification; closed can be reopened.
+- Seed: the synthetic supervisor verifies historic closures 0.5–3 days later (211 closed, 23 open, 6 pending in a
+  fresh demo). This is **simulated** history.
+
+### P1.2 Deadlines and escalation (`shms/escalate.py`, `shms/notify.py`)
+
+- Target close date from the risk band (`config/risk_matrix.json`), unchanged. Plan deadline defaults to it.
+- Project rule (not a regulation): level 1 when an open/planned hazard passes its target date → supervisors;
+  level 2 at +7 days → managers; each once; pending/closed never escalate; reopen → new target date, level 0.
+- Runs via `python -m shms.escalate` (schedulable) and on page loads, throttled to once a minute; failures are logged
+  and never break a page.
+- Notifications: in-app + **test mail backend** writing `.eml` files to `outbox/` (git-ignored, `SHMS_MAIL_OUTBOX`).
+  No e-mail is sent; demo addresses use the reserved `shms.example` domain.
+
+### P1.3 Manual reporting and honest wording
+
+- When the AI finds nothing: "The AI found none of the checked items missing (…). This is not a confirmation that the
+  scene is in order" + "Not checked by the AI here: <area PPE not covered by a released check>, and any hazard other
+  than missing PPE." The former green "No missing PPE detected" box is gone. A test scans the visible page text for
+  "safe", "no violation", "no missing PPE detected", "all clear", "compliant".
+- When the AI fails: error shown, every released, required hazard type selectable.
+- Audit note for new reports: "found none of the checked items missing" / "could not analyse the photo"
+  (existing notes in databases unchanged).
+
+### P1.4 Bugs found and fixed (each with a test that failed first)
+
+| Bug | Test |
+|---|---|
+| `/hazards?status=<unknown>` → HTTP 500 (`ValueError`) | `test_register_ignores_unknown_status_filter` |
+| Plan form with a deadline date → `NameError` (missing import) | `test_html_plan_with_deadline_date` |
+| Owner queue would drop planned hazards | `test_queue_keeps_planned_hazards_and_supervisor_sees_pending` |
+
+### P1.5 Checks
+
+`pytest` 172 passed; `ruff check .` / `ruff format --check .` clean (local, 2026-11-18). New test files:
+`test_workflow_v2.py` (24), `test_web_workflow.py` (11), `test_escalation.py` (9), `test_honest_wording.py` (3).
+User stories US11–US15 added to `docs/requirements.md`.
+
+Not done in Phase 1 (moved to Phase 1b): the API read endpoints (`GET /api/hazards`, `/api/hazards/{id}`,
+`/api/dashboard`, `/api/monitoring`) currently need no sign-in; authorisation per object is not enforced on pages.
