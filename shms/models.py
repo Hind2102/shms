@@ -52,6 +52,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[Role] = mapped_column(Enum(Role))
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     areas: Mapped[list[Area]] = relationship(back_populates="owner")
 
@@ -77,6 +78,18 @@ class Area(Base):
     @property
     def ppe_list(self) -> list[str]:
         return [p.strip() for p in self.required_ppe.split(",") if p.strip()]
+
+    @property
+    def unchecked_ppe(self) -> list[str]:
+        """Required PPE items that no released AI check covers (the AI checks presence, not the type of PPE)."""
+        covered = {
+            "no_hard_hat": ("hard hat", "helmet"),
+            "no_eye_protection": ("glasses", "goggles", "face shield", "visor"),
+            "no_gloves": ("glove",),
+            "no_hi_vis_vest": ("hi-vis", "vest"),
+        }
+        words = [w for code in self.check_codes for w in covered.get(code, ())]
+        return [p for p in self.ppe_list if not any(w in p.lower() for w in words)]
 
     @property
     def check_codes(self) -> list[str]:
@@ -144,6 +157,8 @@ class Hazard(Base):
     action_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     verified_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Overdue escalation: 0 = none, 1 = supervisors notified, 2 = managers notified (see shms/escalate.py)
+    escalation_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     area: Mapped[Area] = relationship(back_populates="hazards")
     reporter: Mapped[User] = relationship(foreign_keys=[reporter_id])

@@ -123,7 +123,8 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
     rng = random.Random(rng_seed)
     now = now or utcnow()
 
-    users = [User(name=n, role=r) for n, r in USERS]
+    # Demo addresses use the reserved .example domain: the test outbox can never deliver real mail.
+    users = [User(name=n, role=r, email=f"{n.split()[0].lower()}@shms.example") for n, r in USERS]
     db.add_all(users)
     db.flush()
     areas = [

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime
 
@@ -12,13 +13,14 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import risk, services, taxonomy
+from .. import escalate, risk, services, taxonomy
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User
 from ..settings import PACKAGE_DIR
 from .deps import COOKIE, current_user_optional, photo_file, save_photo
 
+log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
 templates.env.globals.update(taxonomy=taxonomy, risk=risk, Status=Status, Role=Role)
@@ -41,8 +43,20 @@ def page_user(user: User | None = Depends(current_user_optional)) -> User:
 def render(request: Request, name: str, user: User | None, db: Session, **ctx) -> HTMLResponse:
     unread = 0
     if user is not None:
+        _escalate_on_page_load(db)
         unread = db.query(Notification).filter_by(user_id=user.id, read=False).count()
     return templates.TemplateResponse(request, name, {"user": user, "unread": unread, **ctx})
+
+
+def _escalate_on_page_load(db: Session) -> None:
+    """Overdue escalation also runs on page loads (at most once a minute), so a demo needs no scheduler.
+    A failure here must never break the page; it is logged instead."""
+    try:
+        escalate.maybe_run(db)
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        log.exception("Escalation check failed")
 
 
 def _hazard(db: Session, hazard_id: int) -> Hazard:

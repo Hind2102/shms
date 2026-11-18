@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from . import risk, taxonomy
 from .detection import DetectorResult
-from .models import Area, Hazard, HazardEvent, Notification, Role, Status, User, utcnow
+from .models import Area, Hazard, HazardEvent, Role, Status, User, utcnow
 
 # The safety workflow as a state machine. Every status change goes through _move(), which checks this table and
 # writes an audit event with the from/to status.
@@ -125,6 +125,14 @@ def replay_or_conflict(db: Session, reporter: User, area: Area, key: str | None)
     return existing
 
 
+def _ai_note(h: Hazard) -> str:
+    if h.ai_error:
+        return f"AI ({h.ai_model}) could not analyse the photo"
+    if h.ai_top_code:
+        return f"AI ({h.ai_model}) suggested {h.ai_top_code}"
+    return f"AI ({h.ai_model}) found none of the checked items missing"
+
+
 def create_draft(
     db: Session,
     reporter: User,
@@ -159,7 +167,7 @@ def create_draft(
         h,
         reporter,
         "reported",
-        f"AI ({h.ai_model}) suggested {h.ai_top_code or 'no PPE hazard'}" if result else "Reported without AI",
+        _ai_note(h) if result else "Reported without AI",
         at=h.created_at,
     )
     return h
@@ -224,6 +232,8 @@ def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime |
 
 
 def _alert(db: Session, h: Hazard, actor: User, now: datetime) -> None:
+    from . import notify
+
     recipients = list(db.scalars(select(User).where(User.role == Role.SUPERVISOR)))
     if h.area.owner not in recipients:
         recipients.append(h.area.owner)
@@ -231,8 +241,7 @@ def _alert(db: Session, h: Hazard, actor: User, now: datetime) -> None:
         f"{h.risk_level} risk: {taxonomy.get(h.category_code).name} in {h.area.name} "
         f"(score {h.risk_score}, status {h.status.value})"
     )
-    for u in recipients:
-        db.add(Notification(user_id=u.id, hazard=h, message=msg, created_at=now))
+    notify.send(db, recipients, h, msg, f"Hazard #{h.id}: {msg}. Target close {h.due_at:%Y-%m-%d}.", at=now)
     _event(db, h, actor, "alerted", f"Notified {', '.join(u.name for u in recipients)}", at=now)
 
 
@@ -320,8 +329,12 @@ def reopen(db: Session, h: Hazard, actor: User, reason: str, at: datetime | None
         raise PermissionDenied("Only a supervisor or the reporter can reopen a hazard")
     if not reason.strip():
         raise WorkflowError("Give a reason for reopening the hazard")
-    _move(db, h, actor, Status.OPEN, "reopened", reason.strip(), at=at)
+    now = at or utcnow()
+    _move(db, h, actor, Status.OPEN, "reopened", reason.strip(), at=now)
     _clear_closure(h)
+    # A reopened hazard gets a fresh target date from its risk band and starts escalation again.
+    h.due_at = now + timedelta(days=risk.score(h.consequence, h.likelihood).target_days)
+    h.escalation_level = 0
     db.flush()
     return h
 

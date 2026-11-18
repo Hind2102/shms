@@ -28,3 +28,6 @@ runs/
 
 # Local database backups (never commit)
 backups/
+
+# Test mail backend output (never commit)
+outbox/

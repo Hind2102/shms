@@ -24,6 +24,7 @@ def settings(tmp_path):
         detector="mock",
         database_url="sqlite://",
         ai_release_file=tmp_path / "none.json",
+        mail_outbox=tmp_path / "outbox",
     )
     get_detector.cache_clear()
     yield s

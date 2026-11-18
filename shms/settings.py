@@ -48,6 +48,8 @@ class Settings:
     ai_release_file: Path = field(
         default_factory=lambda: Path(_env("AI_RELEASE_FILE", str(PACKAGE_DIR / "config" / "ai_release.json")))
     )
+    # Test mail backend: every notification is also written as an .eml file here (no e-mail is sent).
+    mail_outbox: Path = field(default_factory=lambda: Path(_env("MAIL_OUTBOX", str(PROJECT_DIR / "outbox"))))
     # Minimum AI confidence for a suggestion to be pre-selected in the report form.
     suggest_threshold: float = field(default_factory=lambda: float(_env("SUGGEST_THRESHOLD", "0.35")))
 
