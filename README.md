@@ -312,6 +312,18 @@ in the app) and latency (≤ 20 s). The specificity threshold was added after th
 tuning on the test set, prompts are developed on a **dev set of 100 training-split images**
 (`--split dev`) and only the final prompt is run once on the test subset.
 
+### External validation and stricter checks (Phase 2)
+
+* **External validation of the hard-hat check – FAIL.** Pre-registered in `docs/external_validation_plan.md` before
+  any image was downloaded, run once on 5 000 images of the independent *Hard Hat Workers* dataset (CC0): precision
+  **0.281**, recall 0.977, specificity **0.445** (`evaluation/results/external_hardhat_yolo_sh17_yolo9e/`). The model
+  misses most hard hats in these small (416 px) photos (it detects about 39 % of them), so it flags compliant workers.
+  The app's release decision is unchanged, as pre-registered; the SH17 results above do not transfer to this data.
+  Eye protection and gloves have no external validation (no public labelled set was found that maps to them).
+* **Stricter label analysis on SH17** (`evaluation/label_rule_audit.py`): on photos where the relevant body part is
+  labelled, specificity is lower than in the released figures – hard hat 0.750 (64 negatives), eye protection 0.828,
+  gloves 0.636 (only 11 negatives). Much of the released specificity comes from photos without any person.
+
 ### Success criteria
 
 | Criterion | Target | Result |
@@ -346,6 +358,17 @@ cause unknown** (details in `docs/verification.md`).
   measuring their agreement is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled
   by alarms and emergency response, and steam plumes in a refinery would cause frequent false alarms.
 * SH17 images come from Pexels (manufacturing settings), not refineries, so field performance may differ.
+
+## Licences of data and models
+
+| Item | Used for | Licence / terms (as stated by the source) |
+|---|---|---|
+| SH17 dataset (Ahmad & Rahimi 2024), Kaggle `mugheesahmad/sh17-dataset-for-ppe-detection` | evaluation (held-out split), label audit | CC BY-NC-SA 4.0; images from Pexels (Pexels licence notice applies); research and education only. Not redistributed here – downloaded by each user |
+| SH17 YOLO weights (`yolo8s.pt`, `yolo9e.pt`, GitHub release v1 of `ahmadmughees/SH17dataset`) | the app's detector, evaluation | no licence is stated in the repository; used here for non-commercial academic evaluation only; not committed (downloaded and checksummed by `scripts/download_models.py`) |
+| Ultralytics YOLO | running the weights | AGPL-3.0 |
+| Qwen2.5-VL 7B via Ollama (`qwen2.5vl:7b`) | vision-language comparison | Apache 2.0 (`ollama show qwen2.5vl:7b --license`) |
+| Hard Hat Workers (Make ML), Hugging Face `Voxel51/hard-hat-detection` | external validation of the hard-hat check | CC0 1.0. Not redistributed here |
+| This project's code | – | written by the author for the course; no licence file has been chosen yet |
 
 ## Acknowledgements
 

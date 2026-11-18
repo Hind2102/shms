@@ -1,0 +1,460 @@
+{
+  "run": "yolo_sh17_yolo9e",
+  "operating_threshold": 0.35,
+  "images": 1620,
+  "hazards": {
+    "no_hard_hat": {
+      "released": {
+        "tp": 1193,
+        "fp": 44,
+        "fn": 39,
+        "tn": 344,
+        "precision": 0.9644300727566694,
+        "recall": 0.9683441558441559,
+        "specificity": 0.8865979381443299,
+        "f1": 0.9663831510733091,
+        "accuracy": 0.9487654320987654,
+        "balanced_accuracy": 0.9274710469942429,
+        "mcc": 0.8587637039123561,
+        "support": 1232,
+        "n": 1620
+      },
+      "disagreements": {
+        "FN: model found no head": 33,
+        "FP: no head box in the labels": 27,
+        "FP: PPE labelled, model missed it": 16,
+        "FN: model saw PPE that is not in the labels": 6,
+        "FP: labelled head below the rule's size limit": 1
+      },
+      "example_images": {
+        "FP: no head box in the labels": [
+          "pexels-photo-586024.jpeg",
+          "pexels-photo-14012633.jpeg",
+          "pexels-photo-6867424.jpeg",
+          "pexels-photo-5089116.jpeg",
+          "pexels-photo-9300985.jpeg",
+          "pexels-photo-7220895.jpeg",
+          "pexels-photo-14012695.jpeg",
+          "pexels-photo-3687977.jpeg",
+          "pexels-photo-3853198.jpeg",
+          "pexels-photo-11143306.jpeg"
+        ],
+        "FN: model found no head": [
+          "pexels-photo-586089.jpeg",
+          "pexels-photo-5974272.jpeg",
+          "pexels-photo-1116035.jpeg",
+          "pexels-photo-7014342.jpeg",
+          "pexels-photo-1325725.jpeg",
+          "pexels-photo-10341122.jpeg",
+          "pexels-photo-15489247.jpeg",
+          "pexels-photo-7483032.jpeg",
+          "pexels-photo-8986172.jpeg",
+          "pexels-photo-3817825.jpeg"
+        ],
+        "FP: PPE labelled, model missed it": [
+          "pexels-photo-9328720.jpeg",
+          "pexels-photo-7976911.jpeg",
+          "pexels-photo-11739070.jpeg",
+          "pexels-photo-8961066.jpeg",
+          "pexels-photo-18355812.jpeg",
+          "pexels-photo-5493673.jpeg",
+          "pexels-photo-5647259.jpeg",
+          "pexels-photo-4956918.jpeg",
+          "pexels-photo-7739856.jpeg",
+          "pexels-photo-5986093.jpeg"
+        ],
+        "FN: model saw PPE that is not in the labels": [
+          "pexels-photo-9272138.jpeg",
+          "pexels-photo-16205189.jpeg",
+          "pexels-photo-3792575.jpeg",
+          "pexels-photo-6890357.jpeg",
+          "pexels-photo-5493654.jpeg",
+          "pexels-photo-6196229.jpeg"
+        ],
+        "FP: labelled head below the rule's size limit": [
+          "pexels-photo-9746797.jpeg"
+        ]
+      },
+      "sensitivity_part_labelled": {
+        "images": 1296,
+        "tp": 1193,
+        "fp": 16,
+        "fn": 39,
+        "tn": 48,
+        "precision": 0.9867659222497932,
+        "recall": 0.9683441558441559,
+        "specificity": 0.75,
+        "f1": 0.9774682507169193,
+        "accuracy": 0.9575617283950617,
+        "balanced_accuracy": 0.859172077922078,
+        "mcc": 0.6219495057567499,
+        "support": 1232,
+        "n": 1296,
+        "precision_ci95": [
+          0.9800995024875622,
+          0.9925742574257426
+        ],
+        "recall_ci95": [
+          0.9578264395782644,
+          0.9787059787059788
+        ],
+        "specificity_ci95": [
+          0.6363636363636364,
+          0.8513513513513513
+        ],
+        "mcc_ci95": [
+          0.5254792680513946,
+          0.7060972106688466
+        ],
+        "baseline_always_yes": {
+          "precision": 0.9506172839506173,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 0.9746835443037974,
+          "mcc": 0.0
+        }
+      }
+    },
+    "no_eye_protection": {
+      "released": {
+        "tp": 953,
+        "fp": 41,
+        "fn": 43,
+        "tn": 583,
+        "precision": 0.9587525150905433,
+        "recall": 0.9568273092369478,
+        "specificity": 0.9342948717948718,
+        "f1": 0.9577889447236181,
+        "accuracy": 0.9481481481481482,
+        "balanced_accuracy": 0.9455610905159098,
+        "mcc": 0.8905921425046821,
+        "support": 996,
+        "n": 1620
+      },
+      "disagreements": {
+        "FN: model found no face": 35,
+        "FP: PPE labelled, model missed it": 23,
+        "FP: no face box in the labels": 16,
+        "FN: model saw PPE that is not in the labels": 8,
+        "FP: labelled face below the rule's size limit": 2
+      },
+      "example_images": {
+        "FN: model found no face": [
+          "pexels-photo-3846005.jpeg",
+          "pexels-photo-9328720.jpeg",
+          "pexels-photo-5835307.jpeg",
+          "pexels-photo-7925868.jpeg",
+          "pexels-photo-10040011.jpeg",
+          "pexels-photo-5089116.jpeg",
+          "pexels-photo-586098.jpeg",
+          "pexels-photo-1325725.jpeg",
+          "pexels-photo-5059647.jpeg",
+          "pexels-photo-5410090.jpeg"
+        ],
+        "FP: PPE labelled, model missed it": [
+          "pexels-photo-4488647.jpeg",
+          "pexels-photo-3379761.jpeg",
+          "pexels-photo-19317897.jpeg",
+          "pexels-photo-14189343.jpeg",
+          "pexels-photo-5846272.jpeg",
+          "pexels-photo-7653999.jpeg",
+          "pexels-photo-8853512.jpeg",
+          "pexels-photo-8691848.jpeg",
+          "pexels-photo-7518805.jpeg",
+          "pexels-photo-6197120.jpeg"
+        ],
+        "FP: no face box in the labels": [
+          "pexels-photo-5301730.jpeg",
+          "pexels-photo-9712971.jpeg",
+          "pexels-photo-13978240.jpeg",
+          "pexels-photo-280076.jpeg",
+          "pexels-photo-3687977.jpeg",
+          "pexels-photo-4544167.jpeg",
+          "pexels-photo-6566003.jpeg",
+          "pexels-photo-7675999.jpeg",
+          "pexels-photo-7020281.jpeg",
+          "pexels-photo-5673503.jpeg"
+        ],
+        "FP: labelled face below the rule's size limit": [
+          "pexels-photo-8729623.jpeg",
+          "pexels-photo-15041788.jpeg"
+        ],
+        "FN: model saw PPE that is not in the labels": [
+          "pexels-photo-5452291.jpeg",
+          "pexels-photo-1797415.jpeg",
+          "pexels-photo-6720548.jpeg",
+          "pexels-photo-3873734.jpeg",
+          "pexels-photo-8374249.jpeg",
+          "pexels-photo-4489673.jpeg",
+          "pexels-photo-4904525.jpeg",
+          "pexels-photo-4354192.jpeg"
+        ]
+      },
+      "sensitivity_part_labelled": {
+        "images": 1130,
+        "tp": 953,
+        "fp": 23,
+        "fn": 43,
+        "tn": 111,
+        "precision": 0.9764344262295082,
+        "recall": 0.9568273092369478,
+        "specificity": 0.8283582089552238,
+        "f1": 0.9665314401622718,
+        "accuracy": 0.9415929203539823,
+        "balanced_accuracy": 0.8925927590960858,
+        "mcc": 0.7398932752209624,
+        "support": 996,
+        "n": 1130,
+        "precision_ci95": [
+          0.9670781893004116,
+          0.9847560975609756
+        ],
+        "recall_ci95": [
+          0.9441117764471058,
+          0.9682539682539683
+        ],
+        "specificity_ci95": [
+          0.7669172932330827,
+          0.8913043478260869
+        ],
+        "mcc_ci95": [
+          0.6798827952490912,
+          0.7948191543472367
+        ],
+        "baseline_always_yes": {
+          "precision": 0.8814159292035398,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 0.9369708372530573,
+          "mcc": 0.0
+        }
+      }
+    },
+    "no_gloves": {
+      "released": {
+        "tp": 1192,
+        "fp": 43,
+        "fn": 54,
+        "tn": 331,
+        "precision": 0.9651821862348178,
+        "recall": 0.956661316211878,
+        "specificity": 0.8850267379679144,
+        "f1": 0.9609028617492946,
+        "accuracy": 0.9401234567901234,
+        "balanced_accuracy": 0.9208440270898962,
+        "mcc": 0.8332630847469471,
+        "support": 1246,
+        "n": 1620
+      },
+      "disagreements": {
+        "FN: model found no hands": 48,
+        "FP: no hands box in the labels": 36,
+        "FN: model saw PPE that is not in the labels": 6,
+        "FP: PPE labelled, model missed it": 4,
+        "FP: labelled hands below the rule's size limit": 3
+      },
+      "example_images": {
+        "FP: no hands box in the labels": [
+          "building-construction-building-site-constructing.jpg",
+          "pexels-photo-6790092.jpeg",
+          "pexels-photo-3562316.jpeg",
+          "pexels-photo-8942133.jpeg",
+          "pexels-photo-4487419.jpeg",
+          "pexels-photo-8067769.jpeg",
+          "pexels-photo-3070211.jpeg",
+          "pexels-photo-8985972.jpeg",
+          "pexels-photo-5619459.jpeg",
+          "pexels-photo-6766231.jpeg"
+        ],
+        "FN: model found no hands": [
+          "pexels-photo-6780198.jpeg",
+          "pexels-photo-5835307.jpeg",
+          "pexels-photo-6729178.jpeg",
+          "pexels-photo-12951630.jpeg",
+          "pexels-photo-7014342.jpeg",
+          "pexels-photo-4575137.jpeg",
+          "pexels-photo-13673728.jpeg",
+          "pexels-photo-5846272.jpeg",
+          "pexels-photo-5234520.jpeg",
+          "pexels-photo-12903349.jpeg"
+        ],
+        "FP: PPE labelled, model missed it": [
+          "pexels-photo-5920630.jpeg",
+          "pexels-photo-5920742.jpeg",
+          "pexels-photo-5920737.jpeg",
+          "pexels-photo-7469478.jpeg"
+        ],
+        "FN: model saw PPE that is not in the labels": [
+          "pexels-photo-14614021.jpeg",
+          "pexels-photo-11429199.jpeg",
+          "pexels-photo-8985464.jpeg",
+          "pexels-photo-3658574.jpeg",
+          "pexels-photo-8961396.jpeg",
+          "pexels-photo-6196229.jpeg"
+        ],
+        "FP: labelled hands below the rule's size limit": [
+          "pexels-photo-15041788.jpeg",
+          "pexels-photo-17042447.jpeg",
+          "pexels-photo-5648227.jpeg"
+        ]
+      },
+      "sensitivity_part_labelled": {
+        "images": 1257,
+        "tp": 1192,
+        "fp": 4,
+        "fn": 54,
+        "tn": 7,
+        "precision": 0.9966555183946488,
+        "recall": 0.956661316211878,
+        "specificity": 0.6363636363636364,
+        "f1": 0.9762489762489762,
+        "accuracy": 0.9538583929992045,
+        "balanced_accuracy": 0.7965124762877571,
+        "mcc": 0.2570382903241669,
+        "support": 1246,
+        "n": 1257,
+        "precision_ci95": [
+          0.9924937447873228,
+          0.999168744804655
+        ],
+        "recall_ci95": [
+          0.9453815261044177,
+          0.9677938808373591
+        ],
+        "specificity_ci95": [
+          0.3333333333333333,
+          0.8888888888888888
+        ],
+        "mcc_ci95": [
+          0.11143964332212739,
+          0.38432821205109385
+        ],
+        "baseline_always_yes": {
+          "precision": 0.9912490055688147,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 0.9956052736715941,
+          "mcc": 0.0
+        }
+      }
+    },
+    "no_hi_vis_vest": {
+      "released": {
+        "tp": 1399,
+        "fp": 74,
+        "fn": 44,
+        "tn": 103,
+        "precision": 0.9497623896809233,
+        "recall": 0.9695079695079695,
+        "specificity": 0.5819209039548022,
+        "f1": 0.9595336076817558,
+        "accuracy": 0.9271604938271605,
+        "balanced_accuracy": 0.7757144367313858,
+        "mcc": 0.5988930323879698,
+        "support": 1443,
+        "n": 1620
+      },
+      "disagreements": {
+        "FP: no person box in the labels": 47,
+        "FN: model found no person": 31,
+        "FP: PPE labelled, model missed it": 24,
+        "FN: model saw PPE that is not in the labels": 13,
+        "FP: labelled person below the rule's size limit": 3
+      },
+      "example_images": {
+        "FN: model saw PPE that is not in the labels": [
+          "pexels-photo-5845969.jpeg",
+          "pexels-photo-16611091.jpeg",
+          "pexels-photo-5688670.jpeg",
+          "pexels-photo-9300985.jpeg",
+          "pexels-photo-14367425.jpeg",
+          "pexels-photo-4981772.jpeg",
+          "pexels-photo-3658574.jpeg",
+          "pexels-photo-14367421.jpeg",
+          "pexels-photo-8413080.jpeg",
+          "pexels-photo-3736102.jpeg"
+        ],
+        "FP: no person box in the labels": [
+          "pexels-photo-4491875.jpeg",
+          "pexels-photo-12725454.jpeg",
+          "pexels-photo-5973916.jpeg",
+          "pexels-photo-6867424.jpeg",
+          "pexels-photo-8147953.jpeg",
+          "pexels-photo-12725452.jpeg",
+          "pexels-photo-8820186.jpeg",
+          "pexels-photo-8853523.jpeg",
+          "pexels-photo-7147728.jpeg",
+          "pexels-photo-5410125.jpeg"
+        ],
+        "FP: PPE labelled, model missed it": [
+          "pexels-photo-9328720.jpeg",
+          "pexels-photo-14053428.jpeg",
+          "pexels-photo-15200454.jpeg",
+          "pexels-photo-14053429.jpeg",
+          "pexels-photo-12956302.jpeg",
+          "pexels-photo-8961152.jpeg",
+          "pexels-photo-12708178.jpeg",
+          "pexels-photo-280076.jpeg",
+          "pexels-photo-8976842.jpeg",
+          "pexels-photo-3792575.jpeg"
+        ],
+        "FN: model found no person": [
+          "pexels-photo-7006670.jpeg",
+          "pexels-photo-15923443.jpeg",
+          "pexels-photo-3145866.jpeg",
+          "pexels-photo-8986172.jpeg",
+          "pexels-photo-4021820.jpeg",
+          "pexels-photo-3757147.jpeg",
+          "pexels-photo-6205586.jpeg",
+          "pexels-photo-4622399.jpeg",
+          "pexels-photo-6057911.jpeg",
+          "pexels-photo-6969846.jpeg"
+        ],
+        "FP: labelled person below the rule's size limit": [
+          "pexels-photo-771146.jpeg",
+          "pexels-photo-15576553.jpeg",
+          "pexels-photo-6130194.jpeg"
+        ]
+      },
+      "sensitivity_part_labelled": {
+        "images": 1496,
+        "tp": 1399,
+        "fp": 24,
+        "fn": 44,
+        "tn": 29,
+        "precision": 0.983134223471539,
+        "recall": 0.9695079695079695,
+        "specificity": 0.5471698113207547,
+        "f1": 0.9762735519888346,
+        "accuracy": 0.9545454545454546,
+        "balanced_accuracy": 0.7583388904143621,
+        "mcc": 0.44332988256928607,
+        "support": 1443,
+        "n": 1496,
+        "precision_ci95": [
+          0.9762569832402235,
+          0.9894291754756871
+        ],
+        "recall_ci95": [
+          0.9608665269042628,
+          0.9777931991672449
+        ],
+        "specificity_ci95": [
+          0.4090909090909091,
+          0.6808510638297872
+        ],
+        "mcc_ci95": [
+          0.3312157838439121,
+          0.547523298038766
+        ],
+        "baseline_always_yes": {
+          "precision": 0.964572192513369,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 0.9819666553249404,
+          "mcc": 0.0
+        }
+      }
+    }
+  }
+}
