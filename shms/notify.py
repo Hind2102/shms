@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import contextmanager
 from datetime import datetime
 from email.message import EmailMessage
 
@@ -30,6 +31,20 @@ def _write_eml(user: User, subject: str, body: str, at: datetime) -> None:
     (folder / f"{stem}.eml").write_text(msg.as_string())
 
 
+_mail_enabled = True
+
+
+@contextmanager
+def no_mail():
+    """Suppress outbox e-mails (in-app notifications are still created), e.g. while seeding synthetic history."""
+    global _mail_enabled
+    old, _mail_enabled = _mail_enabled, False
+    try:
+        yield
+    finally:
+        _mail_enabled = old
+
+
 def send(
     db: Session, users: list[User], hazard: Hazard, subject: str, body: str = "", at: datetime | None = None
 ) -> None:
@@ -37,6 +52,8 @@ def send(
     at = at or utcnow()
     for u in users:
         db.add(Notification(user_id=u.id, hazard=hazard, message=subject, created_at=at))
+        if not _mail_enabled:
+            continue
         try:
             _write_eml(u, subject, body or subject, at)
         except OSError:  # a mail problem must never stop a hazard report or a workflow step

@@ -121,3 +121,10 @@ def test_unwritable_outbox_never_blocks_a_report(empty_db, tmp_path):
         h = report(empty_db, code="no_eye_protection", consequence=5)
     assert h.risk_level == "High" and h.status == Status.OPEN
     assert users(empty_db)[Role.SUPERVISOR][0].id in _notified(empty_db, h)  # in-app notification still created
+
+
+def test_seeding_the_demo_history_writes_no_mail(db):
+    from sqlalchemy import func
+
+    assert db.scalar(select(func.count()).select_from(Notification)) > 0  # in-app history exists
+    assert list(get_settings().mail_outbox.glob("*.eml")) == []

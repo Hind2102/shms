@@ -8,17 +8,17 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import auth, escalate, risk, services, taxonomy
+from .. import auth, escalate, policy, risk, services, taxonomy
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User
 from ..settings import PACKAGE_DIR
-from .deps import current_user_optional, photo_file, save_photo
+from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo
 
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
@@ -82,9 +82,10 @@ def _escalate_on_page_load(db: Session) -> None:
         log.exception("Escalation check failed")
 
 
-def _hazard(db: Session, hazard_id: int) -> Hazard:
+def _hazard(db: Session, hazard_id: int, user: User | None = None) -> Hazard:
+    """The hazard, or 404 if it does not exist or this user may not see it (no hint that it exists)."""
     h = db.get(Hazard, hazard_id)
-    if h is None:
+    if h is None or (user is not None and not policy.can_view(user, h)):
         raise HTTPException(404, "Hazard not found")
     return h
 
@@ -214,7 +215,7 @@ def confirm_form(
     db: Session = Depends(get_session),
     error: str | None = None,
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     if h.status != Status.DRAFT:
         return RedirectResponse(f"/hazards/{h.id}", status_code=303)
     return render(
@@ -242,7 +243,7 @@ async def confirm_submit(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     try:
         photo = await save_photo(closure_photo, prefix="closed_") if fixed_on_spot else None
         services.confirm(
@@ -325,7 +326,7 @@ def hazard_detail(
     created: int = 0,
     error: str | None = None,
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     if h.status == Status.DRAFT:
         return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
     return render(
@@ -366,7 +367,7 @@ def plan(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     try:
         due_at = datetime.strptime(due, "%Y-%m-%d").replace(hour=17) if due else None
     except ValueError:
@@ -376,19 +377,19 @@ def plan(
 
 @router.post("/hazards/{hazard_id}/verify")
 def verify(hazard_id: int, note: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     return _do(db, h, lambda: services.verify(db, h, user, note))
 
 
 @router.post("/hazards/{hazard_id}/reject")
 def reject(hazard_id: int, reason: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     return _do(db, h, lambda: services.reject(db, h, user, reason))
 
 
 @router.post("/hazards/{hazard_id}/reopen")
 def reopen(hazard_id: int, reason: str = Form(""), user: User = Depends(page_user), db: Session = Depends(get_session)):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     return _do(db, h, lambda: services.reopen(db, h, user, reason))
 
 
@@ -400,7 +401,7 @@ async def close(
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    h = _hazard(db, hazard_id)
+    h = _hazard(db, hazard_id, user)
     try:
         name = await save_photo(photo, prefix="closed_")
         services.close(db, h, user, action, name)
@@ -429,3 +430,17 @@ def notifications(request: Request, user: User = Depends(page_user), db: Session
         n.read = True
     db.commit()
     return resp
+
+
+# ------------------------------------------------------------------ photos (replaces the public /uploads folder)
+
+
+@router.get("/photos/{name}")
+def photo(name: str, user: User = Depends(page_user), db: Session = Depends(get_session)):
+    if not PHOTO_NAME.match(name):
+        raise HTTPException(404, "Not found")
+    owner = db.scalar(select(Hazard).where((Hazard.photo_path == name) | (Hazard.closure_photo_path == name)))
+    path = photo_file(name)
+    if not policy.can_view_photo(user, owner) or not path.is_file():
+        raise HTTPException(404, "Not found")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})

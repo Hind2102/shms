@@ -8,7 +8,7 @@ import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import services
@@ -58,11 +58,23 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
     app = FastAPI(title="Site Hazard Management System (SHMS)", version="1.0.0", lifespan=lifespan)
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
-    app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")
     app.middleware("http")(telemetry.timing_middleware)
     app.include_router(api.router)
     app.include_router(telemetry.router)
     app.include_router(pages.router)
+
+    @app.exception_handler(Exception)
+    async def _unexpected(req: Request, exc: Exception):
+        # Details go to the server log only; users never see a stack trace or internal message.
+        log.error("Unhandled error on %s %s", req.method, req.url.path, exc_info=exc)
+        if req.url.path.startswith("/api") or req.url.path == "/metrics":
+            return JSONResponse({"detail": "Internal server error"}, status_code=500)
+        return HTMLResponse(
+            "<!doctype html><title>Error</title><h1>Something went wrong</h1>"
+            "<p>The error has been logged. Please go back and try again; if it keeps happening, tell the safety "
+            "supervisor.</p><p><a href='/'>Back to the dashboard</a></p>",
+            status_code=500,
+        )
 
     @app.exception_handler(pages.CsrfError)
     async def _csrf(_req: Request, _exc: Exception):
