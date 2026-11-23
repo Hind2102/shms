@@ -1,5 +1,5 @@
 {
-  "_source": "SHMS reports only hazards the AI can detect and that were evaluated on a public, peer-reviewed labelled test set (SH17, held-out split). All four are PPE non-compliance (unsafe acts). Unsafe conditions (spills, steam leaks, missing grating) have no such dataset and are future work.",
+  "_source": "Physical conditions are reporter-confirmed observations. The release gate applies to PPE suggestions. Optional condition inference covers floor liquid and walkway obstructions.",
   "categories": [
     {
       "code": "no_hard_hat",
@@ -40,7 +40,7 @@
     {
       "code": "floor_liquid",
       "name": "Possible liquid on the floor",
-      "group": "Unsafe condition (experimental)",
+      "group": "Physical condition",
       "ai": false,
       "experimental": true,
       "default_consequence": 3,
@@ -49,11 +49,39 @@
     {
       "code": "walkway_obstruction",
       "name": "Object possibly obstructing a walkway",
-      "group": "Unsafe condition (experimental)",
+      "group": "Physical condition",
       "ai": false,
       "experimental": true,
       "default_consequence": 2,
       "why": "Trips and blocked escape routes. Counts only when a walkway is visible in the photo."
+    },
+    {
+      "code": "open_panel",
+      "name": "Open machine-panel cover",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 3
+    },
+    {
+      "code": "floor_opening",
+      "name": "Uncovered floor opening or missing grating",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 4
+    },
+    {
+      "code": "surface_corrosion",
+      "name": "Visible surface corrosion",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 2
+    },
+    {
+      "code": "other_condition",
+      "name": "Other physical condition",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 3
     }
   ]
 }

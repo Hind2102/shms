@@ -55,7 +55,7 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
             threading.Thread(target=_warm_up, daemon=True).start()
         yield
 
-    app = FastAPI(title="Site Hazard Management System (SHMS)", version="1.2.0", lifespan=lifespan)
+    app = FastAPI(title="Site Hazard Management System (SHMS)", version="1.3.0", lifespan=lifespan)
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
     app.middleware("http")(telemetry.timing_middleware)

@@ -7,3 +7,14 @@ Use Patil and Bhutad, *Dataset of Stagnant Water and Wet Surface with Annotation
 Inventory the archive and validate image/annotation pairing. Use the original annotated indoor photos, remove exact image duplicates, select up to 32 by ascending SHA-256 of the image bytes, and exclude near-duplicates (64-bit difference hash at Hamming distance ≤ 4 from an already selected photo). Retain source filenames and hashes for reproducibility. This is a bounded external challenge, not a random sample of refinery reports. Similarity filtering does not establish independent locations.
 
 Record model identity, every selected prediction or error, the positive detection count and denominator, and a descriptive Wilson interval. Count inference errors as missed detections and report them separately. A failed request before evaluation starts is an infrastructure failure. Never use these images to change the prompt or thresholds. The all-positive baseline has recall 1 by construction. Meaningful false-alarm testing requires labelled dry examples from comparable scenes. No new human annotations are assumed.
+
+## Reproduction and outcome
+
+From the README environment, start local Ollama and pull qwen2.5vl:7b. Download the December archive (the other two are different files). Use a new output path.
+
+```sh
+curl -fL https://data.mendeley.com/public-files/datasets/y6zyrnxbfm/files/b1892735-9b83-4519-9088-1c50d982b14a/file_downloaded -o /tmp/shms-water-v4.zip
+python -m evaluation.external_floor_liquid /tmp/shms-water-v4.zip /tmp/shms-water-reproduction.json
+```
+
+All five annotated indoor images qualified. All were labelled water. The model flagged zero, with zero request errors. Recall was 0/5 (descriptive Wilson 95% interval 0–43.4%). All five missed cases, model digest and source hashes are in [the run output](../evaluation/results/external_floor_liquid_v4/summary.json). Specificity and precision remain unknown. This small external check cannot estimate performance on dry floors or at the refinery. The pre-inference plan was committed in e74aa34.

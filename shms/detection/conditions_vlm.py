@@ -1,6 +1,6 @@
 """EXPERIMENTAL: unsafe-condition check (liquid on the floor, object obstructing a walkway) with a local VLM.
 
-Not part of the release gate. Evaluated only on synthetic warehouse images (docs/unsafe_conditions_plan.md). The
+Not part of the release gate. See docs/unsafe_conditions_plan.md and docs/external_floor_liquid.md for evaluation scope. The
 model is never asked what a liquid is, and "obstructed" only counts when a walkway is visible in the photo.
 """
 
@@ -76,8 +76,7 @@ FROZEN_PROMPT = "c2"  # frozen after dev tuning, evaluated once on the test spli
 
 def observe(image: Path) -> list[dict]:
     """Experimental observations for a report, as suggestion records marked experimental. Never raises: a failed
-    or unreachable model gives no observation and never blocks a report. The model's free-text explanation is kept
-    for traceability only and is not shown to the reporter (it could name a substance)."""
+    or unreachable model gives no observation and never blocks a report. Only fixed condition codes are retained."""
     import logging
 
     from ..settings import get_settings
@@ -96,7 +95,7 @@ def observe(image: Path) -> list[dict]:
                     "code": code,
                     "confidence": 0.0,
                     "evidence": [],
-                    "explanation": a.get("explanation", ""),
+                    "explanation": "",
                     "required": False,
                     "experimental": True,
                 }

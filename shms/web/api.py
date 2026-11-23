@@ -46,6 +46,11 @@ class ReasonIn(BaseModel):
 
 
 def hazard_out(h: Hazard) -> dict:
+    suggestions = json.loads(h.ai_suggestions or "[]")
+    for observation in suggestions:
+        if observation.get("experimental"):
+            # Older reports stored free text which could speculate about the liquid.
+            observation["explanation"] = ""
     return {
         "id": h.id,
         "status": h.status.value,
@@ -58,7 +63,7 @@ def hazard_out(h: Hazard) -> dict:
         "ai_model": h.ai_model,
         "ai_top_code": h.ai_top_code,
         "ai_latency_ms": h.ai_latency_ms,
-        "ai_suggestions": json.loads(h.ai_suggestions or "[]"),
+        "ai_suggestions": suggestions,
         "ai_accepted": h.ai_accepted,
         "consequence": h.consequence,
         "likelihood": h.likelihood,
