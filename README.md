@@ -1,6 +1,6 @@
 # SHMS – Site Hazard Management System
 
-AI-assisted web platform for reporting PPE non-compliance from a photo, scoring it on a 5 × 5 consequence ×
+AI-assisted web platform for reporting unsafe physical conditions and missing PPE from a photo, scoring it on a 5 × 5 consequence ×
 likelihood risk matrix, routing it to the accountable Area Owner, documenting **how** each case was closed, and
 showing site-wide risk on a live dashboard and heat map of a (synthesized) alumina refinery.
 
@@ -11,8 +11,7 @@ person, and every closure is verified by someone other than the person who close
 limits:** on an independent dataset the hard-hat check over-reported violations badly (precision 0.28), and the
 stricter SH17 analysis shows similar weaknesses – see [External validation](#external-validation-and-stricter-checks-phase-2).
 Two local AI back-ends are compared: **YOLO** detectors trained on SH17 and a **vision-language model served by Ollama**
-(`qwen2.5vl:7b`). An **experimental**, off-by-default check for spilled liquid and obstructed walkways was tested on
-synthetic images only. No paid API is used.
+(`qwen2.5vl:7b`). An **experimental**, off-by-default model checks for visible floor liquid and obstructed walkways. Workers can always report these and other physical conditions manually. The frozen model missed all five water-positive images in a separate real indoor photo challenge. No paid API is used.
 
 | | |
 |---|---|
@@ -152,9 +151,8 @@ A database upgraded from an older version has usernames but no passwords: set on
 Main workflow:
 
 1. **Report** – as *Ahmed (Operator)*: *Report hazard* → choose area → take/upload a photo (try
-   `data/samples/`). The AI checks it against the PPE that area requires and marks what it found.
-2. **Confirm and score** – keep or correct the suggested PPE hazard (or choose one yourself if the AI found nothing
-   or failed – the page lists what the AI does *not* check), choose the worst credible consequence. Likelihood is
+   `data/samples/`). Photograph the floor or access route for a physical condition, or a person and task for missing PPE.
+2. **Confirm and score** – choose the condition you observed or confirm a PPE suggestion, choose the worst credible consequence. Likelihood is
    computed from the area's history and the risk level and target close date are shown. Tick *I already fixed it
    on the spot* to record the action taken and a closing photo.
 3. **Plan, close, verify** – the hazard goes to the Area Owner (e.g. *Khalid* for Digestion); High and Extreme
@@ -230,7 +228,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-305 tests, no model or GPU needed (the YOLO tests run automatically when the weights are present); about 2 minutes on
+The 312-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
@@ -368,8 +366,11 @@ Spilled liquid on the floor and objects obstructing a walkway were tested with t
 tuned on 60 training images, then run once on 186 test images – liquid on the floor: precision 0.976, recall 0.932,
 specificity 0.993; obstruction: precision 0.826, recall 0.792, specificity 0.942. Because the images are synthetic,
 this is **not** validation for real sites and is never part of the release gate. With `SHMS_EXPERIMENTAL_CONDITIONS=1`
-the report form shows an "Experimental check" note and offers the two types for manual choice; the AI never pre-selects
-them and never says what a liquid is.
+the confirmation page can show an experimental observation. It never pre-selects a physical condition or identifies the substance. Manual reporting works with the flag off and when inference fails.
+
+**External liquid check:** the frozen model missed all five labelled indoor water photos in the versioned Mendeley archive. No inference errors occurred. Recall was 0/5 (descriptive 95% Wilson interval 0–43.4%). There were no dry controls to estimate false alarms. Keep the condition detector experimental. [Protocol and reproduction](docs/external_floor_liquid.md) · [Per-image predictions](evaluation/results/external_floor_liquid_v4/summary.json).
+
+For Docker, start the optional service with `docker compose --profile vlm up -d`, then run `docker compose exec ollama ollama pull qwen2.5vl:7b` and `SHMS_EXPERIMENTAL_CONDITIONS=1 docker compose --profile vlm up -d app`. Restore the default by recreating the app with the flag set to 0.
 
 ### Success criteria
 
@@ -399,7 +400,7 @@ cause unknown** (details in `docs/verification.md`).
 |---|---|
 | **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
-| **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic test data only; flag off by default); the vision-language model as a PPE detector |
+| **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic warehouse benchmark and a small positive-only external liquid check; flag off by default); the vision-language model as a PPE detector |
 | **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
 
 ## Data, privacy and limitations
@@ -408,14 +409,8 @@ cause unknown** (details in `docs/verification.md`).
 * Photos are processed locally; nothing is sent to external services.
 * Demo accounts share one documented demo password; a deployment would use the company's single sign-on and set
   `SHMS_SECRET_KEY`. Uploaded photos are checked (JPEG/PNG/WebP, ≤ 20 MB, ≤ 40 megapixels) and re-encoded.
-* The hazard list contains only the PPE checks that passed the release gate, so other hazards (including a missing
-  hi-vis vest, which no seeded area requires) cannot be reported in the app. Liquid on the floor and obstructed
-  walkways can be reported only when the experimental flag is on.
-* Scope is limited on purpose to hazards with a public, peer-reviewed labelled test set. Unsafe conditions
-  (caustic spills, steam leaks, missing grating) lack a verified real-refinery test set in this project; the experimental check was tested on
-  synthetic warehouse images only. Collecting real refinery photos labelled by ≥ 3 annotators, with their agreement
-  measured, is future work. Fire/smoke (D-Fire) was considered and excluded: fires are handled
-  by alarms and emergency response, and steam plumes in a refinery would cause frequent false alarms.
+* In every area, workers can manually choose floor liquid, obstructed walkway, open machine-panel cover, floor opening or missing grating, visible corrosion, or another physical condition. These use the usual risk, assignment, closure and verification workflow. An open panel does not establish energisation, and surface appearance does not identify a substance. Only area-required, released PPE checks can become the AI's top suggestion.
+* Validation on refinery photos and independent human review of project-created labels remain future work. The model cannot certify a site as safe.
 * SH17 images come from Pexels (manufacturing settings), not refineries, so field performance may differ.
 
 ## Licences of data and models
@@ -428,6 +423,7 @@ cause unknown** (details in `docs/verification.md`).
 | Qwen2.5-VL 7B via Ollama (`qwen2.5vl:7b`) | vision-language comparison | Apache 2.0 (`ollama show qwen2.5vl:7b --license`) |
 | Hard Hat Workers (Make ML), Hugging Face `Voxel51/hard-hat-detection` | external validation of the hard-hat check | CC0 1.0. Not redistributed here |
 | Warehouse Safety Hazard Detection (J. S. Sohal), Hugging Face `Jsohal174/warehouse-safety-hazard-dataset` | experimental unsafe-conditions test | CC BY 4.0; synthetic images (Blender + Google Gemini). Not redistributed here |
+| Patil & Bhutad, Mendeley v4, DOI 10.17632/y6zyrnxbfm.4 | external positive-only indoor water challenge | CC BY 4.0; original photos downloaded separately |
 | This project's code | – | GNU AGPL-3.0 (`LICENSE`), chosen because the app depends on Ultralytics (AGPL-3.0) |
 
 ## Acknowledgements

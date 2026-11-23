@@ -96,10 +96,10 @@ class Area(Base):
 
     @property
     def report_codes(self) -> list[str]:
-        """Hazard types a reporter may choose here: released AI checks plus experimental types when enabled."""
+        """Hazard types a reporter may choose here: physical conditions plus released area PPE."""
         from . import taxonomy
 
-        return self.check_codes + taxonomy.experimental_codes()
+        return taxonomy.manual_codes() + self.check_codes
 
     @property
     def check_codes(self) -> list[str]:

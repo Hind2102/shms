@@ -55,3 +55,7 @@ erDiagram
 Integrity rules enforced by the database (`shms/models.py`): consequence and likelihood 1–5, risk score 1–25,
 a closed hazard must have a closure action, foreign keys on every relation, one idempotency key per reporter,
 and indexes on (area, category, created_at), status and created_at.
+
+### Physical-condition reporting
+
+A field worker can report liquid, blocked access, an open machine-panel cover, a floor opening, visible corrosion or another physical condition in any reporting area. The experimental inference flag affects only photo observations for liquid and walkway obstruction. A human chooses the category and consequence. Acceptance checks include flag-off confirmation, no model call when disabled, no automatic condition selection, fixed category wording and a desktop/phone spill closure walkthrough (tests/test_experimental_conditions.py and docs/screenshots/audit_ui.py).

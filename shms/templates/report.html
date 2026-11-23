@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/static/pins.css">
 <div class="card" style="max-width:640px">
   <h1>Report a hazard</h1>
-  <p>Step 1 of 2 · Choose an area and add a photo of the person and task. The AI checks the hard hat, eye or face protection, and gloves required in that area. You confirm or correct its suggestion in step 2.</p>
+  <p>Step 1 of 2 · Choose the area and photograph the condition you observed, such as liquid on the floor or an obstruction across a walkway. You can also report missing PPE. Review the photo and choose the hazard in step 2.</p>
   {% if error %}<div class="alert err" role="alert">{{ error }}</div>{% endif %}
   <form method="post" action="/report" enctype="multipart/form-data" id="hazard-report">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

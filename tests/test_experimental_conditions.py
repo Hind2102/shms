@@ -5,7 +5,7 @@ import pytest
 from shms import services, taxonomy
 from shms.detection import conditions_vlm
 from shms.models import Role, Status
-from shms.services import Confirmation, WorkflowError
+from shms.services import Confirmation
 from shms.settings import override_settings
 from tests.conftest import jpeg_bytes, login
 from tests.test_api import REPORTER, h
@@ -33,18 +33,20 @@ def test_experimental_categories_are_never_ai_released():
     assert all(taxonomy.get(c).experimental for c in EXP)
 
 
-def test_flag_off_by_default_hides_categories_and_never_calls_the_model(client, monkeypatch, settings):
+def test_flag_off_by_default_allows_manual_reports_and_never_calls_the_model(client, monkeypatch, settings):
     assert settings.experimental_conditions is False
     monkeypatch.setattr(conditions_vlm, "ask", lambda *a, **k: pytest.fail("model must not be called"))
     page = client.get(_report_via_form(client)).text
-    assert 'value="floor_liquid"' not in page and "Experimental" not in page
+    assert 'value="floor_liquid"' in page and "Experimental check</strong>" not in page
 
 
-def test_flag_off_rejects_confirming_an_experimental_type(empty_db):
+@pytest.mark.parametrize("code", [*EXP, "open_panel", "floor_opening", "surface_corrosion", "other_condition"])
+def test_manual_condition_needs_no_model(empty_db, code):
     rep = users(empty_db)[Role.REPORTER][0]
     d = services.create_draft(empty_db, rep, area(empty_db), None, None)
-    with pytest.raises(WorkflowError):
-        services.confirm(empty_db, d, rep, Confirmation("floor_liquid", 3))
+    hz = services.confirm(empty_db, d, rep, Confirmation(code, 3))
+    assert hz.status == Status.OPEN and hz.category_code == code
+    assert hz.ai_top_code is None and hz.ai_accepted is None
 
 
 def test_flag_on_shows_a_fixed_wording_note_never_preselected(client, monkeypatch, flag_on):
@@ -82,3 +84,12 @@ def test_flag_on_reporter_can_confirm_an_experimental_type(empty_db, flag_on):
     d = services.create_draft(empty_db, rep, area(empty_db), None, None)
     hz = services.confirm(empty_db, d, rep, Confirmation("floor_liquid", 3))
     assert hz.status == Status.OPEN and hz.category_code == "floor_liquid"
+
+
+def test_api_experimental_observation_uses_only_visible_condition_language(client, monkeypatch, flag_on):
+    monkeypatch.setattr(conditions_vlm, "ask", lambda *a: {"spill": True, "obstruction": False, "explanation": "acid"})
+    report_url = _report_via_form(client)
+    result = client.get(f"/api/hazards/{report_url.split('/')[2]}", headers=h(REPORTER)).json()
+    observation = next(s for s in result["ai_suggestions"] if s.get("experimental"))
+    assert observation["code"] == "floor_liquid"
+    assert "acid" not in observation["explanation"]

@@ -3,11 +3,12 @@
 services:
   app:
     build: .
-    image: shms:1.0
+    image: shms:1.3.0
     ports:
       - "8000:8000"
     environment:
       SHMS_DETECTOR: ${SHMS_DETECTOR:-yolo}
+      SHMS_EXPERIMENTAL_CONDITIONS: ${SHMS_EXPERIMENTAL_CONDITIONS:-0}
       SHMS_OLLAMA_URL: http://ollama:11434
       SHMS_OLLAMA_MODEL: ${SHMS_OLLAMA_MODEL:-qwen2.5vl:7b}
     volumes:

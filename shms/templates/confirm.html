@@ -13,7 +13,7 @@
     {% else %}<p class="muted">No photo attached.</p>{% endif %}
   </div>
   <div class="card">
-    <h2>AI check</h2>
+    <h2>Photo review</h2>
     {% if h.ai_error %}
       <div class="alert err small">The AI could not analyse this photo ({{ h.ai_error }}). Please classify it yourself.</div>
     {% elif not h.ai_model %}
@@ -28,12 +28,11 @@
     {% endif %}
     {% set exp = suggestions | selectattr('experimental') | list %}
     {% if exp %}
-    <div class="alert info small"><strong>Experimental check</strong> (tested only on synthetic warehouse images, not on
-      site photos): {% for s in exp %}{{ s.code | cat }}{% if not loop.last %}; {% endif %}{% endfor %}. Choose it below
+    <div class="alert info small"><strong>Experimental check</strong> (experimental model; refinery accuracy is unknown): {% for s in exp %}{{ s.code | cat }}{% if not loop.last %}; {% endif %}{% endfor %}. Choose it below
       only if you can see it yourself.</div>
     {% endif %}
     {% for s in suggestions if not s.required and not s.experimental %}<p class="muted small">Also seen, not checked here (not required in this area or not released): {{ s.code | cat }}</p>{% endfor %}
-    {% if h.area.unchecked_ppe %}<p class="muted small">Not checked by the AI here: {{ h.area.unchecked_ppe | join(', ') }}, and any hazard other than missing PPE.</p>{% endif %}
+    {% if h.area.unchecked_ppe %}<p class="muted small">Not checked by the AI here: {{ h.area.unchecked_ppe | join(', ') }}.</p>{% endif %}
     {% if h.ai_model %}<p class="muted small">Model {{ h.ai_model }} · {{ (h.ai_latency_ms/1000)|round(1) }} s. Checked against the PPE this area requires. AI evaluated on the SH17 held-out test set.</p>{% endif %}
   </div>
 </div>
@@ -41,11 +40,12 @@
 <form class="card" method="post" action="/hazards/{{ h.id }}/confirm" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <h2>Step 2 of 2 – confirm and score</h2>
-  <p class="muted small">Choose the hazard you observed, then rate its worst credible consequence. You can change the AI suggestion.</p>
+  <p class="muted small">Choose the hazard you observed, then rate its worst credible consequence. Check the floor and access route yourself. The experimental model missed liquid in all five labelled indoor water photos in a separate test.</p>
   <label for="cat">Hazard type</label>
   <select id="cat" name="category_code" required>
+    <option value="" disabled {% if not top %}selected{% endif %}>Choose the observed hazard</option>
     {% for code in h.area.report_codes %}{% set c = taxonomy.get(code) %}
-      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if c.experimental %} (experimental){% endif %}{% if taxonomy.release_note(c.code) %} (AI: unverified suggestion){% endif %}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
+      <option value="{{ c.code }}" data-cons="{{ c.default_consequence }}" {% if top and top.code == c.code %}selected{% endif %}>{{ c.name }}{% if taxonomy.release_note(c.code) %} (AI: unverified suggestion){% endif %}{% if top and top.code == c.code %} (AI suggestion){% endif %}</option>
     {% endfor %}
   </select>
   <p class="muted small">PPE required in {{ h.area.name }}: {{ h.area.check_codes | map('ppe') | join(', ') }}.</p>
@@ -59,12 +59,12 @@
   <p class="muted small">Likelihood is estimated automatically from similar hazards reported in {{ h.area.name }} over the last {{ risk.lookback_days() }} days. <a href="/matrix" target="_blank">See the risk matrix</a>.</p>
 
   <label for="desc">What did you see? (optional)</label>
-  <textarea id="desc" name="description" placeholder="e.g. contractor opening caustic drain valve without face shield near pump P-201"></textarea>
+  <textarea id="desc" name="description" placeholder="e.g. liquid pooled across the walkway beside the digestion pump"></textarea>
 
   <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="fixed" name="fixed_on_spot" value="true" style="width:auto"> I already fixed it on the spot</label>
   <div id="fixfields" class="hide">
     <label for="act">Action taken</label>
-    <textarea id="act" name="closure_action" placeholder="e.g. stopped work, issued face shield, briefed crew"></textarea>
+    <textarea id="act" name="closure_action" placeholder="Describe the corrective action taken"></textarea>
     <label for="cphoto">Closing photo (optional)</label>
     <input id="cphoto" type="file" name="closure_photo" accept="image/*" capture="environment">
   </div>

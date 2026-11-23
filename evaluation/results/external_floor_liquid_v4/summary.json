@@ -1,0 +1,47 @@
+{
+  "dataset_doi": "10.17632/y6zyrnxbfm.4",
+  "archive_sha256": "427e336858a996ee967abdbfc94c5582b96f496ed85d3261632183d47dd39f40",
+  "eligible_before_selection": 5,
+  "model": "qwen2.5vl:7b",
+  "model_digest": "5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc",
+  "prompt": "c2",
+  "predictions": [
+    {
+      "file": "7s.jpeg",
+      "sha256": "2979838f618f379874fb09125886640ef7ea6532b5b7917114bbe339ae00fe25",
+      "detected": false
+    },
+    {
+      "file": "2s.jpeg",
+      "sha256": "801db40f50983d13131bccefb40014cb33388d6a4b2fc2d14a601ed0f70679cc",
+      "detected": false
+    },
+    {
+      "file": "4s.jpeg",
+      "sha256": "a33af32185a1c8160752cec7b4419faf36d04fd68ca3ec64cf766072bbc8bf5f",
+      "detected": false
+    },
+    {
+      "file": "3s.jpeg",
+      "sha256": "d121eae00299806a12922012a2dfce36808843a4c14aeff17f4b4d95bc708bb9",
+      "detected": false
+    },
+    {
+      "file": "0s.jpeg",
+      "sha256": "ddf79f80b9569c426b6a8fe4037c5a743d08963616047db7402cd0656caa97cb",
+      "detected": false
+    }
+  ],
+  "summary": {
+    "eligible_tested": 5,
+    "detected": 0,
+    "errors": 0,
+    "recall": 0.0,
+    "wilson95": [
+      0.0,
+      0.43449149475208104
+    ],
+    "precision": null,
+    "specificity": null
+  }
+}

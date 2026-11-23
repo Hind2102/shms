@@ -191,21 +191,12 @@ def test_ai_suggestion_filtered_by_area_requirements(empty_db):
     assert flags == {"no_hi_vis_vest": False, "no_gloves": True}
 
 
-def test_taxonomy_contains_only_ai_detected_hazards_plus_flagged_experimental_ones():
-    # Requirement change (Phase 4): two EXPERIMENTAL unsafe-condition types exist behind SHMS_EXPERIMENTAL_CONDITIONS.
-    # Every other hazard type is still AI-detected and evaluated; experimental ones are never AI-released.
+def test_physical_conditions_do_not_expand_released_ppe_or_experimental_inference():
     from shms import taxonomy
 
-    cats = taxonomy.categories().values()
-    assert {c.code for c in cats if not c.experimental} == {
-        "no_hard_hat",
-        "no_eye_protection",
-        "no_gloves",
-        "no_hi_vis_vest",
-    }
-    assert all(c.ai for c in cats if not c.experimental)
-    assert {c.code for c in cats if c.experimental} == {"floor_liquid", "walkway_obstruction"}
-    assert not any(c.ai for c in cats if c.experimental)
+    assert set(taxonomy.ai_codes()) == {"no_hard_hat", "no_eye_protection", "no_gloves", "no_hi_vis_vest"}
+    assert {c.code for c in taxonomy.categories().values() if c.experimental} == {"floor_liquid", "walkway_obstruction"}
+    assert all(not taxonomy.get(code).ai for code in taxonomy.manual_codes())
 
 
 def test_database_rejects_invalid_values(empty_db):

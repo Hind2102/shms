@@ -77,7 +77,7 @@ flowchart LR
    measures the model, not a mismatch in definitions, and the rules are unit-tested separately.
 4. **Local models only.** Photos from a refinery are confidential; YOLO and Ollama run on the user's machine,
    so no images leave the site and no paid API is needed.
-5. **Only hazards the AI can detect and that were measured.** The release gate enables three SH17 checks. Each area's configuration further limits which suggestions it displays. The vest check failed specificity. Two unsafe-condition suggestions are experimental and require explicit opt-in.
+5. **Reporting and AI eligibility are separate.** Physical conditions can be confirmed in any area. The same area-level list validates form and API submissions. PPE suggestions are filtered by area and the release gate. Optional floor-liquid and obstruction observations never preselect a category. A new manual category needs a taxonomy entry rather than a database migration.
 6. **Likelihood is computed, not guessed.** It comes from the number of similar hazards in the same area in the
    last 90 days, which links individual cases (problem 1 in the proposal) and makes repeat hazards rise in risk.
 7. **Modular monolith, not microservices.** One team, one database and one deployment; modules have clear
