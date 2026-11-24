@@ -5,7 +5,7 @@ Step 1 - build an audit page for 100 random held-out images (fixed seed):
     open evaluation/data/label_audit.html          # works offline in any browser
 
 For each image and hazard the page shows the label derived from SH17's boxes
-(YES / NO). The auditor (a safety professional) clicks Agree / Disagree, then
+as a sentence. The auditor chooses whether it matches the photo, then
 "Download CSV", and saves it as evaluation/data/label_audit_results.csv.
 
 Step 2 - score the audit:
@@ -47,11 +47,18 @@ SHOW = {
     "glasses": "#0277bd",
     "face-guard": "#0277bd",
 }
-QUESTION = {
-    "no_hard_hat": "Is any visible person's head without a hard hat?",
-    "no_eye_protection": "Is any visible person's face without safety glasses / goggles / face shield?",
-    "no_hi_vis_vest": "Is any visible person without a hi-vis vest / safety suit?",
-    "no_gloves": "Is any visible hand without a glove?",
+# Each pair describes (no visible violation, visible violation) for the same dataset label.
+STATEMENTS = {
+    "no_hard_hat": ("No visible head is missing a hard hat.", "At least one visible head has no hard hat."),
+    "no_eye_protection": (
+        "No face is visibly missing eye protection.",
+        "At least one visible face has no safety glasses, goggles or face shield.",
+    ),
+    "no_hi_vis_vest": (
+        "No one is visibly missing a hi-vis vest or safety suit.",
+        "At least one person is wearing neither a hi-vis vest nor a safety suit.",
+    ),
+    "no_gloves": ("No bare hand is visible.", "At least one visible hand has no glove."),
 }
 
 
@@ -88,7 +95,7 @@ def build(root: str, n: int, seed: int) -> None:
     html = (
         TEMPLATE.replace("__DATA__", json.dumps(items))
         .replace("__COLORS__", json.dumps(SHOW))
-        .replace("__Q__", json.dumps(QUESTION))
+        .replace("__Q__", json.dumps(STATEMENTS))
         .replace("__HAZ__", json.dumps(HAZARDS))
     )
     out = DATA / "label_audit.html"
@@ -139,7 +146,7 @@ button.on.agree{background:#2e7d32;color:#fff;border-color:#2e7d32} button.on.di
 </style></head><body>
 <header><strong>SH17 label audit</strong><span id="prog"></span><button id="dl">Download CSV</button>
 <label style="font-size:13px"><input type="checkbox" id="boxes" checked> show boxes</label></header>
-<p style="margin:14px">For each image, the label derived from the dataset's boxes is shown as YES/NO. Click <b>Agree</b> if it is correct, <b>Disagree</b> if not.
+<p style="margin:14px">Read each statement from the dataset and compare it with the photo. If the picture is too unclear to judge, leave that statement unanswered.
 Answers are kept in this browser tab only, so download the CSV when finished (or periodically).</p>
 <div id="list"></div>
 <script>
@@ -152,8 +159,8 @@ DATA.forEach((it,i)=>{const d=document.createElement('div');d.className='item';
  const rects=it.boxes.map(b=>`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="${COLORS[b.l]}" style="stroke-width:2px" vector-effect="non-scaling-stroke"><title>${b.l}</title></rect>`).join('');
  d.innerHTML=`<div class="wrap"><img src="data:image/jpeg;base64,${it.src}"><svg class="bx" viewBox="0 0 1 1" preserveAspectRatio="none">${rects}</svg></div>
  <div><div class="small">#${i+1} · ${it.image}</div><div class="legend">${Object.entries(COLORS).map(([k,v])=>`<span style="color:${v}">■ ${k}</span>`).join('')}</div>
- ${HAZ.map(h=>{const k=it.image+'|'+h;const y=it.gt[h];return `<div class="q"><div>${Q[h]}</div><div style="margin:6px 0">Dataset label: <span class="tag ${y?'yes':'no'}">${y?'YES':'NO'}</span></div>
- <button class="agree ${ans[k]==='agree'?'on':''}" data-k="${k}" data-v="agree">Agree</button> <button class="disagree ${ans[k]==='disagree'?'on':''}" data-k="${k}" data-v="disagree">Disagree</button></div>`}).join('')}</div>`;
+ ${HAZ.map(h=>{const k=it.image+'|'+h;const y=it.gt[h];return `<div class="q"><div style="margin-bottom:6px">Dataset statement: <strong>${Q[h][Number(y)]}</strong></div>
+ <button class="agree ${ans[k]==='agree'?'on':''}" data-k="${k}" data-v="agree">Matches the photo</button> <button class="disagree ${ans[k]==='disagree'?'on':''}" data-k="${k}" data-v="disagree">Doesn’t match the photo</button></div>`}).join('')}</div>`;
  list.appendChild(d)});
 list.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(!b)return;ans[b.dataset.k]=b.dataset.v;
  b.parentElement.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));save()});

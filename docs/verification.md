@@ -1243,3 +1243,7 @@ Baseline v1.2.0: full pytest suite and Ruff passed before feature work. The prev
 - Local browser check with a disposable database: docs/screenshots/audit_ui.py at 1366 and 390 px, axe-core 4.10.3. The simulated worker reported floor liquid, the owner recorded corrective action and the supervisor verified closure. 48 states, zero automated findings in 11.8 s. Report-pin screenshots refreshed. Human usability and site realism remain pending.
 - Commands: pytest; ruff check .; ruff format --check .; docker compose config --quiet; python -m evaluation.external_floor_liquid ARCHIVE NEW_OUTPUT; browser setup and audit commands in docs/screenshots/audit_ui.py. Protocol, summaries and test fixtures are tracked. Third-party raw photos and local application records remain outside Git.
 - Local suite: 312 passed in 46.25 s with six dependency deprecation warnings. Ruff lint and formatting passed (100 Python files). Compose configuration validation passed. CI additionally builds and smoke-tests the Docker container.
+
+### Phase 6 follow-up — audit wording, 24 November
+
+The offline SH17 audit displays each derived label as a sentence. The two response buttons describe whether the sentence matches the photo. The browser storage keys and CSV verdict encoding are identical to the earlier audit. Rebuilt with `python -m evaluation.label_audit build --root "$SH17"` (default seed 7), then compared the embedded data objects for all 100 images with the existing local page. Images, order, boxes and derived labels matched exactly. No human answers were generated.
