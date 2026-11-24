@@ -53,7 +53,7 @@ evaluation/               offline evaluation on SH17
   external_hardhat.py     pre-registered external validation (hard hat) on an independent dataset
   conditions.py           EXPERIMENTAL unsafe-conditions experiment (synthetic data)
   metrics.py, sh17.py     metric functions and dataset reader
-  data/                   committed manifests and dataset statistics; local human audit pending
+  data/                   committed manifests and dataset statistics; completed human audit CSV
   results/                metrics.json per run, summary_full.md / summary_subset.md, figures (committed)
 scripts/download_models.py  downloads and checksums the SH17 YOLO weights
 tests/                    pytest suite (unit, workflow, API end-to-end, detectors, evaluation pipeline)
@@ -229,7 +229,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-The 313-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
+The 316-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
@@ -297,7 +297,7 @@ python -m evaluation.load_test --image data/samples/<photo>.jpg --users 1 4 8 --
 
 The derived labels are checked by one safety professional (the author) on 100 random held-out images. This
 measures agreement between the dataset-derived labels and one expert; it does not create new ground truth and is
-not a multi-annotator study. Status: **pending** (no results file yet).
+not a multi-annotator study. **Completed.** The reviewer agreed with 81/100 hard-hat labels, 61/100 eye-protection labels and 86/100 glove labels. The original export also retains 100 decisions for the rejected vest check. [Audit summary](evaluation/results/SH17_photo_audit.md) · [All scored decisions by category](evaluation/results/label_audit.json).
 
 ```bash
 python -m evaluation.label_audit build --root $SH17     # writes evaluation/data/label_audit.html
@@ -386,7 +386,7 @@ For Docker, start the optional service with `docker compose --profile vlm up -d`
 | Train/test leakage | none | ✅ 0 file overlaps, 0 near-duplicates (pre-training overlap of YOLO/Qwen unknown) |
 | Reporter accepts AI suggestion without change (proposal) | ≥ 80 % | simulated 97.2 % (lenient, not field data); real acceptance recorded per report on *AI monitoring* |
 | New report visible on dashboard | visible on next dashboard request (proposal: within 5 min) | Functional visibility verified in `tests/test_api.py::test_full_workflow_and_dashboard_update`; elapsed time not separately measured |
-| Derived test labels agree with expert | report accuracy and κ | pending (`python -m evaluation.label_audit score`) |
+| Derived test labels agree with expert | report accuracy and κ | 100 photos per category. Agreement and κ were 81%, 0.35 for hard hats, 61%, 0.13 for eyes/face and 86%, 0.55 for gloves. |
 | Automated tests and lint | all pass | ✅ `pytest` (305 in Phase 6), `ruff`; GitHub Actions green on every merged pull request, including the Docker smoke test |
 
 Detection mAP50 (object level, 17 classes – a different quantity from the image-level results above) measured
@@ -402,7 +402,7 @@ cause unknown** (details in `docs/verification.md`).
 | **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
 | **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic warehouse benchmark and a small positive-only external liquid check; flag off by default); the vision-language model as a PPE detector |
-| **Planned / not done** | label audit by the project owner (page ready, not yet clicked); confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
+| **Planned / not done** | confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
 
 ## Data, privacy and limitations
 
