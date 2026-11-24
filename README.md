@@ -430,3 +430,8 @@ cause unknown** (details in `docs/verification.md`).
 
 SH17 dataset and YOLO weights: H. M. Ahmad and A. Rahimi, <https://github.com/ahmadmughees/SH17dataset>.
 Ultralytics YOLO (AGPL-3.0). Ollama and Qwen2.5-VL.
+
+### Human photo-audit evidence
+
+Keep the reviewer's original browser CSV. Generate the instructor-facing agreement table from the export with
+`python -m evaluation.audit_report /path/to/label_audit_results.csv`. The command prints Markdown, validates the default 100-photo sample and labels, preserves skipped items and includes the input file's SHA-256. To save the table alongside the evidence, redirect the output to a new Markdown file. Results remain pending until the reviewer supplies the export.

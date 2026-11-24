@@ -1257,3 +1257,7 @@ those of the external-validation and unsafe-conditions experiments, which use th
 files without a `run` field. Regression test `test_compare_skips_results_of_other_experiments` failed first.
 Re-running both comparisons with the fix regenerates `summary_full.md|json` and `summary_subset.md|json`
 **byte-identical** to v1.3.0, so no reported result changes. Suite: 313 passed; ruff clean.
+
+### Human-audit evidence presentation
+
+Added a read-only Markdown report for the browser CSV. It validates the sample and verdict encoding and distinguishes extra and missed flags relative to one reviewer. Verified the original page's derived labels against the committed manifest. Regression checks cover unanswered and altered rows and duplicate keys. No personal review results were available at implementation time.
