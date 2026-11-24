@@ -1243,3 +1243,17 @@ Baseline v1.2.0: full pytest suite and Ruff passed before feature work. The prev
 - Local browser check with a disposable database: docs/screenshots/audit_ui.py at 1366 and 390 px, axe-core 4.10.3. The simulated worker reported floor liquid, the owner recorded corrective action and the supervisor verified closure. 48 states, zero automated findings in 11.8 s. Report-pin screenshots refreshed. Human usability and site realism remain pending.
 - Commands: pytest; ruff check .; ruff format --check .; docker compose config --quiet; python -m evaluation.external_floor_liquid ARCHIVE NEW_OUTPUT; browser setup and audit commands in docs/screenshots/audit_ui.py. Protocol, summaries and test fixtures are tracked. Third-party raw photos and local application records remain outside Git.
 - Local suite: 312 passed in 46.25 s with six dependency deprecation warnings. Ruff lint and formatting passed (100 Python files). Compose configuration validation passed. CI additionally builds and smoke-tests the Docker container.
+
+---
+
+# Final audit (2026-11-24) – fix release v1.3.1
+
+Full audit (grading, report ↔ repository consistency, fresh-clone reproduction, hygiene): `docs/final_audit.md`.
+
+**Bug found in the fresh-clone reproduction and fixed:** `python -m evaluation.compare` (a README reproduction
+command) failed on a clean clone of v1.3.0 with `KeyError: 'run'`: it read every `results/*/metrics.json`, including
+those of the external-validation and unsafe-conditions experiments, which use their own format. Introduced in Phase 2
+(external validation) and not caught because the pipeline test builds its own results folder. Fix: `load_runs` skips
+files without a `run` field. Regression test `test_compare_skips_results_of_other_experiments` failed first.
+Re-running both comparisons with the fix regenerates `summary_full.md|json` and `summary_subset.md|json`
+**byte-identical** to v1.3.0, so no reported result changes. Suite: 313 passed; ruff clean.

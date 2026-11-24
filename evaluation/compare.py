@@ -42,6 +42,8 @@ def load_runs(only_subset: bool) -> list[dict]:
     runs = []
     for f in sorted(RESULTS.glob("*/metrics.json")):
         m = json.loads(f.read_text())
+        if "run" not in m:  # other experiments (external validation, unsafe conditions) have their own summaries
+            continue
         if m.get("split", "test") != "test" or only_subset != m["run"].endswith("_subset"):
             continue
         if "specificity" not in m["hazards"][HAZARDS[0]]:

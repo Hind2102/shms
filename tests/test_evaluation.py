@@ -145,3 +145,21 @@ def test_acceptance_simulation():
         out["wrong_type_suggested"],
         out["nothing_suggested"],
     ) == (3, 1, 1, 1)
+
+
+def test_compare_skips_results_of_other_experiments(tmp_path, monkeypatch):
+    """Regression (final audit): evaluation.compare crashed with KeyError 'run' on a clean clone because the
+    external-validation and unsafe-conditions folders write metrics.json in their own format."""
+    from evaluation import compare
+
+    hz = {h: {"specificity": 0.9} for h in ("no_hard_hat", "no_eye_protection", "no_gloves", "no_hi_vis_vest")}
+    (tmp_path / "yolo_x").mkdir()
+    (tmp_path / "yolo_x" / "metrics.json").write_text(json.dumps({"run": "yolo_x", "split": "test", "hazards": hz}))
+    (tmp_path / "external_hardhat_x").mkdir()
+    (tmp_path / "external_hardhat_x" / "metrics.json").write_text(json.dumps({"primary": {}, "verdict": {}}))
+    (tmp_path / "conditions_x_test").mkdir()
+    (tmp_path / "conditions_x_test" / "metrics.json").write_text(
+        json.dumps({"split": "test", "hazards": {"spill": {}}})
+    )
+    monkeypatch.setattr(compare, "RESULTS", tmp_path)
+    assert [m["run"] for m in compare.load_runs(only_subset=False)] == ["yolo_x"]
