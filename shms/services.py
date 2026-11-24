@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from . import risk, taxonomy
 from .detection import DetectorResult
 from .models import Area, Hazard, HazardEvent, Role, Status, User, utcnow
+from .photo_metadata import PhotoCapture
 from .site_layout import UNITS
 
 # The safety workflow as a state machine. Every status change goes through _move(), which checks this table and
@@ -166,6 +167,7 @@ def create_draft(
     experimental: list[dict] | None = None,
     x: int | None = None,
     y: int | None = None,
+    capture: PhotoCapture = PhotoCapture(),
 ) -> Hazard:
     validate_pin(area, x, y)
     h = Hazard(
@@ -175,6 +177,9 @@ def create_draft(
         reporter_id=reporter.id,
         status=Status.DRAFT,
         photo_path=photo_path,
+        photo_captured_at=capture.taken_at,
+        photo_latitude=capture.latitude,
+        photo_longitude=capture.longitude,
         created_at=at or utcnow(),
         idem_key=idem_key,
     )

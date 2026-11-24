@@ -36,6 +36,7 @@
       <noscript><p>Coordinate ranges on the illustrative plan</p><ul>{% for u in units if u.reporting %}<li>{{ u.code }} · X {{ u.x }}–{{ u.x + u.w }}, Y {{ u.y }}–{{ u.y + u.h }}</li>{% endfor %}</ul></noscript>
     </details>
     <label for="photo">Photo</label>
+    <p class="small muted">Capture time and GPS coordinates are filled from the photo when available. Choose the reporting area above.</p>
     <input id="photo" type="file" name="photo" accept="image/*" capture="environment" required>
     <br><button class="btn block" type="submit">Analyse and continue</button>
   </form>

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..models import User
+from ..photo_metadata import PhotoCapture, photo_capture
 from ..settings import get_settings
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -52,15 +53,22 @@ PHOTO_NAME = re.compile(r"^[A-Za-z0-9_-]{1,80}\.jpg$")
 
 
 async def save_photo(upload: UploadFile | None, prefix: str = "") -> str | None:
+    name, _ = await store_photo(upload, prefix)
+    return name
+
+
+async def store_photo(
+    upload: UploadFile | None, prefix: str = "", *, capture: bool = False
+) -> tuple[str | None, PhotoCapture]:
     """Validate an uploaded image and store a re-encoded JPEG under a generated name.
 
     * size: at most 20 MB, checked while reading (never more than 20 MB + 1 byte in memory);
     * type: the content must decode as JPEG, PNG or WebP (the file name and MIME type are not trusted);
     * pixels: at most 40 megapixels (decompression bombs);
     * name: random prefix + sanitised stem, ".jpg"; no path from the client is used.
-    Returns the file name inside the upload directory, or None if no file was sent."""
+    Returns the stored name and requested capture metadata."""
     if upload is None or not upload.filename:
-        return None
+        return None, PhotoCapture()
     data = await upload.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Photo is larger than 20 MB")
@@ -70,6 +78,7 @@ async def save_photo(upload: UploadFile | None, prefix: str = "") -> str | None:
                 raise HTTPException(status_code=422, detail="Upload a JPEG, PNG or WebP photo")
             if im.width * im.height > MAX_PIXELS:
                 raise HTTPException(status_code=422, detail="Photo has too many pixels (max 40 megapixels)")
+            metadata = photo_capture(im) if capture else PhotoCapture()
             im = ImageOps.exif_transpose(im).convert("RGB")
             im.thumbnail((2048, 2048))
             stem = re.sub(r"[^A-Za-z0-9_-]", "", Path(upload.filename).stem)[:40]
@@ -79,7 +88,7 @@ async def save_photo(upload: UploadFile | None, prefix: str = "") -> str | None:
             im.save(folder / name, format="JPEG", quality=90)
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise HTTPException(status_code=422, detail="File is not a readable image") from exc
-    return name
+    return name, metadata
 
 
 def photo_file(name: str) -> Path:

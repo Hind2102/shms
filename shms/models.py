@@ -138,6 +138,9 @@ class Hazard(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    photo_captured_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    photo_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    photo_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     description: Mapped[str] = mapped_column(Text, default="")
 

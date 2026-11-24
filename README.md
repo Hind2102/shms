@@ -152,6 +152,7 @@ Main workflow:
 
 1. **Report** – as *Ahmed (Operator)*: *Report hazard* → choose area → take/upload a photo (try
    `data/samples/`). Photograph the floor or access route for a physical condition, or a person and task for missing PPE.
+   SHMS reads GPS latitude/longitude and the original capture timestamp from supported photo EXIF metadata before storing the resized JPEG. Review these on the confirmation page. A timestamp without an offset is shown in camera local time. Missing tags leave fields unavailable. The reporting area and optional illustrative map pin are selected separately. The server records the submission time independently. Existing databases require Alembic revision `0007_photo_capture` (see *Upgrading an existing database*).
 2. **Confirm and score** – choose the condition you observed or confirm a PPE suggestion, choose the worst credible consequence. Likelihood is
    computed from the area's history and the risk level and target close date are shown. Tick *I already fixed it
    on the spot* to record the action taken and a closing photo.
