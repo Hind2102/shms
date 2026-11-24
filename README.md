@@ -228,7 +228,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-The 312-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
+The 313-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
