@@ -1261,3 +1261,8 @@ Re-running both comparisons with the fix regenerates `summary_full.md|json` and 
 ### Human-audit evidence presentation
 
 Added a read-only Markdown report for the browser CSV. It validates the sample and verdict encoding and distinguishes extra and missed flags relative to one reviewer. Verified the original page's derived labels against the committed manifest. Regression checks cover unanswered and altered rows and duplicate keys. No personal review results were available at implementation time.
+### Phase 6 follow-up — audit wording, 24 November
+
+The offline SH17 audit displays each derived label as a sentence. The two response buttons describe whether the sentence matches the photo. The browser storage keys and CSV verdict encoding are identical to the earlier audit. Rebuilt with `python -m evaluation.label_audit build --root "$SH17"` (default seed 7), then compared the embedded data objects for all 100 images with the existing local page. Images, order, boxes and derived labels matched exactly. No human answers were generated.
+
+The direct-choice revision displays PPE status buttons (e.g. Gloves / No gloves). Previously saved verdicts keep their original meaning. The displayed dataset statements were removed partway through the human review, so describe the change of interface when reporting the audit. Rebuilt with the same data and verified the verdict mapping for all 800 buttons. No human answers were entered.
