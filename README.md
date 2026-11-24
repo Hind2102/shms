@@ -4,14 +4,15 @@ AI-assisted web platform for reporting unsafe physical conditions and missing PP
 likelihood risk matrix, routing it to the accountable Area Owner, documenting **how** each case was closed, and
 showing site-wide risk on a live dashboard and heat map of a (synthesized) alumina refinery.
 
-The AI checks a photo against the PPE that the area requires: **hard hat**, **eye / face protection** (caustic
-splash) and **gloves**. These three passed a release gate on the held-out split of the public, peer-reviewed **SH17**
-dataset; a fourth check, the **hi-vis vest**, was evaluated and *not* released. Every AI suggestion is confirmed by a
-person, and every closure is verified by someone other than the person who closed it. **Read the evaluation with its
-limits:** on an independent dataset the hard-hat check over-reported violations badly (precision 0.28), and the
-stricter SH17 analysis shows similar weaknesses – see [External validation](#external-validation-and-stricter-checks-phase-2).
-Two local AI back-ends are compared: **YOLO** detectors trained on SH17 and a **vision-language model served by Ollama**
-(`qwen2.5vl:7b`). An **experimental**, off-by-default model checks for visible floor liquid and obstructed walkways. Workers can always report these and other physical conditions manually. The frozen model missed all five water-positive images in a separate real indoor photo challenge. No paid API is used.
+### Computer vision scope
+
+| Photo check | Status and interpretation |
+|---|---|
+| Visible liquid on the floor | Experimental, off by default. Flags a possible pool, wet patch or liquid trail. The reporter confirms the observation. Chemical identity, source and pH require separate evidence. The frozen model missed all five real indoor water photos in the external challenge. |
+| Obstructed walkway | Experimental, off by default. Flags objects narrowing or blocking a visible walkway, such as debris or a pallet. Evaluated on synthetic warehouse images. |
+| Missing hard hat, eye/face protection or gloves | Released local SH17 PPE checks, filtered by area. Object detections and spatial rules estimate whether PPE is worn. The hard-hat check failed external validation and carries an unverified-suggestion warning. |
+
+Open panels, missing grating, surface corrosion and other physical conditions can be reported manually. Workers can also report a spill or blocked walkway whether or not the model flags it. Risk scoring, assignment, corrective action and verification are workflow functions. No paid API is used.
 
 | | |
 |---|---|
@@ -431,7 +432,7 @@ cause unknown** (details in `docs/verification.md`).
 SH17 dataset and YOLO weights: H. M. Ahmad and A. Rahimi, <https://github.com/ahmadmughees/SH17dataset>.
 Ultralytics YOLO (AGPL-3.0). Ollama and Qwen2.5-VL.
 
-### Human photo-audit evidence
+### SH17 photo audit
 
-Keep the reviewer's original browser CSV. Generate the instructor-facing agreement table from the export with
+Keep the reviewer's original browser CSV. Generate the agreement table for the three PPE checks from the export with
 `python -m evaluation.audit_report /path/to/label_audit_results.csv`. The command prints Markdown, validates the default 100-photo sample and labels, preserves skipped items and includes the input file's SHA-256. To save the table alongside the evidence, redirect the output to a new Markdown file. Results remain pending until the reviewer supplies the export.

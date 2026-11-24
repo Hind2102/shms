@@ -9,12 +9,12 @@ from pathlib import Path
 
 from .label_audit import DATA
 from .metrics import cohen_kappa, wilson_ci
+from .sh17 import HAZARDS
 
 NAMES = {
     "no_hard_hat": "Hard hat",
     "no_eye_protection": "Eye or face protection",
     "no_gloves": "Gloves",
-    "no_hi_vis_vest": "Hi-vis vest or safety suit",
 }
 
 
@@ -60,9 +60,9 @@ def main() -> None:
     raw = args.csv.read_bytes()
     with (DATA / "sh17_test_manifest.csv").open() as source:
         sample = random.Random(7).sample(list(csv.DictReader(source)), 100)
-    expected = {(row["image"], h): row[f"gt_{h}"] for row in sample for h in NAMES}
-    rows = read_verdicts(raw, expected)
-    print("# SH17 photo-label audit\n")
+    expected = {(row["image"], h): row[f"gt_{h}"] for row in sample for h in HAZARDS}
+    rows = [r for r in read_verdicts(raw, expected) if r["hazard"] in NAMES]
+    print("# SH17 photo audit\n")
     print("Reviewer: Hind Alhmoudi · Single-reviewer assessment · 100 held-out photographs · Sampling seed 7\n")
     reviewed = sum(bool(row["verdict"]) for row in rows)
     print(f"**{reviewed} of {len(rows)} decisions recorded.** Blank responses are excluded from agreement.\n")

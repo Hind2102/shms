@@ -38,8 +38,6 @@ SHOW = {
     "head": "#e8710a",
     "helmet": "#2e7d32",
     "person": "#1f3a5f",
-    "safety-vest": "#9c27b0",
-    "safety-suit": "#9c27b0",
     "hands": "#c62828",
     "gloves": "#00897b",
     "face": "#795548",
@@ -50,7 +48,6 @@ SHOW = {
 CHOICES = {
     "no_hard_hat": ("Hard hat", "No hard hat"),
     "no_eye_protection": ("Glasses", "No glasses"),
-    "no_hi_vis_vest": ("Vest / suit", "No vest / suit"),
     "no_gloves": ("Gloves", "No gloves"),
 }
 
@@ -103,7 +100,7 @@ def score() -> None:
     with path.open() as f:
         rows = list(csv.DictReader(f))
     out = {"images": len({r["image"] for r in rows}), "hazards": {}}
-    for h in HAZARDS:
+    for h in CHOICES:
         rs = [r for r in rows if r["hazard"] == h and r["verdict"] in ("agree", "disagree")]
         derived = [r["derived"] == "1" for r in rs]
         expert = [d if r["verdict"] == "agree" else not d for d, r in zip(derived, rs, strict=True)]
@@ -124,7 +121,7 @@ def score() -> None:
     print(json.dumps(out, indent=2))
 
 
-TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><title>SH17 label audit</title>
+TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><title>SH17 photo audit</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body{font:15px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f6f8;color:#1d2733}
@@ -137,7 +134,7 @@ button.on{background:#1f3a5f;color:#fff;border-color:#1f3a5f}
 .q{border:1px solid #dde2e8;border-radius:8px;padding:10px;margin:8px 0} .tag{font-weight:700;padding:1px 8px;border-radius:5px}
 .yes{background:#fde3d0;color:#8a3b00} .no{background:#e6f4e7;color:#1f5f22} .legend span{margin-right:10px;font-size:13px}
 </style></head><body>
-<header><strong>SH17 label audit</strong><span id="prog"></span><button id="dl">Download CSV</button>
+<header><strong>SH17 photo audit</strong><span id="prog"></span><button id="dl">Download CSV</button>
 <label style="font-size:13px"><input type="checkbox" id="boxes" checked> show boxes</label></header>
 <p style="margin:14px">Pick what you see. If anyone is missing an item, choose “No”. Can’t tell? Skip it. Goggles and face shields count as glasses.
 Answers are kept in this browser tab only, so download the CSV when finished (or periodically).</p>
@@ -147,12 +144,14 @@ const DATA=__DATA__, COLORS=__COLORS__, choices=__Q__, HAZ=__HAZ__; const ans={}
 try{Object.assign(ans, JSON.parse(localStorage.getItem('sh17audit')||'{}'))}catch(e){}
 const list=document.getElementById('list');
 function save(){try{localStorage.setItem('sh17audit',JSON.stringify(ans))}catch(e){} prog()}
-function prog(){const total=DATA.length*HAZ.length;const done=Object.keys(ans).length;document.getElementById('prog').textContent=`${done}/${total} answered`}
+const activeHazards = Object.keys(choices);
+function prog(){const total=DATA.length*activeHazards.length;
+ const done=DATA.reduce((count,it)=>count+activeHazards.filter(h=>ans[it.image+'|'+h]).length,0);document.getElementById('prog').textContent=`${done}/${total} answered`}
 DATA.forEach((it,i)=>{const d=document.createElement('div');d.className='item';
  const rects=it.boxes.map(b=>`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="${COLORS[b.l]}" style="stroke-width:2px" vector-effect="non-scaling-stroke"><title>${b.l}</title></rect>`).join('');
  d.innerHTML=`<div class="wrap"><img src="data:image/jpeg;base64,${it.src}"><svg class="bx" viewBox="0 0 1 1" preserveAspectRatio="none">${rects}</svg></div>
  <div><div class="small">#${i+1} · ${it.image}</div><div class="legend">${Object.entries(COLORS).map(([k,v])=>`<span style="color:${v}">■ ${k}</span>`).join('')}</div>
- ${HAZ.map(h => {
+ ${activeHazards.map(h => {
    const key = it.image + '|' + h;
    const buttons = choices[h].map((label, index) => {
      const missing = index === 1;
