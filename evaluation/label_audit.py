@@ -4,8 +4,7 @@ Step 1 - build an audit page for 100 random held-out images (fixed seed):
     python -m evaluation.label_audit build --root ~/datasets/sh17 --n 100
     open evaluation/data/label_audit.html          # works offline in any browser
 
-For each image and hazard the page shows the label derived from SH17's boxes
-as a sentence. The auditor chooses whether it matches the photo, then
+For each photo the auditor directly selects the visible PPE status, then uses
 "Download CSV", and saves it as evaluation/data/label_audit_results.csv.
 
 Step 2 - score the audit:
@@ -47,18 +46,12 @@ SHOW = {
     "glasses": "#0277bd",
     "face-guard": "#0277bd",
 }
-# Each pair describes (no visible violation, visible violation) for the same dataset label.
-STATEMENTS = {
-    "no_hard_hat": ("No visible head is missing a hard hat.", "At least one visible head has no hard hat."),
-    "no_eye_protection": (
-        "No face is visibly missing eye protection.",
-        "At least one visible face has no safety glasses, goggles or face shield.",
-    ),
-    "no_hi_vis_vest": (
-        "No one is visibly missing a hi-vis vest or safety suit.",
-        "At least one person is wearing neither a hi-vis vest nor a safety suit.",
-    ),
-    "no_gloves": ("No bare hand is visible.", "At least one visible hand has no glove."),
+# First choice: present on everyone visible. Second: missing on at least one.
+CHOICES = {
+    "no_hard_hat": ("Hard hat", "No hard hat"),
+    "no_eye_protection": ("Glasses", "No glasses"),
+    "no_hi_vis_vest": ("Vest / suit", "No vest / suit"),
+    "no_gloves": ("Gloves", "No gloves"),
 }
 
 
@@ -95,7 +88,7 @@ def build(root: str, n: int, seed: int) -> None:
     html = (
         TEMPLATE.replace("__DATA__", json.dumps(items))
         .replace("__COLORS__", json.dumps(SHOW))
-        .replace("__Q__", json.dumps(STATEMENTS))
+        .replace("__Q__", json.dumps(CHOICES))
         .replace("__HAZ__", json.dumps(HAZARDS))
     )
     out = DATA / "label_audit.html"
@@ -137,7 +130,7 @@ TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><title>SH17 labe
 body{font:15px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f6f8;color:#1d2733}
 header{position:sticky;top:0;background:#1f3a5f;color:#fff;padding:10px 16px;display:flex;gap:16px;align-items:center;z-index:9}
 button{font:inherit;border-radius:6px;border:1px solid #c5cdd6;background:#fff;padding:6px 12px;cursor:pointer}
-button.on.agree{background:#2e7d32;color:#fff;border-color:#2e7d32} button.on.disagree{background:#c62828;color:#fff;border-color:#c62828}
+button.on{background:#1f3a5f;color:#fff;border-color:#1f3a5f}
 .item{display:grid;grid-template-columns:minmax(0,640px) 1fr;gap:16px;background:#fff;margin:14px;padding:14px;border-radius:10px;border:1px solid #dde2e8}
 @media(max-width:900px){.item{grid-template-columns:1fr}}
 .wrap{position:relative} .wrap img{width:100%;display:block;border-radius:6px} .wrap svg{position:absolute;inset:0;width:100%;height:100%}
@@ -146,11 +139,11 @@ button.on.agree{background:#2e7d32;color:#fff;border-color:#2e7d32} button.on.di
 </style></head><body>
 <header><strong>SH17 label audit</strong><span id="prog"></span><button id="dl">Download CSV</button>
 <label style="font-size:13px"><input type="checkbox" id="boxes" checked> show boxes</label></header>
-<p style="margin:14px">Read each statement from the dataset and compare it with the photo. If the picture is too unclear to judge, leave that statement unanswered.
+<p style="margin:14px">Pick what you see. If anyone is missing an item, choose “No”. Can’t tell? Skip it. Goggles and face shields count as glasses.
 Answers are kept in this browser tab only, so download the CSV when finished (or periodically).</p>
 <div id="list"></div>
 <script>
-const DATA=__DATA__, COLORS=__COLORS__, Q=__Q__, HAZ=__HAZ__; const ans={};
+const DATA=__DATA__, COLORS=__COLORS__, choices=__Q__, HAZ=__HAZ__; const ans={};
 try{Object.assign(ans, JSON.parse(localStorage.getItem('sh17audit')||'{}'))}catch(e){}
 const list=document.getElementById('list');
 function save(){try{localStorage.setItem('sh17audit',JSON.stringify(ans))}catch(e){} prog()}
@@ -159,11 +152,19 @@ DATA.forEach((it,i)=>{const d=document.createElement('div');d.className='item';
  const rects=it.boxes.map(b=>`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="${COLORS[b.l]}" style="stroke-width:2px" vector-effect="non-scaling-stroke"><title>${b.l}</title></rect>`).join('');
  d.innerHTML=`<div class="wrap"><img src="data:image/jpeg;base64,${it.src}"><svg class="bx" viewBox="0 0 1 1" preserveAspectRatio="none">${rects}</svg></div>
  <div><div class="small">#${i+1} · ${it.image}</div><div class="legend">${Object.entries(COLORS).map(([k,v])=>`<span style="color:${v}">■ ${k}</span>`).join('')}</div>
- ${HAZ.map(h=>{const k=it.image+'|'+h;const y=it.gt[h];return `<div class="q"><div style="margin-bottom:6px">Dataset statement: <strong>${Q[h][Number(y)]}</strong></div>
- <button class="agree ${ans[k]==='agree'?'on':''}" data-k="${k}" data-v="agree">Matches the photo</button> <button class="disagree ${ans[k]==='disagree'?'on':''}" data-k="${k}" data-v="disagree">Doesn’t match the photo</button></div>`}).join('')}</div>`;
+ ${HAZ.map(h => {
+   const key = it.image + '|' + h;
+   const buttons = choices[h].map((label, index) => {
+     const missing = index === 1;
+     const verdict = missing === it.gt[h] ? 'agree' : 'disagree';
+     const selected = ans[key] === verdict;
+     return `<button class="${selected ? 'on' : ''}" aria-pressed="${selected}" data-k="${key}" data-v="${verdict}">${label}</button>`;
+   });
+   return `<div class="q">${buttons.join(' ')}</div>`;
+ }).join('')}</div>`;
  list.appendChild(d)});
 list.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(!b)return;ans[b.dataset.k]=b.dataset.v;
- b.parentElement.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));save()});
+ b.parentElement.querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b))});save()});
 document.getElementById('boxes').addEventListener('change',e=>document.querySelectorAll('svg.bx').forEach(s=>s.style.display=e.target.checked?'':'none'));
 document.getElementById('dl').onclick=()=>{const rows=['image,hazard,derived,verdict'];
  DATA.forEach(it=>HAZ.forEach(h=>rows.push(`${it.image},${h},${it.gt[h]?1:0},${ans[it.image+'|'+h]||''}`)));

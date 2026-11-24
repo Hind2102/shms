@@ -1247,3 +1247,5 @@ Baseline v1.2.0: full pytest suite and Ruff passed before feature work. The prev
 ### Phase 6 follow-up — audit wording, 24 November
 
 The offline SH17 audit displays each derived label as a sentence. The two response buttons describe whether the sentence matches the photo. The browser storage keys and CSV verdict encoding are identical to the earlier audit. Rebuilt with `python -m evaluation.label_audit build --root "$SH17"` (default seed 7), then compared the embedded data objects for all 100 images with the existing local page. Images, order, boxes and derived labels matched exactly. No human answers were generated.
+
+The direct-choice revision displays PPE status buttons (e.g. Gloves / No gloves). Previously saved verdicts keep their original meaning. The displayed dataset statements were removed partway through the human review, so describe the change of interface when reporting the audit. Rebuilt with the same data and verified the verdict mapping for all 800 buttons. No human answers were entered.
