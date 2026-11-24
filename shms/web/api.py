@@ -14,7 +14,7 @@ from .. import policy, services
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Status, User
-from .deps import current_user, photo_file, save_photo
+from .deps import current_user, photo_file, save_photo, store_photo
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -59,6 +59,9 @@ def hazard_out(h: Hazard) -> dict:
         "y": h.y,
         "reporter_id": h.reporter_id,
         "created_at": h.created_at.isoformat(),
+        "photo_captured_at": h.photo_captured_at,
+        "photo_latitude": h.photo_latitude,
+        "photo_longitude": h.photo_longitude,
         "category_code": h.category_code,
         "ai_model": h.ai_model,
         "ai_top_code": h.ai_top_code,
@@ -142,7 +145,7 @@ async def create_hazard(
     if existing is not None:
         response.status_code = 200
         return {**hazard_out(existing), "replayed": True}
-    name = await save_photo(photo)
+    name, capture = await store_photo(photo, capture=True)
     if name is None:
         raise HTTPException(422, "A photo is required")
     from .pages import _experimental
@@ -157,6 +160,7 @@ async def create_hazard(
         x=x,
         y=y,
         experimental=_experimental(photo_file(name)),
+        capture=capture,
     )
     db.commit()
     return {**hazard_out(h), "replayed": False}

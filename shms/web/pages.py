@@ -18,7 +18,7 @@ from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User, utcnow
 from ..settings import PACKAGE_DIR
-from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo
+from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo, store_photo
 
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
@@ -266,7 +266,7 @@ async def report_submit(
         return _report_form(request, user, db, idem_key, error=str(exc), status_code=422, **fields)
     if existing is not None:
         return RedirectResponse(f"/hazards/{existing.id}/confirm", status_code=303)
-    name = await save_photo(photo)
+    name, capture = await store_photo(photo, capture=True)
     if name is None:
         return _report_form(request, user, db, idem_key, error="Please add a photo.", **fields)
     h = services.create_draft(
@@ -279,6 +279,7 @@ async def report_submit(
         x=x,
         y=y,
         experimental=_experimental(photo_file(name)),
+        capture=capture,
     )
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)

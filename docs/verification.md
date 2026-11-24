@@ -1257,3 +1257,9 @@ those of the external-validation and unsafe-conditions experiments, which use th
 files without a `run` field. Regression test `test_compare_skips_results_of_other_experiments` failed first.
 Re-running both comparisons with the fix regenerates `summary_full.md|json` and `summary_subset.md|json`
 **byte-identical** to v1.3.0, so no reported result changes. Suite: 313 passed; ruff clean.
+
+### Report photo capture metadata
+
+HTML and JSON report creation extract original EXIF capture time (including its offset when available) and a valid GPS coordinate pair before image re-encoding. API fields are photo_captured_at, photo_latitude and photo_longitude. Services persist them when constructing the draft. Report time, the area and illustrative map coordinates retain their separate meanings. Existing reports have null metadata.
+
+Revision 0007_photo_capture was applied via shms.db.migrate_to_head on disposable SQLite backups of shms_demo.db and backups/shms_2026-11-17.db. Each retained 240 original report IDs, area/reporter relationships, timestamps and photo references. Integrity and foreign-key checks passed. Targeted tests cover the API and HTML upload paths, signed coordinates, missing GPS, a timezone offset and camera time without an offset.

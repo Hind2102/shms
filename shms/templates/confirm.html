@@ -10,6 +10,7 @@
     {% if h.photo_path %}
       {% set ev = [] %}{% for s in suggestions %}{% for b in s.evidence %}{% set _ = ev.append(b) %}{% endfor %}{% endfor %}
       {{ photo(h.photo_path, ev) }}
+      {% include "_photo_capture.html" %}
     {% else %}<p class="muted">No photo attached.</p>{% endif %}
   </div>
   <div class="card">

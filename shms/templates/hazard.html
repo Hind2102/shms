@@ -28,7 +28,7 @@
       </table>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-      {% if h.photo_path %}<div class="card"><h2>Reported</h2>{% set ev = [] %}{% for s in suggestions %}{% for b in s.evidence %}{% set _ = ev.append(b) %}{% endfor %}{% endfor %}{{ photo(h.photo_path, ev) }}</div>{% endif %}
+      {% if h.photo_path %}<div class="card"><h2>Reported</h2>{% set ev = [] %}{% for s in suggestions %}{% for b in s.evidence %}{% set _ = ev.append(b) %}{% endfor %}{% endfor %}{{ photo(h.photo_path, ev) }}{% include "_photo_capture.html" %}</div>{% endif %}
       {% if h.closure_photo_path %}<div class="card"><h2>After closure</h2>{{ photo(h.closure_photo_path, []) }}</div>{% endif %}
     </div>
   </div>

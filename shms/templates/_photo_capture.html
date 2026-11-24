@@ -1,0 +1,4 @@
+<dl class="small">
+  <dt>Photo capture time</dt><dd>{{ h.photo_captured_at or 'Capture time unavailable' }}{% if h.photo_captured_at and h.photo_captured_at|length == 19 %} (camera local time, timezone unknown){% endif %}</dd>
+  <dt>Photo location (GPS)</dt><dd>{% if h.photo_latitude is not none %}{{ h.photo_latitude }}, {{ h.photo_longitude }}{% else %}GPS unavailable{% endif %}</dd>
+</dl>
