@@ -1389,3 +1389,56 @@ heuristic, not the guideline's definition."
 - On the hazard page it is shown under the risk line.
 - It also appears in the README, architecture.md, risk_matrix_source.md and requirements.md.
 - `tests/test_likelihood_label.py` checks all of these.
+
+# v1.5.0 (2026-11-25) – approved concept site map
+
+**Map.** The owner-approved map is `map_proposal/ata_concept_map.svg` with its generator `make_map5.py`.
+- The generator was copied to `scripts/site_plan/make_map5.py`. The only change is an optional output path. The
+  file is excluded from ruff so it stays as approved.
+- `shms/static/ata_concept_map.svg` is generated from it. The approved file is byte-identical to this output once
+  its embedded C2PA provenance block and an empty `<metadata>` tag are removed.
+- `shms/site_layout.py` reads the zone polygons from `<g id="zone-…">` and the road centre-lines from
+  `<g id="roads">`.
+- There are 15 reporting zones and one support area (LAB).
+- The page footer keeps the note "Concept layout only — … require a verified site plot plan". `docs/site_layout.md`
+  states the remaining limits: an illustrative concept based on public photographs, not a verified plot plan;
+  positions indicative; zone codes and PPE lists are project assumptions.
+
+**Behaviour changes.**
+- **Pin check.** Pins are validated by point in polygon (`services.validate_pin`). Pins within 48 map units are
+  grouped (30 on the old 1200-wide plan).
+- **Route.** It now starts at the south gate (1458, 1000) and follows the road graph. It avoids every stretch of road
+  within 30 units of a zone with active High/Extreme cases. When there is no route, the page names the flagged zones.
+- **Removed.** The "Process flow" toggle and the walkway drawing of the old schematic are gone, because the concept
+  drawing has its own conveyors and roads. The approved map shows no muster points, so the area card shows none.
+- **Dashboard.** The heat map now uses the zone polygons.
+- **Contrast.** The axe audit found two problems introduced in v1.4.0, now fixed:
+  - Extreme badges use black text (#000 on #ff0000 is 5.25:1).
+  - The SLO status text on /monitoring is now dark green or red, no longer the light band colours.
+
+**Migration `0009_ata_site_map`, checked on copies.** The originals' SHA-256 was unchanged afterwards.
+
+| Copy | Start | Result |
+|---|---|---|
+| `shms_demo.db` | 0007 | 242 hazards. Every row, id, relationship, event and notification is unchanged, apart from 0008's documented re-scoring. The 9 areas were renamed with id, owner, PPE and checks unchanged, and 6 zones were added (EVP, HYD, ALS → owner 6; LIM, WKS, WTR → owner 7). The 2 DIG pins moved from (539, 143) and (500, 166) to (296, 479) and (245, 562), both inside the DIG polygon. Integrity ok, 0 foreign-key violations. |
+| `shms_demo_v14.db` | 0008 | 150 hazards. Rows and relationships identical. Areas renamed, 6 added, no pins. Integrity ok. |
+| `backups/shms_2026-11-17.db` | original schema | 240 hazards. Same result as the first copy; `api_tokens` was added empty by 0005. Integrity ok. |
+
+**Seed.** The seed has 15 zones and 210 reports. After v1.4.0 scoring the bands are Low 39.5 %, Moderate 35.2 %,
+High 21.0 % and Extreme 4.3 %, all within the v1.4.1 targets. Closure controls: Procedural 40 %, Engineering 32 %,
+PPE 21 %, Elimination 4 %, Substitution 3 %.
+
+**Tests.** 418 pass and ruff is clean.
+- `tests/test_site_layout.py` was rewritten for the map:
+  - every reporting code has geometry;
+  - no zones overlap;
+  - every zone is reachable from the gate along the roads;
+  - the route avoids roads beside flagged zones and refuses honestly;
+  - pages for each role and each overlay.
+- `tests/test_site_pins.py` adds point-in-polygon checks and the report-form polygon.
+- `tests/test_site_map_migration.py` covers renames, new zones, proportional pins, downgrade and frozen values.
+- Updated for the new specification, with no assertion weakened:
+  - the expected map note in `test_home_and_map.py`;
+  - the migration snapshot in `test_migrations.py`, which now ignores only the six new zones.
+- `docs/screenshots/audit_ui.py` (axe-core 4.10.3, 1366 and 390 px) passed: 48 page states, 0 findings, no
+  horizontal overflow, no server errors.
