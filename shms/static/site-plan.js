@@ -1,6 +1,7 @@
 (() => {
   const svg = document.getElementById('plan');
-  const width = 1200, height = 800;
+  const box = svg.viewBox.baseVal;
+  const width = box.width, height = box.height;
   let x = 0, y = 0, w = width, h = height;
   const bound = (value, max) => Math.max(0, Math.min(max, value));
   function render() {
@@ -10,7 +11,7 @@
     svg.classList.toggle('is-zoomed', w < width);
   }
   function zoom(factor, cx = x + w / 2, cy = y + h / 2) {
-    const next = Math.max(180, Math.min(width, w * factor));
+    const next = Math.max(width * 0.15, Math.min(width, w * factor));
     x = cx - (cx - x) * next / w;
     y = cy - (cy - y) * next / w;
     w = next;

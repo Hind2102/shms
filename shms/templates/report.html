@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from "_site_basemap.html" import basemap %}
 {% block title %}Report a hazard{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/site-plan.css">
@@ -16,16 +15,16 @@
       {% for a in areas %}
       {% set u = bounds.get(a.code) %}
       <option value="{{ a.id }}" {% if area_id == a.id %}selected{% endif %}
-              {% if u %}data-x="{{ u.x }}" data-y="{{ u.y }}" data-w="{{ u.w }}" data-h="{{ u.h }}"{% endif %}>{{ a.name }} ({{ a.code }})</option>
+              {% if u %}data-x="{{ u.x }}" data-y="{{ u.y }}" data-w="{{ u.w }}" data-h="{{ u.h }}" data-points="{{ u.points_attr }}"{% endif %}>{{ a.name }} ({{ a.code }})</option>
       {% endfor %}
     </select>
     <details id="pin-picker" {% if x is defined and (x is not none or y is not none) %}open{% endif %}>
       <summary>Add a map pin (optional)</summary>
-      <p>Tap a point in the selected unit or enter both coordinates. Leave them blank to report by area.</p>
-      <svg id="report-map" viewBox="0 0 1200 800" role="img" aria-label="Illustrative layout of the selected reporting area" hidden>
-        {{ basemap(units) }}
-        <rect id="pin-bounds" fill="none" stroke="#263b43" stroke-dasharray="3 3" stroke-width="1"/>
-        <g id="picked-point" style="display:none" aria-hidden="true"><circle r="5" fill="#232e35" stroke="white" stroke-width="1.5"/><circle r="1.4" fill="white"/></g>
+      <p>Tap a point in the selected zone or enter both coordinates. Leave them blank to report by area. The map is a concept layout; positions are indicative.</p>
+      <svg id="report-map" viewBox="0 0 {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H }}" role="img" aria-label="Concept map of the selected reporting zone" hidden>
+        <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}"/>
+        <polygon id="pin-bounds" fill="#ffffff" fill-opacity=".18" stroke="#263b43" stroke-dasharray="6 4" stroke-width="2.5"/>
+        <g id="picked-point" style="display:none" aria-hidden="true"><circle r="8" fill="#232e35" stroke="white" stroke-width="2.5"/><circle r="2.4" fill="white"/></g>
       </svg>
       <div class="pin-fields">
         <div><label for="pin-x">X coordinate</label><input id="pin-x" name="x" type="number" step="1" value="{{ x if x is defined and x is not none else '' }}"></div>
@@ -33,7 +32,7 @@
         <button id="clear-pin" class="btn secondary" type="button" hidden>Clear pin</button>
       </div>
       <div id="pin-status" role="status" class="small"></div>
-      <noscript><p>Coordinate ranges on the illustrative plan</p><ul>{% for u in units if u.reporting %}<li>{{ u.code }} · X {{ u.x }}–{{ u.x + u.w }}, Y {{ u.y }}–{{ u.y + u.h }}</li>{% endfor %}</ul></noscript>
+      <noscript><p>Coordinate ranges on the concept map</p><ul>{% for code, u in bounds.items() %}<li>{{ code }} · X {{ u.x }}–{{ u.x + u.w }}, Y {{ u.y }}–{{ u.y + u.h }}</li>{% endfor %}</ul></noscript>
     </details>
     <label for="photo">Photo</label>
     <p class="small muted">Capture time and GPS coordinates are filled from the photo when available. Choose the reporting area above.</p>

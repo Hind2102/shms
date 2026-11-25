@@ -3,6 +3,8 @@
 v1.4.1: 150 reports over 6 months with per-area frequencies (PROFILE), realistic consequences
 (CONSEQUENCE_WEIGHTS) and mixed closure controls (CONTROLS), so that the ADOSH-SF v4.0 bands come out roughly
 Low 40 %, Moderate 35 %, High 24 %, Extreme 1 % (tests/test_seed_realism.py).
+v1.5.0: 15 zones of the approved concept map and 210 reports (Low 39.5 %, Moderate 35.2 %, High 21.0 %,
+Extreme 4.3 %).
 
 Real refinery records and site maps are confidential, so the demo uses a
 synthesized layout that follows the Bayer process flow and a generated
@@ -37,65 +39,39 @@ USERS = [
 
 BASE_PPE = "Hard hat, Safety glasses, Gloves, Safety boots, Flame-resistant coverall"
 REQUIRED = "no_hard_hat,no_eye_protection,no_gloves"
-# code, name, owner index, extra PPE shown at the entrance, AI checks, x, y, w, h, relative hazard weight (unused since
-# v1.4.1: per-area frequencies are in PROFILE)
-# This refinery uses coveralls, not hi-vis vests, so no area requires a vest (the vest check was also
-# rejected by the release gate). Every area requires hard hat, eye protection and gloves.
-AREAS = [
-    ("BXH", "Bauxite Handling", 3, "Dust mask, Hearing protection", REQUIRED, 20, 40, 200, 230, 1.0),
-    ("GRD", "Grinding & Desilication", 3, "Hearing protection", REQUIRED, 240, 40, 180, 230, 1.0),
-    ("DIG", "Digestion", 3, "Face shield over glasses (caustic), Chemical gloves", REQUIRED, 440, 40, 200, 230, 2.2),
-    (
-        "CLR",
-        "Clarification (Red Mud)",
-        4,
-        "Face shield over glasses (caustic), Chemical gloves",
-        REQUIRED,
-        660,
-        40,
-        150,
-        230,
-        1.4,
-    ),
-    (
-        "FLT",
-        "Security Filtration",
-        4,
-        "Face shield over glasses (caustic), Chemical gloves",
-        REQUIRED,
-        830,
-        40,
-        150,
-        230,
-        1.8,
-    ),
-    ("PRC", "Precipitation", 5, "Chemical gloves", REQUIRED, 660, 300, 320, 250, 1.2),
-    ("CAL", "Calcination", 5, "Heat-resistant gloves, Dust mask", REQUIRED, 380, 300, 260, 250, 1.3),
-    (
-        "TNK",
-        "Caustic Tank Farm",
-        6,
-        "Face shield (caustic transfers), Chemical suit",
-        REQUIRED,
-        240,
-        300,
-        120,
-        250,
-        0.9,
-    ),
-    (
-        "PWR",
-        "Powerhouse & Utilities",
-        6,
-        "Hearing protection, Arc-rated clothing (switchrooms)",
-        REQUIRED,
-        20,
-        300,
-        200,
-        250,
-        0.7,
-    ),
+# Reporting zones of the approved concept map (v1.5.0): code, owner index, required PPE shown at the entrance.
+# Names and geometry come from the map (shms/site_layout.py). PPE lists are project assumptions, not verified site
+# requirements. This refinery uses coveralls, not hi-vis vests, so no area requires a vest (the vest check was also
+# rejected by the release gate). AI checks are the released PPE checks only (REQUIRED ∩ release gate).
+# The first nine keep their v1.4 order (and ids); the six new zones follow, as migration 0009 adds them.
+ZONE_PPE = [
+    ("BXH", 3, f"{BASE_PPE}, Dust mask, Hearing protection"),
+    ("GRD", 3, f"{BASE_PPE}, Hearing protection"),
+    ("DIG", 3, f"{BASE_PPE}, Face shield over glasses (caustic), Chemical gloves"),
+    ("CLR", 4, f"{BASE_PPE}, Face shield over glasses (caustic), Chemical gloves"),
+    ("FLT", 4, f"{BASE_PPE}, Face shield over glasses (caustic), Chemical gloves"),
+    ("PRC", 5, f"{BASE_PPE}, Chemical gloves"),
+    ("CAL", 5, f"{BASE_PPE}, Heat-resistant gloves, Dust mask"),
+    ("TNK", 6, f"{BASE_PPE}, Face shield (caustic transfers), Chemical suit"),
+    ("PWR", 6, f"{BASE_PPE}, Hearing protection, Arc-rated clothing (switchrooms)"),
+    ("EVP", 5, "Hard hat, Face shield, Chemical gloves"),
+    ("HYD", 5, "Hard hat, Face shield, Chemical gloves"),
+    ("ALS", 5, "Hard hat, Safety glasses, Gloves, Dust mask"),
+    ("LIM", 6, "Hard hat, Goggles, Gloves, Dust mask"),
+    ("WKS", 6, "Hard hat, Safety glasses, Gloves, Hearing protection"),
+    ("WTR", 6, "Hard hat, Safety glasses, Life jacket (near open water)"),
 ]
+
+
+def _area_rows():
+    from .site_layout import REPORTING
+
+    for code, owner, ppe in ZONE_PPE:
+        z = REPORTING[code]
+        yield code, z.name, owner, ppe, REQUIRED, z.x, z.y, z.w, z.h
+
+
+AREAS = list(_area_rows())  # code, name, owner index, required PPE, AI checks, x, y, w, h (map bounding box)
 
 # ---------------------------------------------------------------- synthesized history (v1.4.1)
 # Expected findings per area over the 6-month history, by hazard type. Caustic areas (digestion, clarification,
@@ -103,7 +79,7 @@ AREAS = [
 # (mobile plant, conveyors, overhead work); calcination hot-work gloves; the powerhouse more open panels.
 # Repeats of one type in one area are kept low, as on a site that acts on its findings.
 PPE_FINDINGS = ("no_hard_hat", "no_eye_protection", "no_gloves")
-CAUSTIC = {"DIG", "CLR", "FLT", "TNK"}
+CAUSTIC = {"DIG", "CLR", "FLT", "TNK", "EVP"}
 PROFILE: dict[str, dict[str, float]] = {
     "BXH": {
         "no_hard_hat": 3,
@@ -182,6 +158,37 @@ PROFILE: dict[str, dict[str, float]] = {
         "other_condition": 1,
         "surface_corrosion": 0.6,
     },
+    # New zones of the v1.5.0 concept map (project assumptions about typical findings)
+    "EVP": {
+        "no_eye_protection": 2,
+        "no_gloves": 1.5,
+        "no_hard_hat": 0.7,
+        "floor_liquid": 1.2,
+        "surface_corrosion": 0.8,
+    },
+    "HYD": {
+        "no_gloves": 1.5,
+        "no_eye_protection": 1.2,
+        "no_hard_hat": 0.8,
+        "floor_liquid": 1,
+        "walkway_obstruction": 0.7,
+    },
+    "ALS": {
+        "no_hard_hat": 1.5,
+        "no_eye_protection": 1,
+        "no_gloves": 0.7,
+        "walkway_obstruction": 0.8,
+        "other_condition": 0.6,
+    },
+    "LIM": {
+        "no_eye_protection": 1.5,
+        "no_gloves": 1,
+        "no_hard_hat": 1,
+        "walkway_obstruction": 0.6,
+        "surface_corrosion": 0.5,
+    },
+    "WKS": {"no_hard_hat": 1.2, "no_eye_protection": 1.2, "no_gloves": 1, "walkway_obstruction": 1, "open_panel": 0.7},
+    "WTR": {"no_hard_hat": 0.8, "floor_opening": 0.6, "other_condition": 0.8, "walkway_obstruction": 0.5},
 }
 # Consequence (ADOSH-SF Table 1) as weights for C1..C5. Most missing-PPE findings are C2-C3; C4 only where the
 # context makes it credible (no face shield at a caustic sampling point or during line breaking; an uncovered opening
@@ -221,7 +228,7 @@ CONTROLS: dict[str, list[tuple[str, float, int, str]]] = {
         ("ppe", 3, 0, "Interim PPE issued until the repair is made."),
     ],
 }
-N_HISTORY = 150
+N_HISTORY = 210  # v1.5.0: 15 reporting zones (was 150 for 9 zones in v1.4.1)
 
 
 def _consequence(rng: random.Random, area_code: str, cat: str) -> tuple[int, str]:
@@ -280,14 +287,14 @@ def seed(db: Session, n_history: int = N_HISTORY, now: datetime | None = None, r
             code=c,
             name=nm,
             owner_id=users[o].id,
-            required_ppe=f"{BASE_PPE}, {extra}",
+            required_ppe=ppe,
             ai_checks=checks,
             x=x,
             y=y,
             w=w,
             h=h,
         )
-        for c, nm, o, extra, checks, x, y, w, h, _ in AREAS
+        for c, nm, o, ppe, checks, x, y, w, h in AREAS
     ]
     db.add_all(areas)
     db.flush()

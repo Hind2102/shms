@@ -1,17 +1,17 @@
-"""Report coordinates use the selected unit's stable map bounds and remain optional."""
+"""Report coordinates must lie inside the selected zone's polygon on the concept map and remain optional."""
 
 import pytest
 from sqlalchemy import select
 
 from shms import risk, services
 from shms.models import Area, Hazard, Status
-from shms.site_layout import UNITS
+from shms.site_layout import REPORTING
 from tests.conftest import jpeg_bytes, login
 from tests.test_api import REPORTER, h
 
 
 def digestion():
-    return next(unit for unit in UNITS if unit.code == "DIG")
+    return REPORTING["DIG"]
 
 
 def submit(client, data, key="pin"):
@@ -96,3 +96,28 @@ def test_migrated_hazards_keep_area_only_location_and_enforce_complete_pair(tmp_
         ]
         with pytest.raises(sqlite3.IntegrityError, match="ck_hazard_pin_pair"):
             database.execute("UPDATE hazards SET x = 500 WHERE id = 1")
+
+
+@pytest.mark.parametrize(
+    "point,ok",
+    [((175, 320), True), ((282, 571), True), ((390, 822), True), ((391, 571), False), ((500, 400), False)],
+    ids=["corner", "inside", "far-corner", "just-outside", "in-another-zone"],
+)
+def test_pin_must_lie_inside_the_zone_polygon(empty_db, point, ok):
+    from tests.test_workflow import area
+
+    dig = area(empty_db)
+    assert dig.code == "DIG" and REPORTING["DIG"].contains(*point) is ok
+    if ok:
+        services.validate_pin(dig, *point)
+    else:
+        with pytest.raises(services.WorkflowError, match="inside Digestion"):
+            services.validate_pin(dig, *point)
+
+
+def test_report_form_offers_the_zone_polygon_for_pin_selection(client):
+    login(client, REPORTER)
+    page = client.get("/report").text
+    assert 'id="report-map"' in page and 'href="/static/ata_concept_map.svg"' in page
+    assert f'data-points="{REPORTING["DIG"].points_attr}"' in page
+    assert 'polygon id="pin-bounds"' in page

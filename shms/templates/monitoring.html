@@ -11,7 +11,7 @@ A falling acceptance rate is an early warning of drift – new cameras, lighting
   <div class="kpi {% if c.ok == false %}warn{% endif %}">
     <div class="v">{{ c.value or '–' }}</div>
     <div class="l">{{ c.name }} · target {{ c.target }}<br>
-      {% if c.ok is none %}<span class="muted">not enough data</span>{% elif c.ok %}<span style="color:var(--low)">✓ within SLO</span>{% else %}<span style="color:var(--extreme)">✗ SLO breached</span>{% endif %}</div>
+      {% if c.ok is none %}<span class="muted">not enough data</span>{% elif c.ok %}<span style="color:#1f5f22">✓ within SLO</span>{% else %}<span style="color:#8e1c13">✗ SLO breached</span>{% endif %}</div>
   </div>
   {% endfor %}
   <div class="kpi"><div class="v">{{ m.reports }}</div><div class="l">AI-analysed reports</div></div>

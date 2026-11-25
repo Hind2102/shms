@@ -14,7 +14,7 @@
       <tr><th>Likelihood (Table 2) \ Consequence (Table 1)</th>{% for c, spec in risk.consequence_levels().items() %}<th style="text-align:center">{{ spec.name }} ({{ c }})</th>{% endfor %}</tr>
       {% for row in table %}
       <tr><th>{{ risk.likelihood_levels()[row[0].likelihood].name }} ({{ row[0].likelihood }})</th>
-        {% for cell in row %}<td style="background:{{ cell.color }};color:#1d1d1d">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
+        {% for cell in row %}<td style="background:{{ cell.color }};color:#000">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
       {% endfor %}
     </table>
   </div>

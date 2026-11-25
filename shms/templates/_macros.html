@@ -18,30 +18,21 @@
 {% macro heatmap(rows) -%}
 {% set colors = {'Low': '#99cc00', 'Moderate': '#ffff00', 'High': '#ffcc00', 'Extreme': '#ff0000'} %}
 <div class="heatmap">
-<svg viewBox="0 0 1000 590" role="group" aria-label="Refinery heat map of open hazard risk by area">
-  <rect x="0" y="0" width="1000" height="590" fill="#eef1f4" rx="10"/>
-  <!-- Bayer process flow (synthesized layout) -->
-  <g stroke="#9aa6b2" stroke-width="4" fill="none" stroke-dasharray="8 6">
-    <path d="M220 155 H240"/><path d="M420 155 H440"/><path d="M640 155 H660"/><path d="M810 155 H830"/>
-    <path d="M905 270 V300"/><path d="M660 425 H640"/><path d="M360 425 H380"/>
-  </g>
-  {% for r in rows %}{% set a = r.area %}
+<svg viewBox="140 130 1640 850" role="group" aria-label="Concept site map: open hazard risk by zone">
+  <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}" opacity="0.45" aria-hidden="true"/>
+  {% for r in rows %}{% set a = r.area %}{% set z = site_layout.REPORTING.get(a.code) %}{% if z %}
   <a href="/areas/{{ a.code }}" aria-label="{{ a.name }}: {{ r.open }} open, total open risk {{ r.heat }}">
-    <rect x="{{ a.x }}" y="{{ a.y }}" width="{{ a.w }}" height="{{ a.h }}" rx="8"
-          fill="{{ colors[r.worst_level] if r.worst_level else '#cfd8dc' }}"
-          fill-opacity="{{ (0.25 + 0.75 * r.heat_ratio) if r.worst_level else 0.6 }}" stroke="#1f3a5f" stroke-width="2"/>
-    <text x="{{ a.x + 10 }}" y="{{ a.y + 24 }}" font-size="15" font-weight="700" fill="#1d2733">{{ a.code }}</text>
-    <text x="{{ a.x + 10 }}" y="{{ a.y + 44 }}" font-size="12" fill="#1d2733">{{ a.name }}</text>
-    <text x="{{ a.x + 10 }}" y="{{ a.y + a.h - 34 }}" font-size="26" font-weight="700" fill="#1d2733">{{ r.open }}</text>
-    <text x="{{ a.x + 10 }}" y="{{ a.y + a.h - 14 }}" font-size="12" fill="#1d2733">open · risk {{ r.heat }}</text>
+    <polygon points="{{ z.points_attr }}" fill="{{ colors[r.worst_level] if r.worst_level else '#cfd8dc' }}"
+          fill-opacity="{{ (0.35 + 0.55 * r.heat_ratio) if r.worst_level else 0.45 }}" stroke="#1f3a5f" stroke-width="3"/>
+    <text x="{{ z.x + 10 }}" y="{{ z.y + z.h - 12 }}" font-size="22" font-weight="700" fill="#1d2733" paint-order="stroke" stroke="#ffffff" stroke-width="4">{{ a.code }} · {{ r.open }} open · risk {{ r.heat }}</text>
     <title>{{ a.name }}: {{ r.open }} open, total open risk {{ r.heat }}, {{ r.reported_90d }} reported in 90 days</title>
   </a>
-  {% endfor %}
+  {% endif %}{% endfor %}
 </svg>
 <div class="legend">
-  <span>Colour = worst open risk level; intensity = total open risk score.</span>
+  <span>Colour = worst open risk level; intensity = total open risk score. Concept layout only – positions are indicative.</span>
   {% for l, c in colors.items() %}<span><i style="background:{{ c }}"></i>{{ l }}</span>{% endfor %}
-  <span><i style="background:#cfd8dc"></i>No open hazards</span>
+  <span><i style="background:#cfd8dc"></i>No open hazards recorded – not a statement about conditions</span>
 </div>
 </div>
 {%- endmacro %}

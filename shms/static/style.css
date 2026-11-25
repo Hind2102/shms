@@ -41,7 +41,7 @@ th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line
 th { color: var(--muted); font-weight: 600; font-size: 13px; }
 .lvl { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; color: #1d1d1d; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
 .lvl.Low { background: var(--low); } .lvl.Moderate { background: var(--moderate); }
-.lvl.High { background: var(--high); } .lvl.Extreme { background: var(--extreme); }
+.lvl.High { background: var(--high); } .lvl.Extreme { background: var(--extreme); color: #000; }
 .st { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; background: #e7ecf2; }
 .st.open { background: #fff1e0; color: #8a4b00; } .st.closed { background: #e6f4e7; color: #1f5f22; }
 .st.planned { background: #e8f0fb; color: #1d4f91; } .st.pending_verification { background: #f3e8fb; color: #5b2a86; }
@@ -66,11 +66,11 @@ textarea { min-height: 80px; }
 .timeline li.closed::before { background: var(--low); } .timeline li.alerted::before { background: var(--extreme); }
 .ppe { display: flex; flex-wrap: wrap; gap: 6px; } .ppe span { background: #e8f0fb; border-radius: 14px; padding: 3px 10px; font-size: 13px; }
 .heatmap svg { width: 100%; height: auto; }
-.heatmap a rect { transition: stroke-width .15s; } .heatmap a:hover rect { stroke-width: 4; }
+.heatmap a polygon { transition: stroke-width .15s; } .heatmap a:hover polygon, .heatmap a:focus polygon { stroke-width: 7; }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; } .filters > div { min-width: 140px; flex: 1; }
-.matrix td { text-align: center; font-weight: 700; color: #1d1d1d; border: 2px solid #fff; padding: 12px 4px; }
+.matrix td { text-align: center; font-weight: 700; color: #000; border: 2px solid #fff; padding: 12px 4px; }
 .login-list button { width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 6px 0; font: inherit; cursor: pointer; }
 .login-list button:hover { border-color: var(--accent); }
 .hide { display: none; }

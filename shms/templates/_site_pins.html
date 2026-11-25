@@ -4,7 +4,7 @@
    class="case-pin" data-pin-count="{{ group|length }}" transform="translate({{ anchor.x }} {{ anchor.y }})"
    aria-label="{{ anchor.area.code }} · {{ group|length }} open hazard{{ 's' if group|length != 1 }} · {{ anchor.risk_level }} risk">
   <title>{{ anchor.area.name }} · {{ group|length }} open hazard{{ 's' if group|length != 1 }} · highest risk {{ anchor.risk_level }}</title>
-  <circle r="13" fill="{{ risk.band_for(anchor.risk_score).color }}" stroke="#162830" stroke-width="2"/>
-  <text text-anchor="middle" y="4.5" fill="{{ '#fff' if anchor.risk_level in ('Low','Extreme') else '#162830' }}">{{ group|length }}</text>
+  <circle r="18" fill="{{ risk.band_for(anchor.risk_score).color }}" stroke="#162830" stroke-width="2"/>
+  <text text-anchor="middle" y="6" fill="#162830">{{ group|length }}</text>
 </a>
 {% endfor %}

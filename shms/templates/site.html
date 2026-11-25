@@ -1,12 +1,11 @@
 {% extends "base.html" %}
-{% from '_site_basemap.html' import basemap %}
 {% from '_macros.html' import level as risk_badge %}
 {% block title %}Site plan{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/site-plan.css">
 {% set names = {'open_risk': 'Open risk', 'overdue': 'Overdue', 'reports': 'Reports'} %}
 <h1>Refinery plan view</h1>
-<p class="disclaimer">Illustrative layout – not an actual site plan. Areas and positions are synthesized for this project.</p>
+<p class="disclaimer">{{ site_layout.FOOTER_NOTE }} Illustrative concept based on public photographs; zone codes and PPE lists are project assumptions.</p>
 <form class="filters plan-filters" method="get" action="/site">
   <fieldset class="seg"><legend>Overlay</legend>
     {% for key, label in names.items() %}
@@ -27,34 +26,30 @@
 {% set query = 'overlay=' ~ v.overlay ~ '&window=' ~ v.window_days ~ '&level=' ~ (v.min_level or '') %}
 <div class="map-shell">
   <div class="map-toolbar" aria-label="Map controls">
-    <label><input id="show-flow" type="checkbox"> Process flow</label>
+    <span class="small muted">Tap or select a zone to check it before entering.</span>
     <div class="map-buttons">
       <button type="button" data-pan="left" aria-label="Pan left">←</button><button type="button" data-pan="up" aria-label="Pan up">↑</button><button type="button" data-pan="down" aria-label="Pan down">↓</button><button type="button" data-pan="right" aria-label="Pan right">→</button>
       <button type="button" data-zoom="out" aria-label="Zoom out">−</button><button type="button" data-zoom="in" aria-label="Zoom in">+</button><button type="button" data-zoom="reset">Reset view</button>
     </div>
   </div>
-  <svg id="plan" viewBox="0 0 1200 800" role="group" tabindex="0" aria-label="Illustrative refinery map, {{ names[v.overlay] }} overlay" aria-describedby="map-help">
-    {{ basemap(units, edges) }}
-    <g id="process-flow" fill="none" stroke="#75408a" stroke-width="3" marker-end="url(#flow-head)" aria-hidden="true">
-      {% for id in ['ore-belt','slurry','mud-line','liquor','hydrate'] %}
-      <use href="#{{ id }}"/>{% endfor %}
-      <use href="#recovery" stroke-dasharray="7 4"/>
-    </g>
-    {% for u in units if u.reporting and u.code in rows %}
-    {% set a = rows[u.code] %}
-    <a href="/site?{{ query }}&amp;unit={{ u.code }}{% if route_requested %}&amp;route=1{% endif %}#unit-detail" class="unit-link{% if detail and u.code == detail.area.code %} selected{% endif %}" aria-label="{{ a.name }}, {{ names[v.overlay] }}: {{ a.label }}. Check before entering.">
+  <svg id="plan" viewBox="0 0 {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H }}" role="group" tabindex="0" aria-label="Concept site map, {{ names[v.overlay] }} overlay" aria-describedby="map-help">
+    <defs><pattern id="no-records" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(42)"><path d="M0 0V10" stroke="#73858c" stroke-width="2.5"/></pattern></defs>
+    <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}" aria-hidden="true"/>
+    {% for code, z in zones.items() if code in rows %}
+    {% set a = rows[code] %}
+    <a href="/site?{{ query }}&amp;unit={{ code }}{% if route_requested %}&amp;route=1{% endif %}#unit-detail" class="unit-link{% if detail and code == detail.area.code %} selected{% endif %}" aria-label="{{ a.name }}, {{ names[v.overlay] }}: {{ a.label }}. Check before entering.">
       <title>{{ a.name }} · {{ names[v.overlay] }} · {{ a.label }}</title>
-      <rect class="lot-target" x="{{ u.x }}" y="{{ u.y }}" width="{{ u.w }}" height="{{ u.h }}"/>
-      <rect x="{{ u.x+1 }}" y="{{ u.y+u.h-25 }}" width="{{ u.w-2 }}" height="24" fill="{{ ('#9b472c' if v.scale == 'risk' else '#476e83') if a.value else 'url(#no-records)' }}" fill-opacity="{{ (0.18 + 0.65*a.ratio) if a.value else 0.55 }}"/>
-      <text x="{{ u.x+8 }}" y="{{ u.y+u.h-8 }}" class="metric-label">{{ u.code }} · {{ a.value if a.value else 'None recorded' }}</text>
+      <polygon class="lot-target" points="{{ z.points_attr }}"/>
+      <rect x="{{ z.x + 2 }}" y="{{ z.y + z.h - 30 }}" width="{{ z.w - 4 }}" height="28" fill="{{ ('#9b472c' if v.scale == 'risk' else '#476e83') if a.value else 'url(#no-records)' }}" fill-opacity="{{ (0.25 + 0.6*a.ratio) if a.value else 0.6 }}"/>
+      <text x="{{ z.x + z.w - 10 }}" y="{{ z.y + z.h - 10 }}" text-anchor="end" class="metric-label">{{ code }} · {{ a.value if a.value else 'None recorded' }}</text>
     </a>
     {% endfor %}
-    {% if path %}<polyline id="walk-route" fill="none" stroke="#fff" stroke-width="9" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><polyline fill="none" stroke="#785098" stroke-width="5" pointer-events="none" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/>{% endif %}
+    {% if path %}<polyline id="walk-route" fill="none" stroke="#fff" stroke-width="14" stroke-linejoin="round" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><polyline fill="none" stroke="#785098" stroke-width="8" stroke-linejoin="round" pointer-events="none" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><circle cx="{{ path[0][0] }}" cy="{{ path[0][1] }}" r="11" fill="#785098" stroke="#fff" stroke-width="3"/>{% endif %}
     {% include '_site_pins.html' %}
   </svg>
-  <div class="map-key"><span><i class="key-road"></i>One-way road</span><span><i class="key-walk"></i>Pedestrian walkway</span><span><i class="key-rack"></i>Rack / conveyor</span><span><i class="key-context"></i>Untracked facility</span>{% if path %}<span><i class="key-route"></i>Suggested walk</span>{% endif %}</div>
+  <div class="map-key"><span><i class="key-hatch"></i>No matching records – not a statement about conditions</span><span><i class="key-strip"></i>Overlay value, shaded relative to the highest area</span>{% if path %}<span><i class="key-route"></i>Suggested route from the south gate</span>{% endif %}<span>Roads, legend and labels are part of the concept drawing.</span></div>
 </div>
-<p class="small muted" id="map-help">Choose an area on the map or from the list. Zoom with + or −, then pan with the arrow keys or drag. Home resets the view.</p>
+<p class="small muted" id="map-help">Choose a zone on the map or from the list. Zoom with + or −, then pan with the arrow keys or drag. Home resets the view. {{ site_layout.FOOTER_NOTE }}</p>
 <div class="basis">
   <p><strong>Calculation:</strong> {{ v.basis }}{% if v.min_level %} Only {{ 'High and Extreme' if v.min_level == 'High' else 'Extreme' }} hazards.{% endif %}</p>
   <p>Site total: <strong>{{ v.site_total }}</strong> from {{ v.hazards_counted }} hazard{{ '' if v.hazards_counted == 1 else 's' }}. Shading is relative to the highest area value. Hatching means nothing recorded for this view.</p>
@@ -65,13 +60,13 @@
   <p><strong>{{ detail.open|length }} active</strong> · <strong>{{ detail.overdue }} overdue</strong> · Highest active risk: <strong>{{ detail.open[0].risk_level if detail.open else 'None recorded' }}</strong>. Includes all report dates and risk levels.</p>
   <div class="entry-columns">
   <div><h3>Open hazards</h3><ul>{% for h in detail.open %}<li><a href="/hazards/{{ h.id }}">#{{ h.id }} {{ h.category_code | cat }}</a> {{ risk_badge(h.risk_level) }}</li>{% else %}<li>No active hazards recorded.</li>{% endfor %}</ul></div>
-  <div><h3>Required PPE</h3><p>{{ detail.area.ppe_list|join(', ') or 'No requirements recorded' }}</p>
+  <div><h3>Required PPE</h3><p>{{ detail.area.ppe_list|join(', ') or 'No requirements recorded' }}</p><p class="small muted">PPE list is a project assumption, not the site's verified requirement.</p>
     <h3>Recent verified closures</h3><ul>{% for h in detail.recent_closed %}<li><a href="/hazards/{{ h.id }}">#{{ h.id }}</a> {{ h.closure_action }}</li>{% else %}<li>No verified closures recorded.</li>{% endfor %}</ul></div>
   </div>
-  <p><a href="/areas/{{ detail.area.code }}">Full area board</a> · <a href="/site?{{ query }}&amp;unit={{ detail.area.code }}&amp;route=1#route-status">Show route from gatehouse</a></p>
+  <p><a href="/areas/{{ detail.area.code }}">Full area board</a> · <a href="/site?{{ query }}&amp;unit={{ detail.area.code }}&amp;route=1#route-status">Show suggested route from the south gate</a></p>
   {% if route_requested %}
-  <div id="route-status" tabindex="-1"><strong>{% if path %}Walkway route to {{ detail.area.name }}</strong>. The highlighted path ends at the unit entrance and avoids frontages with active High or Extreme hazards. <a href="#plan">View route on map</a>{% elif detail.area.code in flagged %}Route unavailable.</strong> The destination has active High or Extreme hazards. Contact the Area Owner before entry.{% else %}Route unavailable.</strong> Active High or Extreme hazards block the marked walkway approaches. Contact the Area Owner before entry.{% endif %}
-  <p>Illustrative routing on a synthesized layout – follow site rules and permits.</p></div>
+  <div id="route-status" tabindex="-1"><strong>{% if path %}Suggested route to {{ detail.area.name }}</strong>. It starts at the south gate, follows the road centre-lines and avoids every road beside a zone with active High or Extreme hazards{% if flagged %} ({{ flagged|sort|join(', ') }}){% endif %}. <a href="#plan">View route on map</a>{% elif detail.area.code in flagged %}Route unavailable.</strong> The destination has active High or Extreme hazards. Contact the Area Owner before entry.{% else %}Route unavailable.</strong> Active High or Extreme hazards in {{ flagged|sort|join(', ') }} block every road approach. Contact the Area Owner before entry.{% endif %}
+  <p>Illustrative routing on a concept layout – follow site rules and permits.</p></div>
   {% endif %}
 </section>
 {% endif %}
