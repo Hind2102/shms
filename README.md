@@ -256,7 +256,7 @@ Docker image and smoke-tests the running container.
 ruff check . && ruff format --check .      # lint and formatting
 ```
 
-v1.4.0 statement coverage is **73%** (2,482 of 3,421 statements). Phase 6 candidate statement coverage was **72%** (2,269 of 3,166 statements). Baseline statement coverage was **71%** for `shms` and `evaluation` together (2,154 of 3,043 statements). Reproduce on the review base with `pytest --cov=shms --cov=evaluation` after installing pytest-cov. [Coverage by module](evaluation/results/phase6_baseline_coverage/statements.md).
+v1.4.0 statement coverage is **72%** (2,480 of 3,421 statements on a fresh clone; 2,482 on the development machine). Phase 6 candidate statement coverage was **72%** (2,269 of 3,166 statements). Baseline statement coverage was **71%** for `shms` and `evaluation` together (2,154 of 3,043 statements). Reproduce on the review base with `pytest --cov=shms --cov=evaluation` after installing pytest-cov. [Coverage by module](evaluation/results/phase6_baseline_coverage/statements.md).
 
 ## Evaluation
 

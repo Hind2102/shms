@@ -1319,4 +1319,6 @@ pairs reach 6 or more similar reports and therefore likelihood 5. This reflects 
 synthetic data. It is not a finding about a real site.
 
 **Checks.** `pytest`: 371 passed. `ruff check .` and `ruff format --check .` are clean. Statement coverage
-(`pytest --cov=shms --cov=evaluation`) is 73 % (2,482 of 3,421).
+(`pytest --cov=shms --cov=evaluation`) is 72 % on a fresh clone of the branch with Python 3.12 (2,480 of 3,421;
+2,482 on the development machine). The fresh clone ran 371 tests, all passed, with ruff clean. The Docker smoke test passed: healthy,
+401 without a token, dashboard and `/metrics` with a token, non-root user, no tracebacks.
