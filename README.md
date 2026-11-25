@@ -122,10 +122,22 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_EXPERIMENTAL_CONDITIONS` | `0` | `1` enables the EXPERIMENTAL unsafe-condition check (liquid on the floor, obstructed walkway; needs Ollama) |
 | `SHMS_DEMO_HEADER_AUTH` | `0` | `1` lets the API accept an `X-User-Id` header instead of a token – tests and local scripts only |
 
-The risk-matrix page separates what follows the ADOSH-SF guideline (the 5 × 5 consequence × likelihood structure)
-from what this project defined (level wording, bands, deadlines, and the history-based likelihood, which is a
-**project heuristic**, not a validated likelihood). Risk-matrix definitions, bands and target close-out times are in `shms/config/risk_matrix.json`; hazard
-categories are in `shms/config/taxonomy.json`. Both can be changed without code changes.
+The risk matrix follows the **ADOSH-SF Technical Guideline "Process of Risk Management", version 4.0 (15 July 2024)**:
+consequence levels and definitions from Table 1 (human health and safety; production loss and cost shown as guidance),
+likelihood levels from Table 2, and the Table 3 grid with its band names (Low 1–3, Moderate 4–6, High 8–12, Extreme
+15–25; score 5 is Moderate, 9 and 10 High and 16 Extreme, read from the table's cell colours) and action texts. The
+`/matrix` page separates this from what the project defined: the history-based likelihood (similar hazards in the
+same area in the last 365 days: 0 → 1, 1 → 2, 2 → 3, 3–5 → 4, ≥ 6 → 5 – a **project heuristic**, not a validated
+likelihood), the close-out targets (the guideline sets no time frames) and the alert rule (High/Extreme, or
+consequence ≥ 4 in any band, after Sec. 5(b)). Closures record the control type from the hierarchy of controls
+(Sec. 5.3.4(c)) and the residual risk (Appendix 2). Source, page numbers and the PDF's SHA-256:
+[docs/risk_matrix_source.md](docs/risk_matrix_source.md). Values are in `shms/config/risk_matrix.json`; hazard
+categories are in `shms/config/taxonomy.json`.
+
+**Upgrading an existing database:** `alembic upgrade head` (back up the `.db` file first). Migration `0008_adosh_v4`
+adds the closure fields and re-scores every confirmed hazard to the v4.0 matrix, writing an audit event
+"risk re-scored to ADOSH-SF v4.0 matrix" with old → new values; existing closures keep the control type and residual
+risk empty ("not recorded").
 
 ## Usage
 
@@ -157,8 +169,9 @@ Main workflow:
    computed from the area's history and the risk level and target close date are shown. Tick *I already fixed it
    on the spot* to record the action taken and a closing photo.
 3. **Plan, close, verify** – the hazard goes to the Area Owner (e.g. *Khalid* for Digestion); High and Extreme
-   hazards alert the safety supervisor (*Sara*). The owner plans an action (action owner + deadline) and closes it
-   with what was done. A closure is final only after **verification** by the supervisor or the reporter – never
+   hazards, and any hazard with consequence 4 or 5, alert the safety supervisor (*Sara*); the alert says why. The owner
+   plans an action (action owner + deadline) and closes it with what was done, the type of control (elimination …
+   PPE) and the residual consequence. A closure is final only after **verification** by the supervisor or the reporter – never
    by the person who closed it; they can also **reject** it (back to open, reason required). A verified hazard can
    be **reopened** with a reason. Every status change is a rule in `services.ALLOWED_TRANSITIONS` and is kept in
    the audit trail with from/to status, who and when.
@@ -229,10 +242,10 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-The 316-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
-GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix, the
+The 371-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
+GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix against the ADOSH-SF Table 3 grid, the alert rules, the hierarchy-of-controls and residual-risk closure fields, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
-upgraded with identical rows), every state-machine transition and every action from every wrong state, permissions
+upgraded with identical rows, and the v4.0 re-scoring with its audit events), every state-machine transition and every action from every wrong state, permissions
 per role, sign-in, CSRF, API tokens, upload checks, escalation and the test mail outbox, the role home pages and plan
 view, the HTTP API end-to-end, the detectors (Ollama mocked at HTTP level), the metric functions against
 hand-computed values, the evaluation pipeline on miniature fake datasets, and the experimental feature flag.
@@ -243,7 +256,7 @@ Docker image and smoke-tests the running container.
 ruff check . && ruff format --check .      # lint and formatting
 ```
 
-Phase 6 candidate statement coverage was **72%** (2,269 of 3,166 statements). Baseline statement coverage was **71%** for `shms` and `evaluation` together (2,154 of 3,043 statements). Reproduce on the review base with `pytest --cov=shms --cov=evaluation` after installing pytest-cov. [Coverage by module](evaluation/results/phase6_baseline_coverage/statements.md).
+v1.4.0 statement coverage is **73%** (2,482 of 3,421 statements). Phase 6 candidate statement coverage was **72%** (2,269 of 3,166 statements). Baseline statement coverage was **71%** for `shms` and `evaluation` together (2,154 of 3,043 statements). Reproduce on the review base with `pytest --cov=shms --cov=evaluation` after installing pytest-cov. [Coverage by module](evaluation/results/phase6_baseline_coverage/statements.md).
 
 ## Evaluation
 
@@ -399,10 +412,11 @@ cause unknown** (details in `docs/verification.md`).
 
 | Status | What |
 |---|---|
-| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the 5 × 5 matrix; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
+| **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the ADOSH-SF v4.0 5 × 5 matrix, alerts for High/Extreme or consequence ≥ 4, control type (hierarchy of controls) and residual risk at closure; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
 | **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic warehouse benchmark and a small positive-only external liquid check; flag off by default); the vision-language model as a PPE detector |
-| **Planned / not done** | confirmation of the risk bands against the ADOSH-SF guideline text; single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
+| **Human checks done** | SH17 label audit by the author personally (commit `4693bc8`; single reviewer, not a multi-annotator study); realism review of the synthesized data and site layout by a refinery safety supervisor, November 2026; risk matrix checked against the ADOSH-SF v4.0 PDF ([source](docs/risk_matrix_source.md)) |
+| **Planned / not done** | single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
 
 ## Data, privacy and limitations
 
