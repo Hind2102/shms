@@ -58,7 +58,8 @@
         <br><span class="muted small">Also as guidance – production: {{ spec.production_loss }} Cost: {{ spec.cost }}</span></span></label>
   {% endfor %}
   </fieldset>
-  <p class="muted small">Likelihood (ADOSH-SF Table 2) is estimated automatically from similar hazards reported in {{ h.area.name }} over the last {{ risk.lookback_days() }} days (a project rule). Consequence 4 or 5 always alerts the safety supervisor. <a href="/matrix" target="_blank">See the risk matrix</a>.</p>
+  <p class="muted small"><abbr title="{{ risk.LIKELIHOOD_NOTE }}">Likelihood</abbr> is set by the system, not by you.
+    <span class="likelihood-note">{{ risk.LIKELIHOOD_NOTE }}</span> Consequence 4 or 5 always alerts the safety supervisor. <a href="/matrix" target="_blank">See the risk matrix</a>.</p>
 
   <label for="desc">What did you see? (optional)</label>
   <textarea id="desc" name="description" placeholder="e.g. liquid pooled across the walkway beside the digestion pump"></textarea>

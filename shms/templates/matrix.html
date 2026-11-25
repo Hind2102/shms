@@ -31,6 +31,7 @@
       <table>{% for k, v in risk.consequence_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}<br><span class="muted">Production: {{ v.production_loss }} Cost: {{ v.cost }}</span></td></tr>{% endfor %}</table></div>
     <div><h3>Likelihood – Table 2 (Sec. 5.3.2, p. 10)</h3>
       <table>{% for k, v in risk.likelihood_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}</td></tr>{% endfor %}</table>
+      <p class="small likelihood-note"><strong>{{ risk.LIKELIHOOD_NOTE }}</strong></p>
       <h3>Hierarchy of controls – Sec. 5.3.4(c), p. 11</h3>
       <ol class="small">{% for c in risk.control_types().values() %}<li>{{ c.guideline }}</li>{% endfor %}</ol>
       <p class="small muted">Residual risk is recorded at closure, as in the example risk assessment form (Appendix 2, p. 17).</p></div>
@@ -41,7 +42,8 @@
   <h2>Defined by this project</h2>
   <div class="cols">
     <div><h3>Likelihood from the area's history – a project heuristic</h3>
-      <p class="small"><strong>A project heuristic, not a validated likelihood.</strong> The system sets the likelihood from the
+      <p class="small likelihood-note"><strong>{{ risk.LIKELIHOOD_NOTE }}</strong></p>
+      <p class="small">It is not a validated likelihood. The system sets the likelihood from the
         number of confirmed hazards of the same type in the same area in the last {{ risk.lookback_days() }} days. It does not know
         about exposure time, controls in place or reporting habits, and it has not been compared with incident data.</p>
       <table>{% for k, v in risk.likelihood_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.history_rule }}</td></tr>{% endfor %}</table></div>
