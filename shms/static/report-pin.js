@@ -10,15 +10,27 @@
   const clear = document.querySelector('#clear-pin');
   const picker = document.querySelector('#pin-picker');
 
+  let polygon = [];
+  function inside(px, py) {  // point in polygon, outline counts as inside (same rule as the server)
+    let hit = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const [x1, y1] = polygon[i], [x2, y2] = polygon[j];
+      const onEdge = (px - x1) * (y2 - y1) === (py - y1) * (x2 - x1) &&
+        Math.min(x1, x2) <= px && px <= Math.max(x1, x2) && Math.min(y1, y2) <= py && py <= Math.max(y1, y2);
+      if (onEdge) return true;
+      if ((y1 > py) !== (y2 > py) && px < x1 + (py - y1) * (x2 - x1) / (y2 - y1)) hit = !hit;
+    }
+    return hit;
+  }
   function updatePoint() {
     x.required = y.value !== '';
     y.required = x.value !== '';
-    const valid = x.value !== '' && y.value !== '' && x.validity.valid && y.validity.valid;
+    const valid = x.value !== '' && y.value !== '' && x.validity.valid && y.validity.valid && inside(x.valueAsNumber, y.valueAsNumber);
     marker.style.display = valid ? '' : 'none';
     if (valid) marker.setAttribute('transform', `translate(${x.valueAsNumber} ${y.valueAsNumber})`);
     clear.disabled = x.value === '' && y.value === '';
     status.textContent = valid ? `Pin at X ${x.value}, Y ${y.value}.` :
-      `X ${x.min}–${x.max}, Y ${y.min}–${y.max} in this unit.`;
+      `X ${x.min}–${x.max}, Y ${y.min}–${y.max} inside the outlined zone.`;
   }
   function updateArea() {
     const unit = area.selectedOptions[0]?.dataset;
@@ -29,10 +41,10 @@
     x.max = left + w;
     y.min = top;
     y.max = top + h;
-    map.setAttribute('viewBox', `${left - 5} ${top - 5} ${w + 10} ${h + 10}`);
-    for (const [attr, value] of Object.entries({x: left, y: top, width: w, height: h})) {
-      bounds.setAttribute(attr, value);
-    }
+    const pad = Math.max(20, Math.round(Math.max(w, h) * 0.06));
+    map.setAttribute('viewBox', `${left - pad} ${top - pad} ${w + 2 * pad} ${h + 2 * pad}`);
+    polygon = unit.points.split(' ').map(p => p.split(',').map(Number));
+    bounds.setAttribute('points', unit.points);
     updatePoint();
   }
   function clearPoint() {
@@ -50,8 +62,8 @@
     event.preventDefault();
     const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(map.getScreenCTM().inverse());
     const px = Math.round(p.x), py = Math.round(p.y);
-    if (px < Number(x.min) || px > Number(x.max) || py < Number(y.min) || py > Number(y.max)) {
-      status.textContent = 'Choose a point inside the outlined unit.';
+    if (!inside(px, py)) {
+      status.textContent = 'Choose a point inside the outlined zone.';
       return;
     }
     x.value = px;

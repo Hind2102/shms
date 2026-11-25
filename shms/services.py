@@ -23,7 +23,7 @@ from . import risk, taxonomy
 from .detection import DetectorResult
 from .models import Area, Hazard, HazardEvent, Role, Status, User, utcnow
 from .photo_metadata import PhotoCapture
-from .site_layout import UNITS
+from .site_layout import REPORTING
 
 # The safety workflow as a state machine. Every status change goes through _move(), which checks this table and
 # writes an audit event with the from/to status.
@@ -152,8 +152,8 @@ def validate_pin(area: Area, x: int | None, y: int | None) -> None:
         return
     if type(x) is not int or type(y) is not int:
         raise WorkflowError("Enter both map coordinates as whole numbers, or clear both to report by area.")
-    unit = next((u for u in UNITS if u.reporting and u.code == area.code), None)
-    if unit is None or not (unit.x <= x <= unit.x + unit.w and unit.y <= y <= unit.y + unit.h):
+    zone = REPORTING.get(area.code)
+    if zone is None or not zone.contains(x, y):
         raise WorkflowError(f"Choose a point inside {area.name} or clear the pin.")
 
 
@@ -709,6 +709,9 @@ OVERLAYS = ("open_risk", "overdue", "reports")
 WINDOWS = (30, 90, 180)
 
 
+PIN_CLUSTER_RADIUS = 48  # map units on the 1920-wide concept map (was 30 on the 1200-wide plan)
+
+
 def _pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
     """Group nearby active cases within a unit. The highest-risk member anchors and colours each marker."""
     pinned = (h for h in pool if h.status in ACTIVE and h.x is not None and h.y is not None)
@@ -716,7 +719,10 @@ def _pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
     for hazard in sorted(pinned, key=lambda h: (-(h.risk_score or 0), h.id)):
         for group in groups:
             anchor = group[0]
-            if hazard.area_id == anchor.area_id and (hazard.x - anchor.x) ** 2 + (hazard.y - anchor.y) ** 2 <= 30**2:
+            if (
+                hazard.area_id == anchor.area_id
+                and (hazard.x - anchor.x) ** 2 + (hazard.y - anchor.y) ** 2 <= PIN_CLUSTER_RADIUS**2
+            ):
                 group.append(hazard)
                 break
         else:

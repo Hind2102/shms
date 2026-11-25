@@ -47,6 +47,8 @@ INSERT INTO notifications VALUES (1,3,1,'High risk',0,'2026-11-01 08:00:00');
 TABLES = ("users", "areas", "hazards", "hazard_events", "notifications")
 # Migration 0008 adds one audit event per re-scored hazard by design; every row that existed before is kept.
 NOT_RESCORE = "kind != 'risk_rescored'"
+# Migration 0009 adds the six new zones of the approved concept map by design; every area that existed is kept.
+NOT_NEW_ZONE = "code NOT IN ('EVP','HYD','ALS','LIM','WKS','WTR')"
 
 
 def _old_db(path) -> str:
@@ -62,7 +64,10 @@ def _snapshot(url: str) -> dict:
     with eng.connect() as c:
         counts = {
             t: c.execute(
-                sa.text(f"SELECT count(*) FROM {t}" + (f" WHERE {NOT_RESCORE}" if t == "hazard_events" else ""))
+                sa.text(
+                    f"SELECT count(*) FROM {t}"
+                    + {"hazard_events": f" WHERE {NOT_RESCORE}", "areas": f" WHERE {NOT_NEW_ZONE}"}.get(t, "")
+                )
             ).scalar()
             for t in TABLES
         }

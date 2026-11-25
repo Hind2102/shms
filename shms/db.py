@@ -72,9 +72,10 @@ def schema_status(engine: Engine) -> str:
     return "current" if current == head_revision() else "outdated"
 
 
-def migrate_to_head(url: str) -> None:
+def migrate_to_head(url: str, revision: str = "head") -> None:
     """Apply all migrations (same as `alembic upgrade head`) using a private engine, so the
-    foreign-key switch that SQLite migrations need never leaks into the application's connections."""
+    foreign-key switch that SQLite migrations need never leaks into the application's connections.
+    ``revision`` stops at an earlier migration (tests of a single migration)."""
     from alembic import command
 
     engine = create_engine(url)
@@ -82,7 +83,7 @@ def migrate_to_head(url: str) -> None:
     try:
         with engine.begin() as conn:
             cfg.attributes["connection"] = conn
-            command.upgrade(cfg, "head")
+            command.upgrade(cfg, revision)
     finally:
         engine.dispose()
 

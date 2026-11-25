@@ -23,7 +23,7 @@ from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo, sto
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
-templates.env.globals.update(taxonomy=taxonomy, risk=risk, Status=Status, Role=Role)
+templates.env.globals.update(taxonomy=taxonomy, risk=risk, Status=Status, Role=Role, site_layout=site_layout)
 templates.env.filters["cat"] = lambda code: taxonomy.get(code).name if code else "Not classified"
 templates.env.filters["ppe"] = lambda code: taxonomy.get(code).ppe
 templates.env.filters["dt"] = lambda d: d.strftime("%d %b %Y %H:%M") if d else ""
@@ -153,7 +153,7 @@ def site_plan(
     window_days = next((days for days in services.WINDOWS if str(days) == window), 90)
     view = services.site_overview(db, overlay=overlay, window_days=window_days, min_level=level or None)
 
-    selected = next((u for u in site_layout.UNITS if u.code == unit and u.reporting), None)
+    selected = site_layout.REPORTING.get(unit)
     area = db.scalar(select(Area).where(Area.code == unit)) if selected else None
     detail = services.area_overview(db, area) if area else None
     if detail:
@@ -170,8 +170,7 @@ def site_plan(
         db,
         v=view,
         windows=services.WINDOWS,
-        units=site_layout.UNITS,
-        edges=site_layout.walkway_edges(),
+        zones=site_layout.REPORTING,
         rows={a["code"]: a for a in view["areas"]},
         detail=detail,
         route_requested=route == "1",
@@ -223,16 +222,13 @@ def matrix(request: Request, user: User = Depends(page_user), db: Session = Depe
 
 
 def _report_form(request: Request, user: User, db: Session, idem_key: str, **fields) -> HTMLResponse:
-    from ..site_layout import UNITS
-
     return render(
         request,
         "report.html",
         user,
         db,
         areas=list(db.scalars(select(Area).order_by(Area.name))),
-        units=UNITS,
-        bounds={u.code: u for u in UNITS if u.reporting},
+        bounds=site_layout.REPORTING,
         idem_key=idem_key,
         **fields,
     )

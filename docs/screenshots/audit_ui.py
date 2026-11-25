@@ -96,8 +96,6 @@ def check_map(audit: Audit, base_url: str) -> None:
         page.goto(f"{base_url}/site?overlay={overlay}&window=90")
         if overlay == "open_risk":
             expect(page.locator(".case-pin").first).to_be_visible()
-        if overlay == "reports":
-            page.locator("#show-flow").check()
         audit.check(f"site_{overlay}", capture=True, full_page=True)
     svg = page.locator("#plan")
     original = svg.get_attribute("viewBox")
@@ -109,13 +107,16 @@ def check_map(audit: Audit, base_url: str) -> None:
     assert svg.get_attribute("viewBox") != zoomed
     svg.press("Home")
     expect(svg).to_have_attribute("viewBox", original)
-    page.locator("#show-flow").check()
-    expect(page.locator("#process-flow")).to_be_visible()
     page.goto(f"{base_url}/site?unit=DIG")
     page.locator("#unit-detail").evaluate("el => el.scrollIntoView({block: 'start'})")
+    expect(page.locator("#unit-detail")).to_contain_text("Required PPE")
     audit.check("site_detail", capture=True)
-    page.goto(f"{base_url}/site?unit=BXH&route=1")
-    expect(page.locator("#route-status")).to_contain_text("Walkway route")
+    # The suggested route avoids zones with active High/Extreme cases, so pick the first zone that has one today.
+    for code in ["WKS", "ALS", "HYD", "LIM", "TNK", "CAL", "EVP", "PWR", "GRD", "BXH"]:
+        page.goto(f"{base_url}/site?unit={code}&route=1")
+        if page.locator("#walk-route").count():
+            break
+    expect(page.locator("#route-status")).to_contain_text("Suggested route")
     expect(page.locator("#walk-route")).to_be_visible()
     audit.check("site_route", capture=True, full_page=True)
 
@@ -128,8 +129,8 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     page.locator("#pin-picker summary").click()
     page.locator("#report-map").click()
     expect(page.locator("#picked-point")).to_be_visible()
-    page.locator("#pin-x").fill("530")
-    page.locator("#pin-y").fill("175")
+    page.locator("#pin-x").fill("282")  # inside the Digestion zone of the concept map
+    page.locator("#pin-y").fill("571")
     page.locator("#pin-y").press("Tab")
     page.locator("#pin-picker").scroll_into_view_if_needed()
     audit.check("report_pin", capture=True, full_page=True)

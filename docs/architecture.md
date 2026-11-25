@@ -57,6 +57,7 @@ flowchart LR
 | `web/pages.py`, `templates/` | HTML pages; no business rules | HTTP form posts → service calls |
 | `web/api.py` | JSON API for scripts and tests | `POST /api/hazards`, `/confirm`, `/close`, `GET /api/dashboard`, `POST /api/detect` |
 | `services.py` | Workflow (draft, open, planned, pending verification, closed; reject and reopen), permissions, routing to Area Owner, alerts, dashboard figures | Plain Python functions taking a DB session |
+| `site_layout.py` | Zones (polygons) and road network read from the approved concept map `static/ata_concept_map.svg`; point-in-polygon pin check; suggested route from the south gate avoiding roads beside zones with active High/Extreme hazards | Pure functions over the SVG; see [site_layout.md](site_layout.md) |
 | `risk.py` | Consequence × likelihood scoring on the ADOSH-SF v4.0 matrix (Tables 1–3); likelihood from area history; alert reason (High/Extreme band or consequence ≥ 4); hierarchy of controls | Pure functions; definitions in `config/risk_matrix.json`, source in [risk_matrix_source.md](risk_matrix_source.md) |
 | `taxonomy.py` | Hazard categories; marks the AI-evaluated subset | `config/taxonomy.json` |
 | `detection/` | `HazardDetector.detect(photo) → DetectorResult` (suggestions, boxes, latency, error) | YOLO, Ollama and mock implementations are interchangeable via `SHMS_DETECTOR` |

@@ -40,6 +40,8 @@ addopts = "-q"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# The approved site-map generator is kept as the owner wrote it (only the output path was added).
+extend-exclude = ["scripts/site_plan/make_map5.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]

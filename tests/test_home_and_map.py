@@ -135,7 +135,7 @@ def test_plan_view_page_is_labelled_illustrative_and_explains_the_overlay(client
     login(client, MANAGER)
     for overlay in ("open_risk", "overdue", "reports"):
         page = _visible(client.get(f"/site?overlay={overlay}&window=30").text)
-        assert "Illustrative layout – not an actual site plan" in page
+        assert "Concept layout only" in page and "require a verified site plot plan" in page  # v1.5.0 map note
         assert "Calculation:" in page
         assert not re.search(r"\bsafe\b", page, re.I)
 

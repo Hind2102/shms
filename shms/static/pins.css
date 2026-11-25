@@ -4,7 +4,7 @@
 #report-map[hidden], #clear-pin[hidden], #pin-picker[hidden] { display: none; }
 .pin-fields { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; margin: .75rem 0; }
 .pin-fields input { width: 6.5rem; max-width: 100%; }
-.case-pin text { font: bold 13px system-ui, sans-serif; pointer-events: none; }
+.case-pin text { font: bold 18px system-ui, sans-serif; pointer-events: none; }
 .case-pin:focus-visible circle { stroke: #152d40; stroke-width: 5px; }
 .pin-index p { margin: .35rem 0; }
 .pin-index ul { padding-inline-start: 1.25rem; }
