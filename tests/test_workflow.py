@@ -7,6 +7,7 @@ from shms import services
 from shms.detection.base import DetectorResult, Suggestion
 from shms.models import Area, Notification, Role, Status, User, utcnow
 from shms.services import Confirmation, PermissionDenied, WorkflowError
+from tests.conftest import CLOSE
 
 
 def users(db):
@@ -39,7 +40,7 @@ def test_confirmed_report_is_routed_to_area_owner(empty_db):
 
 def test_fixed_on_spot_records_how_and_awaits_verification(empty_db):
     # Requirement change (workflow v2): a closure is only final after independent verification.
-    h = report(empty_db, fixed_on_spot=True, closure_action="Issued hard hat")
+    h = report(empty_db, fixed_on_spot=True, closure_action="Issued hard hat", **CLOSE)
     assert h.status == Status.PENDING_VERIFICATION and h.closed_on_spot
     assert h.closure_action == "Issued hard hat" and h.closed_at is not None
 
@@ -67,7 +68,7 @@ def test_likelihood_grows_with_similar_history(empty_db):
     for d in range(9, 4, -1):  # five more in the window
         report(empty_db, code="no_eye_protection", at=now - timedelta(days=d))
     latest = report(empty_db, code="no_eye_protection", at=now)
-    assert latest.likelihood == 4  # 6 similar hazards -> Likely
+    assert latest.likelihood == 5  # 6 similar hazards in 365 days -> Frequent (project mapping of ADOSH-SF Table 2)
     other = report(empty_db, code="no_gloves", at=now)
     assert other.likelihood == 1  # different category -> not similar
 
@@ -75,16 +76,16 @@ def test_likelihood_grows_with_similar_history(empty_db):
 def test_history_outside_lookback_is_ignored(empty_db):
     now = utcnow()
     for _ in range(5):
-        report(empty_db, code="no_hi_vis_vest", at=now - timedelta(days=200))
+        report(empty_db, code="no_hi_vis_vest", at=now - timedelta(days=400))  # look-back is 365 days
     assert report(empty_db, code="no_hi_vis_vest", at=now).likelihood == 1
 
 
 def test_high_risk_alerts_supervisor_and_owner(empty_db):
-    h = report(empty_db, code="no_eye_protection", consequence=5)  # 5 x 1 = 5 Medium -> no alert
+    # Consequence 5 now always alerts (high-consequence rule), so this test uses consequence 3.
+    report(empty_db, code="no_eye_protection", consequence=3)  # 3 x 1 = 3 Low -> no alert
+    report(empty_db, code="no_eye_protection", consequence=3)  # 1 similar -> L2 -> 6 Moderate -> no alert
     assert empty_db.scalars(select(Notification)).all() == []
-    for _ in range(3):
-        report(empty_db, code="no_eye_protection", consequence=5)
-    h = report(empty_db, code="no_eye_protection", consequence=5)  # 4 similar -> L3 -> 15 High
+    h = report(empty_db, code="no_eye_protection", consequence=3)  # 2 similar -> L3 -> 9 High (Table 3 colour)
     assert h.risk_level == "High"
     notified = {n.user_id for n in empty_db.scalars(select(Notification).where(Notification.hazard_id == h.id))}
     roles = users(empty_db)
@@ -96,7 +97,7 @@ def test_owner_closes_with_documented_action(empty_db):
     h = report(empty_db)
     owner = empty_db.get(User, h.area.owner_id)
     services.plan_action(empty_db, h, owner, "Toolbox talk on Monday")
-    services.close(empty_db, h, owner, "Hard hat issued; crew briefed")
+    services.close(empty_db, h, owner, "Hard hat issued; crew briefed", **CLOSE)
     assert h.status == Status.PENDING_VERIFICATION and h.closed_by_id == owner.id
     assert [e.kind for e in h.events][-2:] == ["planned", "closed"]
 
@@ -104,25 +105,25 @@ def test_owner_closes_with_documented_action(empty_db):
 def test_close_requires_action_text(empty_db):
     h = report(empty_db)
     with pytest.raises(WorkflowError):
-        services.close(empty_db, h, empty_db.get(User, h.area.owner_id), "")
+        services.close(empty_db, h, empty_db.get(User, h.area.owner_id), "", **CLOSE)
 
 
 def test_only_owner_or_supervisor_can_close(empty_db):
     h = report(empty_db)
     roles = users(empty_db)
     with pytest.raises(PermissionDenied):
-        services.close(empty_db, h, roles[Role.REPORTER][0], "done")
+        services.close(empty_db, h, roles[Role.REPORTER][0], "done", **CLOSE)
     other_owner = next(u for u in roles[Role.AREA_OWNER] if u.id != h.area.owner_id)
     with pytest.raises(PermissionDenied):
-        services.close(empty_db, h, other_owner, "done")
-    services.close(empty_db, h, roles[Role.SUPERVISOR][0], "done by supervisor")
+        services.close(empty_db, h, other_owner, "done", **CLOSE)
+    services.close(empty_db, h, roles[Role.SUPERVISOR][0], "done by supervisor", **CLOSE)
     assert h.status == Status.PENDING_VERIFICATION
 
 
 def test_closed_hazard_cannot_be_closed_again(empty_db):
-    h = report(empty_db, fixed_on_spot=True, closure_action="fixed")
+    h = report(empty_db, fixed_on_spot=True, closure_action="fixed", **CLOSE)
     with pytest.raises(WorkflowError):
-        services.close(empty_db, h, users(empty_db)[Role.SUPERVISOR][0], "again")
+        services.close(empty_db, h, users(empty_db)[Role.SUPERVISOR][0], "again", **CLOSE)
 
 
 def test_only_reporter_confirms(empty_db):

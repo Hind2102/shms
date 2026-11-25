@@ -1,47 +1,58 @@
 {% extends "base.html" %}
 {% block title %}Risk matrix{% endblock %}
 {% block content %}
+{% set g = risk.guideline() %}
 <h1>Risk matrix</h1>
+<p class="muted">Risk = consequence × likelihood, rated on the 5 × 5 matrix of the <strong>{{ g.name }}</strong>, version {{ g.version }}
+  ({{ g.date }}), Abu Dhabi Public Health Centre. The guideline itself says its contents are not mandatory (Sec. 1(a)).</p>
 
 <section class="panel source official">
-  <h2>From the ADOSH-SF guideline</h2>
-  <p>The structure follows the Abu Dhabi Occupational Safety and Health System Framework (ADOSH-SF) Risk Management
-    Technical Guideline: risk is rated as <strong>consequence × likelihood</strong> on a 5 × 5 matrix, every level has a
-    written definition, and the required response depends on the resulting risk level.</p>
-  <p class="small muted">The level wording, score bands and close-out deadlines below are this project's own choices.
-    They have not yet been checked line by line against the official guideline text; that check is an open action for the
-    project owner.</p>
+  <h2>From the ADOSH-SF guideline (v{{ g.version }})</h2>
+  <h3>Risk rating – Table 3 (Sec. 5.3.3, p. 10)</h3>
+  <div class="table-scroll" role="region" aria-label="Risk rating: likelihood by consequence" tabindex="0">
+    <table class="matrix">
+      <tr><th>Likelihood (Table 2) \ Consequence (Table 1)</th>{% for c, spec in risk.consequence_levels().items() %}<th style="text-align:center">{{ spec.name }} ({{ c }})</th>{% endfor %}</tr>
+      {% for row in table %}
+      <tr><th>{{ risk.likelihood_levels()[row[0].likelihood].name }} ({{ row[0].likelihood }})</th>
+        {% for cell in row %}<td style="background:{{ cell.color }};color:#1d1d1d">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+  </div>
+  <table>
+    <tr><th>Score (as printed)</th><th>Rating</th><th>Guideline action</th></tr>
+    {% for b in risk.bands() | reverse %}<tr><td>{{ b.guideline_range }}</td><td><span class="lvl {{ b.level }}">{{ b.level }} Risk</span></td><td class="small">{{ b.action }}</td></tr>{% endfor %}
+  </table>
+  <p class="small muted">Scores 5, 9, 10 and 16 fall between the printed ranges; their rating is taken from the cell colours of Table 3
+    (5 Moderate, 9 and 10 High, 16 Extreme). Scores 7, 11, 13 and 14 cannot occur.</p>
+
+  <div class="cols">
+    <div><h3>Consequence – Table 1 (Sec. 5.3.1, p. 9)</h3>
+      <p class="small muted">The reporter chooses the level. Human health and safety is the main definition; production loss and cost are shown as extra guidance.</p>
+      <table>{% for k, v in risk.consequence_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}<br><span class="muted">Production: {{ v.production_loss }} Cost: {{ v.cost }}</span></td></tr>{% endfor %}</table></div>
+    <div><h3>Likelihood – Table 2 (Sec. 5.3.2, p. 10)</h3>
+      <table>{% for k, v in risk.likelihood_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}</td></tr>{% endfor %}</table>
+      <h3>Hierarchy of controls – Sec. 5.3.4(c), p. 11</h3>
+      <ol class="small">{% for c in risk.control_types().values() %}<li>{{ c.guideline }}</li>{% endfor %}</ol>
+      <p class="small muted">Residual risk is recorded at closure, as in the example risk assessment form (Appendix 2, p. 17).</p></div>
+  </div>
 </section>
 
 <section class="panel source project">
   <h2>Defined by this project</h2>
   <div class="cols">
-    <div class="table-scroll" role="region" aria-label="Consequence by likelihood scores" tabindex="0">
-      <table class="matrix">
-        <tr><th></th>{% for lk, spec in risk.likelihood_levels().items() %}<th style="text-align:center">L{{ lk }}<br>{{ spec.name }}</th>{% endfor %}</tr>
-        {% for row in table %}
-        <tr><th>C{{ row[0].consequence }} {{ risk.consequence_levels()[row[0].consequence].name }}</th>
-          {% for cell in row %}<td style="background:{{ cell.color }}{% if cell.level in ('Medium', 'High') %};color:#221a00{% endif %}">{{ cell.score }}<br><span style="font-weight:400;font-size:11px">{{ cell.level }}</span></td>{% endfor %}</tr>
-        {% endfor %}
-      </table>
-    </div>
-    <div>
-      <h3>Score bands, response and target close-out</h3>
-      <table>{% for b in risk.bands() %}<tr><td><span class="lvl {{ b.level }}">{{ b.level }}</span><br><span class="small muted">score {{ b.min }}–{{ b.max }}</span></td><td class="small">{{ b.action }}<br><span class="muted">Target: {{ b.target_days }} day{{ '' if b.target_days == 1 else 's' }}</span></td></tr>{% endfor %}</table>
-    </div>
+    <div><h3>Likelihood from the area's history – a project heuristic</h3>
+      <p class="small"><strong>A project heuristic, not a validated likelihood.</strong> The system sets the likelihood from the
+        number of confirmed hazards of the same type in the same area in the last {{ risk.lookback_days() }} days. It does not know
+        about exposure time, controls in place or reporting habits, and it has not been compared with incident data.</p>
+      <table>{% for k, v in risk.likelihood_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.history_rule }}</td></tr>{% endfor %}</table></div>
+    <div><h3>Target close-out times</h3>
+      <p class="small">The guideline asks for an action plan with a time frame (Sec. 5.3.4(f)) but sets no time frames. These targets are this project's choice:</p>
+      <table>{% for b in risk.bands() %}<tr><td><span class="lvl {{ b.level }}">{{ b.level }}</span></td><td class="small">{{ b.target_days }} day{{ '' if b.target_days == 1 else 's' }}</td></tr>{% endfor %}</table>
+      <h3>Alerts</h3>
+      <p class="small">High and Extreme hazards alert the safety supervisors and the Area Owner. A hazard with consequence
+        {{ risk.high_consequence_min() }} or 5 also alerts them when its score is Low or Moderate, because the guideline asks for particular
+        attention to risks with a very low likelihood but major consequences (Sec. 5(b), p. 5); the threshold of {{ risk.high_consequence_min() }} is the project's reading.</p></div>
   </div>
-
-  <div class="cols">
-    <div><h3>Consequence levels – chosen by the reporter</h3>
-      <p class="small muted">Wording written for an alumina refinery by this project.</p>
-      <table>{% for k, v in risk.consequence_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}</td></tr>{% endfor %}</table></div>
-    <div><h3>Likelihood levels – estimated by the system</h3>
-      <p class="small"><strong>A project heuristic, not a validated likelihood.</strong> Likelihood is set from how many
-        hazards of the same type were reported in the same area in the last {{ risk.lookback_days() }} days. More reports
-        raise it; it does not know about exposure time, controls in place or reporting habits, and it has not been compared
-        with incident data.</p>
-      <table>{% for k, v in risk.likelihood_levels().items() %}<tr><td><strong>{{ k }} {{ v.name }}</strong></td><td class="small">{{ v.definition }}</td></tr>{% endfor %}</table></div>
-  </div>
-  <p class="small muted">All values are in <code>shms/config/risk_matrix.json</code> and can be changed without code changes.</p>
+  <p class="small muted">All values are in <code>shms/config/risk_matrix.json</code>; the source, page numbers and the PDF's SHA-256 are in <code>docs/risk_matrix_source.md</code>.</p>
 </section>
 {% endblock %}

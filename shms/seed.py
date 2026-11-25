@@ -100,6 +100,13 @@ ACTIONS = {
     "no_gloves": "Task paused; chemical gloves issued and task risk assessment reviewed.",
     "no_hi_vis_vest": "Worker briefed; hi-vis vest issued from the area PPE station.",
 }
+# Synthetic closures issue PPE, so their control type is PPE (the last level of the ADOSH-SF hierarchy). The residual
+# consequence is a fixed synthetic choice (two levels lower, at least 1) – demo data, not an assessment.
+SYNTHETIC_CONTROL = "ppe"
+
+
+def _residual(consequence: int) -> int:
+    return max(1, consequence - 2)
 
 
 def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta):
@@ -186,6 +193,8 @@ def _history(db, rng, areas, area_w, reporters, supervisor, times, now) -> None:
                 description=f"Synthetic report: {taxonomy.get(cat).name.lower()}.",
                 fixed_on_spot=on_spot,
                 closure_action=ACTIONS[cat] if on_spot else "",
+                control_type=SYNTHETIC_CONTROL if on_spot else None,
+                residual_consequence=_residual(cons) if on_spot else None,
             ),
             at=t,
         )
@@ -195,7 +204,15 @@ def _history(db, rng, areas, area_w, reporters, supervisor, times, now) -> None:
             age = (now - t).days
             if rng.random() < min(0.97, 0.35 + age / 60):
                 close_at = min(now, t + timedelta(days=rng.uniform(0.2, 1.6) * (h.due_at - t).days + 0.1))
-                services.close(db, h, area.owner, ACTIONS[cat], at=close_at)
+                services.close(
+                    db,
+                    h,
+                    area.owner,
+                    ACTIONS[cat],
+                    at=close_at,
+                    control_type=SYNTHETIC_CONTROL,
+                    residual_consequence=_residual(cons),
+                )
         if close_at is not None:
             # The safety supervisor verifies closures a few days later; recent ones are still waiting.
             verify_at = close_at + timedelta(days=rng.uniform(0.5, 3))

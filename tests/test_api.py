@@ -2,7 +2,7 @@
 
 import time
 
-from tests.conftest import jpeg_bytes, login
+from tests.conftest import CLOSE, jpeg_bytes, login
 
 REPORTER, OWNER_DIG, SUPERVISOR = 1, 4, 8  # ids from the deterministic seed (DIG is owned by user 4)
 
@@ -44,7 +44,7 @@ def test_full_workflow_and_dashboard_update(client):
     assert dash["kpis"]["open"] == before + 1  # visible on the dashboard straight away
     assert elapsed < 5  # success criterion: report visible in seconds, not minutes
 
-    r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(OWNER_DIG), json={"action": "Hard hat issued"})
+    r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(OWNER_DIG), json={"action": "Hard hat issued", **CLOSE})
     # Requirement change (workflow v2): the owner's closure waits for independent verification.
     assert r.status_code == 200 and r.json()["status"] == "pending_verification"
     assert [e["kind"] for e in r.json()["events"]][-1] == "closed"
@@ -76,7 +76,7 @@ def test_wrong_person_cannot_close(client):
     client.post(
         f"/api/hazards/{hz['id']}/confirm", headers=h(REPORTER), json={"category_code": "no_gloves", "consequence": 2}
     )
-    r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(REPORTER), json={"action": "x"})
+    r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(REPORTER), json={"action": "x", **CLOSE})
     assert r.status_code == 403
 
 
@@ -149,6 +149,7 @@ def test_html_report_flow(client):
             "consequence": "4",
             "fixed_on_spot": "true",
             "closure_action": "Face shield issued",
+            **CLOSE,
         },
     )
     assert r.status_code == 200 and "fixed on the spot" in r.text

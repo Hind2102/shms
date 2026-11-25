@@ -7,7 +7,7 @@ import pytest
 
 from shms import services
 from shms.models import Area, Hazard, Role, Status, User, utcnow
-from tests.conftest import login
+from tests.conftest import CLOSE, login
 from tests.test_api import OWNER_DIG, REPORTER, SUPERVISOR
 from tests.test_workflow import area, report, users
 
@@ -25,7 +25,7 @@ def test_supervisor_home_lists_verifications_urgent_items_and_escalations(empty_
     r = users(empty_db)
     sup = r[Role.SUPERVISOR][0]
     pending = report(empty_db, consequence=2)
-    services.close(empty_db, pending, empty_db.get(User, pending.area.owner_id), "Done")
+    services.close(empty_db, pending, empty_db.get(User, pending.area.owner_id), "Done", **CLOSE)
     urgent = report(empty_db, code="no_eye_protection", consequence=5)
     for _ in range(3):
         urgent = report(empty_db, code="no_eye_protection", consequence=5)
@@ -56,10 +56,12 @@ def test_manager_home_has_closure_performance_with_its_denominator(empty_db):
     sup = users(empty_db)[Role.SUPERVISOR][0]
     now = utcnow()
     on_time = report(empty_db, consequence=2, at=now - timedelta(days=20))
-    services.close(empty_db, on_time, empty_db.get(User, on_time.area.owner_id), "Done", at=now - timedelta(days=19))
+    services.close(
+        empty_db, on_time, empty_db.get(User, on_time.area.owner_id), "Done", at=now - timedelta(days=19), **CLOSE
+    )
     services.verify(empty_db, on_time, sup, "ok", at=now - timedelta(days=18))
     late = report(empty_db, consequence=2, at=now - timedelta(days=40))  # Low band: 30-day target
-    services.close(empty_db, late, empty_db.get(User, late.area.owner_id), "Done", at=now - timedelta(days=5))
+    services.close(empty_db, late, empty_db.get(User, late.area.owner_id), "Done", at=now - timedelta(days=5), **CLOSE)
     services.verify(empty_db, late, sup, "ok", at=now - timedelta(days=4))
     assert late.closed_at > late.due_at
     m = User(name="Manager", role=Role.MANAGER)
@@ -100,7 +102,7 @@ def test_overdue_overlay_counts_only_hazards_awaiting_action(empty_db):
     h.due_at = utcnow() - timedelta(days=1)
     done = report(empty_db, consequence=2)
     done.due_at = utcnow() - timedelta(days=1)
-    services.close(empty_db, done, empty_db.get(User, done.area.owner_id), "Done")
+    services.close(empty_db, done, empty_db.get(User, done.area.owner_id), "Done", **CLOSE)
     view = services.site_overview(empty_db, overlay="overdue", window_days=30)
     assert next(a for a in view["areas"] if a["code"] == "DIG")["value"] == 1
 

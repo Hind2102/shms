@@ -45,6 +45,8 @@ INSERT INTO notifications VALUES (1,3,1,'High risk',0,'2026-11-01 08:00:00');
 """
 
 TABLES = ("users", "areas", "hazards", "hazard_events", "notifications")
+# Migration 0008 adds one audit event per re-scored hazard by design; every row that existed before is kept.
+NOT_RESCORE = "kind != 'risk_rescored'"
 
 
 def _old_db(path) -> str:
@@ -58,12 +60,17 @@ def _old_db(path) -> str:
 def _snapshot(url: str) -> dict:
     eng = sa.create_engine(url)
     with eng.connect() as c:
-        counts = {t: c.execute(sa.text(f"SELECT count(*) FROM {t}")).scalar() for t in TABLES}
+        counts = {
+            t: c.execute(
+                sa.text(f"SELECT count(*) FROM {t}" + (f" WHERE {NOT_RESCORE}" if t == "hazard_events" else ""))
+            ).scalar()
+            for t in TABLES
+        }
         joins = c.execute(
             sa.text(
                 "SELECT h.id, h.status, a.code, u.name, h.closure_action, count(e.id) FROM hazards h "
                 "JOIN areas a ON a.id = h.area_id JOIN users u ON u.id = h.reporter_id "
-                "LEFT JOIN hazard_events e ON e.hazard_id = h.id GROUP BY h.id ORDER BY h.id"
+                f"LEFT JOIN hazard_events e ON e.hazard_id = h.id AND e.{NOT_RESCORE} GROUP BY h.id ORDER BY h.id"
             )
         ).all()
     eng.dispose()

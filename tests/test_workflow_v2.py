@@ -11,6 +11,7 @@ import pytest
 from shms import services
 from shms.models import Role, Status, User, utcnow
 from shms.services import PermissionDenied, WorkflowError
+from tests.conftest import CLOSE
 from tests.test_workflow import area, report, users
 
 
@@ -31,7 +32,7 @@ def _manager(db):
 
 def _closed_by_owner(db):
     h, owner, other, rep, sup = _people(db)
-    services.close(db, h, owner, "Hard hat issued")
+    services.close(db, h, owner, "Hard hat issued", **CLOSE)
     return h, owner, other, rep, sup
 
 
@@ -70,12 +71,12 @@ def test_close_goes_to_pending_verification_not_closed(empty_db):
 def test_close_from_planned_is_allowed(empty_db):
     h, owner, *_ = _people(empty_db)
     services.plan_action(empty_db, h, owner, "Toolbox talk")
-    services.close(empty_db, h, owner, "Done")
+    services.close(empty_db, h, owner, "Done", **CLOSE)
     assert h.status == Status.PENDING_VERIFICATION
 
 
 def test_fixed_on_spot_needs_verification_too(empty_db):
-    h = report(empty_db, fixed_on_spot=True, closure_action="Issued hard hat")
+    h = report(empty_db, fixed_on_spot=True, closure_action="Issued hard hat", **CLOSE)
     assert h.status == Status.PENDING_VERIFICATION and h.closed_on_spot
 
 
@@ -96,7 +97,7 @@ def test_reporter_can_verify_closure(empty_db):
 
 def test_closer_cannot_verify_own_closure(empty_db):
     h, owner, other, rep, sup = _people(empty_db)
-    services.close(empty_db, h, sup, "Supervisor fixed it")
+    services.close(empty_db, h, sup, "Supervisor fixed it", **CLOSE)
     with pytest.raises(PermissionDenied):
         services.verify(empty_db, h, sup, "self-check")
 
@@ -163,10 +164,10 @@ def test_cannot_plan_or_close_pending_or_closed(empty_db):
     with pytest.raises(WorkflowError):
         services.plan_action(empty_db, h, owner, "x")
     with pytest.raises(WorkflowError):
-        services.close(empty_db, h, owner, "again")
+        services.close(empty_db, h, owner, "again", **CLOSE)
     services.verify(empty_db, h, sup, "ok")
     with pytest.raises(WorkflowError):
-        services.close(empty_db, h, owner, "again")
+        services.close(empty_db, h, owner, "again", **CLOSE)
 
 
 def test_manager_is_read_only(empty_db):
@@ -175,7 +176,7 @@ def test_manager_is_read_only(empty_db):
     with pytest.raises(PermissionDenied):
         services.plan_action(empty_db, h, m, "x")
     with pytest.raises(PermissionDenied):
-        services.close(empty_db, h, m, "x")
+        services.close(empty_db, h, m, "x", **CLOSE)
 
 
 def test_every_transition_rule_is_declared():
@@ -194,9 +195,9 @@ def test_every_transition_rule_is_declared():
 def test_events_record_from_and_to_for_every_transition(empty_db):
     h, owner, other, rep, sup = _people(empty_db)
     services.plan_action(empty_db, h, owner, "Toolbox talk")
-    services.close(empty_db, h, owner, "Done")
+    services.close(empty_db, h, owner, "Done", **CLOSE)
     services.reject(empty_db, h, sup, "Not done")
-    services.close(empty_db, h, owner, "Done properly")
+    services.close(empty_db, h, owner, "Done properly", **CLOSE)
     services.verify(empty_db, h, rep, "ok")
     services.reopen(empty_db, h, sup, "Recurred")
     moves = [(e.kind, e.from_status, e.to_status, e.actor_id) for e in h.events if e.to_status]
@@ -214,7 +215,7 @@ def test_events_record_from_and_to_for_every_transition(empty_db):
 def test_ai_suggestion_is_preserved_through_the_lifecycle(empty_db):
     h, owner, other, rep, sup = _people(empty_db)
     before = (h.ai_model, h.ai_suggestions, h.ai_top_code, h.ai_latency_ms, h.ai_error)
-    services.close(empty_db, h, owner, "Done")
+    services.close(empty_db, h, owner, "Done", **CLOSE)
     services.verify(empty_db, h, sup, "ok")
     services.reopen(empty_db, h, rep, "again")
     assert (h.ai_model, h.ai_suggestions, h.ai_top_code, h.ai_latency_ms, h.ai_error) == before

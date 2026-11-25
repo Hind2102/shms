@@ -1,0 +1,27 @@
+{# Closure fields from ADOSH-SF v4.0: hierarchy of controls (Sec. 5.3.4(c)) and residual risk (Appendix 2).
+   Expects `h` (the hazard; its likelihood is used for the residual score) and optional `prefix` for element ids. #}
+{% set pf = prefix | default('cl') %}
+<fieldset class="radio-list"><legend>Type of control (hierarchy of controls – choose the highest that applies)</legend>
+  {% for code, c in risk.control_types().items() %}
+  <label><input type="radio" name="control_type" value="{{ code }}" {% if required_controls | default(true) %}required{% endif %}>
+    <span><strong>{{ loop.index }}. {{ c.name }}</strong><br><span class="muted small">{{ c.guideline }}</span></span></label>
+  {% endfor %}
+</fieldset>
+<label for="{{ pf }}-res">Residual consequence after the control</label>
+<select id="{{ pf }}-res" name="residual_consequence" data-likelihood="{{ h.likelihood or '' }}" {% if required_controls | default(true) %}required{% endif %}>
+  <option value="" selected disabled>Choose 1–5</option>
+  {% for lvl, spec in risk.consequence_levels().items() %}<option value="{{ lvl }}">{{ lvl }} – {{ spec.name }}</option>{% endfor %}
+</select>
+<p class="small" id="{{ pf }}-res-out" aria-live="polite">{% if h.likelihood %}Residual risk = residual consequence × likelihood {{ h.likelihood }}.{% else %}Residual risk = residual consequence × the likelihood set when the report is scored.{% endif %}</p>
+<script>
+(() => {
+  const sel = document.getElementById('{{ pf }}-res'), out = document.getElementById('{{ pf }}-res-out');
+  const bands = {{ risk.matrix_config()['bands'] | tojson }};
+  sel.addEventListener('change', () => {
+    const lk = parseInt(sel.dataset.likelihood, 10), c = parseInt(sel.value, 10);
+    if (!lk || !c) return;
+    const s = c * lk, b = bands.find(x => x.min <= s && s <= x.max);
+    out.textContent = `Residual risk: C${c} × L${lk} = ${s} (${b.level}). Original: {{ h.risk_score or '' }} ({{ h.risk_level or '' }}).`;
+  });
+})();
+</script>

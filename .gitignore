@@ -38,3 +38,6 @@ instance/
 
 # Local cache of SH17 image hashes (re-computed when missing)
 evaluation/results/*/sh17_dhash_cache.json
+
+# pytest-cov output
+.coverage

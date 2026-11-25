@@ -7,7 +7,7 @@ from sqlalchemy import select
 from shms import escalate, services
 from shms.models import Notification, Role, Status, User
 from shms.settings import get_settings
-from tests.conftest import login
+from tests.conftest import CLOSE, login
 from tests.test_workflow import report, users
 
 
@@ -55,7 +55,7 @@ def test_escalation_is_not_repeated(empty_db):
 def test_not_yet_due_and_awaiting_verification_never_escalate(empty_db):
     h = report(empty_db, consequence=2)
     assert escalate.run(empty_db, now=h.due_at - timedelta(hours=1)) == []
-    services.close(empty_db, h, empty_db.get(User, h.area.owner_id), "Done")
+    services.close(empty_db, h, empty_db.get(User, h.area.owner_id), "Done", **CLOSE)
     assert h.status == Status.PENDING_VERIFICATION
     assert escalate.run(empty_db, now=h.due_at + timedelta(days=30)) == []
 
@@ -64,7 +64,7 @@ def test_reopen_sets_a_new_deadline_and_resets_escalation(empty_db):
     h = report(empty_db, consequence=2)
     escalate.run(empty_db, now=h.due_at + timedelta(days=1))
     sup = users(empty_db)[Role.SUPERVISOR][0]
-    services.close(empty_db, h, empty_db.get(User, h.area.owner_id), "Done")
+    services.close(empty_db, h, empty_db.get(User, h.area.owner_id), "Done", **CLOSE)
     services.verify(empty_db, h, sup, "ok")
     old_due = h.due_at
     services.reopen(empty_db, h, sup, "Recurred")
@@ -84,7 +84,7 @@ def test_page_load_runs_escalation_at_most_once_per_minute(empty_db, monkeypatch
 
 def test_high_risk_alert_also_goes_to_the_outbox(empty_db):
     users(empty_db)[Role.SUPERVISOR][0].email = "sara@shms.example"
-    for _ in range(4):
+    for _ in range(2):  # ADOSH-SF v4.0: second similar report -> L2 Possible -> 5 x 2 = 10 High
         h = report(empty_db, code="no_eye_protection", consequence=5)
     assert h.risk_level == "High"
     assert any("High risk" in p.read_text() for p in get_settings().mail_outbox.glob("*.eml"))
@@ -117,7 +117,7 @@ def test_unwritable_outbox_never_blocks_a_report(empty_db, tmp_path):
     blocker.write_text("a file where the outbox folder should be")
     override_settings(mail_outbox=blocker / "outbox")
     users(empty_db)[Role.SUPERVISOR][0].email = "sara@shms.example"
-    for _ in range(4):
+    for _ in range(2):  # 5 x 2 = 10 High (ADOSH-SF v4.0)
         h = report(empty_db, code="no_eye_protection", consequence=5)
     assert h.risk_level == "High" and h.status == Status.OPEN
     assert users(empty_db)[Role.SUPERVISOR][0].id in _notified(empty_db, h)  # in-app notification still created

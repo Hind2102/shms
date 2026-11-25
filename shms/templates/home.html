@@ -66,6 +66,16 @@
       <p class="small muted">Counts only closures verified in the window. Hazards closed before verification existed are not included.</p>
     </div>
   </div>
+  <div class="panel" id="control-types"><h2>Share of closures by control type (verified closures, last {{ home.closure.window_days }} days)</h2>
+    {% set c = home.closure %}
+    {% if c.verified_closures %}
+    <table>
+      <tr><th>Control type (ADOSH-SF hierarchy, highest first)</th><th style="text-align:right">Closures</th><th style="text-align:right">Share</th></tr>
+      {% for row in c.by_control_type %}<tr><td>{{ row.name }}</td><td style="text-align:right">{{ row.n }}</td><td style="text-align:right">{{ (100 * row.n / c.verified_closures) | round | int }} %</td></tr>{% endfor %}
+    </table>
+    <p class="small muted">Denominator: {{ c.verified_closures }} closures verified in the last {{ c.window_days }} days. Closures recorded before the control type was asked (v1.4.0) are shown as "not recorded"; no value is guessed for them.</p>
+    {% else %}<p class="muted">No closures were verified in the last {{ c.window_days }} days.</p>{% endif %}
+  </div>
   <div class="panel"><h2>Reported and verified closed per week</h2>{% from "_macros.html" import trend %}{{ trend(home.weeks) }}</div>
 </section>
 {% endif %}

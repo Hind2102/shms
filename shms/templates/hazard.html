@@ -2,7 +2,7 @@
 {% from "_macros.html" import level, status, photo %}
 {% block title %}Hazard #{{ h.id }}{% endblock %}
 {% block content %}
-{% if created %}<div class="alert ok">Report submitted.{% if h.status.value == 'open' %} Routed to {{ h.assignee.name }}.{% endif %}{% if h.risk_level in ('High','Extreme') %} Safety supervisor alerted.{% endif %}</div>{% endif %}
+{% if created %}<div class="alert ok">Report submitted.{% if h.status.value == 'open' %} Routed to {{ h.assignee.name }}.{% endif %}{% if risk.alert_reason(h.consequence, h.risk_level) %} Safety supervisor alerted ({{ risk.alert_reason(h.consequence, h.risk_level) }}).{% endif %}</div>{% endif %}
 {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
 <h1>#{{ h.id }} · {{ h.category_code | cat }} {{ level(h.risk_level) }} {{ status(h.status) }}</h1>
 <div class="grid two">
@@ -22,6 +22,9 @@
         {% if h.status.value in ('pending_verification', 'closed') %}
         <tr><th>Closed</th><td>{{ h.closed_at | dt }} by {{ h.closed_by.name }}{% if h.closed_on_spot %} (fixed on the spot){% endif %}</td></tr>
         <tr><th>How it was closed</th><td>{{ h.closure_action }}</td></tr>
+        <tr><th>Control type</th><td>{{ h.control_type | control }}{% if h.control_type %} <span class="small muted">(ADOSH-SF hierarchy of controls)</span>{% endif %}</td></tr>
+        <tr><th>Risk: original → residual</th><td>{{ level(h.risk_level) }} {{ h.risk_score }} (C{{ h.consequence }} × L{{ h.likelihood }}) →
+          {% if h.residual_level %}{{ level(h.residual_level) }} {{ h.residual_score }} (C{{ h.residual_consequence }} × L{{ h.likelihood }}){% else %}<span class="muted">residual risk not recorded (closed before v1.4.0)</span>{% endif %}</td></tr>
         {% endif %}
         {% if h.status.value == 'pending_verification' %}<tr><th>Verification</th><td><strong>Awaiting verification</strong> by a safety supervisor or the reporter (not the person who closed it).</td></tr>{% endif %}
         {% if h.status.value == 'closed' %}<tr><th>Verified</th><td>{% if h.verified_at %}{{ h.verified_at | dt }} by {{ h.verified_by.name }}{% else %}Closed before the verification step existed (no verification recorded).{% endif %}</td></tr>{% endif %}
@@ -52,6 +55,7 @@
       <h2>Close hazard</h2>
       <label for="action">Action taken (required)</label>
       <textarea id="action" name="action" required placeholder="Describe the control put in place and how you checked it works"></textarea>
+      {% include "_closure_controls.html" %}
       <label for="cp">Closing photo</label>
       <input id="cp" type="file" name="photo" accept="image/*" capture="environment">
       <p class="muted small">A safety supervisor or the reporter then verifies the closure.</p>
@@ -63,6 +67,7 @@
     <form class="card" method="post" action="/hazards/{{ h.id }}/verify">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <h2>Verify closure</h2>
+      <p class="small">Original risk {{ level(h.risk_level) }} {{ h.risk_score }} → residual {% if h.residual_level %}{{ level(h.residual_level) }} {{ h.residual_score }}{% else %}not recorded{% endif %}; control: {{ h.control_type | control }}.</p>
       <label for="vn">What you checked</label>
       <textarea id="vn" name="note" placeholder="e.g. checked on site, closing photo shows the hard hat"></textarea>
       <br><br><button class="btn" type="submit">Verify and close</button>

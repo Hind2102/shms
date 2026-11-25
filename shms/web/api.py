@@ -25,10 +25,14 @@ class ConfirmIn(BaseModel):
     description: str = ""
     fixed_on_spot: bool = False
     closure_action: str = ""
+    control_type: str | None = None  # required with fixed_on_spot (ADOSH-SF hierarchy of controls)
+    residual_consequence: int | None = None  # required with fixed_on_spot
 
 
 class CloseIn(BaseModel):
     action: str
+    control_type: str | None = None  # elimination | substitution | engineering | procedural | ppe (required)
+    residual_consequence: int | None = None  # 1-5 after the control (required)
 
 
 class PlanIn(BaseModel):
@@ -77,6 +81,10 @@ def hazard_out(h: Hazard) -> dict:
         "closed_at": h.closed_at.isoformat() if h.closed_at else None,
         "closure_action": h.closure_action,
         "closed_on_spot": h.closed_on_spot,
+        "control_type": h.control_type,
+        "residual_consequence": h.residual_consequence,
+        "residual_score": h.residual_score,
+        "residual_level": h.residual_level,
         "photo_path": h.photo_path,
         "closure_photo_path": h.closure_photo_path,
         "planned_action": h.planned_action,
@@ -182,7 +190,14 @@ def confirm_hazard(
 def close_hazard(
     hazard_id: int, body: CloseIn, user: User = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    h = services.close(db, _get(db, hazard_id, user), user, body.action)
+    h = services.close(
+        db,
+        _get(db, hazard_id, user),
+        user,
+        body.action,
+        control_type=body.control_type,
+        residual_consequence=body.residual_consequence,
+    )
     db.commit()
     return hazard_out(h)
 

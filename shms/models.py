@@ -2,7 +2,7 @@
 
 User ──< Area (owner)            User ──< Hazard (reporter / assignee / closer)
 Area ──< Hazard ──< HazardEvent  (audit trail of every state change)
-User ──< Notification >── Hazard (alerts for High / Extreme risk)
+User ──< Notification >── Hazard (alerts for High / Extreme risk or consequence >= 4)
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def utcnow() -> datetime:
 class Role(str, enum.Enum):
     REPORTER = "reporter"  # field operator, contractor or visitor
     AREA_OWNER = "area_owner"  # accountable for closing hazards in their areas
-    SUPERVISOR = "supervisor"  # safety supervisor: alerted on High/Extreme, can act on any hazard
+    SUPERVISOR = "supervisor"  # safety supervisor: alerted on High/Extreme or consequence >= 4; acts on any
     MANAGER = "manager"  # read-only site-wide view
 
 
@@ -120,6 +120,13 @@ class Hazard(Base):
         CheckConstraint("status != 'CLOSED' OR closure_action IS NOT NULL", name="ck_closed_has_action"),
         CheckConstraint("status != 'PENDING_VERIFICATION' OR closure_action IS NOT NULL", name="ck_pending_has_action"),
         CheckConstraint("(x IS NULL) = (y IS NULL)", name="ck_hazard_pin_pair"),
+        CheckConstraint(
+            "control_type IS NULL OR control_type IN ('elimination','substitution','engineering','procedural','ppe')",
+            name="ck_control_type",
+        ),
+        CheckConstraint(
+            "residual_consequence IS NULL OR residual_consequence BETWEEN 1 AND 5", name="ck_residual_consequence_1_5"
+        ),
         UniqueConstraint("reporter_id", "idem_key", name="uq_reporter_idem_key"),
         # Indexes match the hot queries: likelihood look-up, dashboard / register filters.
         Index("ix_hazard_area_cat_time", "area_id", "category_code", "created_at"),
@@ -168,6 +175,12 @@ class Hazard(Base):
     closure_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     closure_photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     closed_on_spot: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ADOSH-SF Sec. 5.3.4(c) hierarchy of controls and Appendix 2 residual risk, chosen by the closer.
+    # NULL on closures recorded before v1.4.0 ("not recorded"); never back-filled.
+    control_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    residual_consequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    residual_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    residual_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Action plan and independent verification of the closure
     action_owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
