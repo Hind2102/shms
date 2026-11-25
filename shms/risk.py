@@ -1,4 +1,5 @@
-"""Risk scoring on a 5x5 consequence x likelihood matrix.
+"""Risk scoring on the 5x5 consequence x likelihood matrix of the ADOSH-SF Technical Guideline
+"Process of Risk Management" v4.0 (Tables 1-3).
 
 Pure functions only (no database access) so every cell of the matrix can be
 unit-tested. Level definitions and bands live in ``config/risk_matrix.json``.
@@ -22,7 +23,8 @@ class Band:
     max: int
     action: str
     color: str
-    target_days: int
+    target_days: int  # project-defined: the guideline sets no time frames
+    guideline_range: str = ""  # the range as printed in Table 3 (min/max also cover non-product scores)
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,34 @@ def is_alert_level(level: str) -> bool:
     return level in {"High", "Extreme"}
 
 
+def high_consequence_min() -> int:
+    return int(matrix_config()["high_consequence_alert_min"])
+
+
+def alert_reason(consequence: int, level: str) -> str | None:
+    """Why supervisors are alerted, or None. High/Extreme by score band; otherwise a Major or Catastrophic
+    consequence, because ADOSH-SF Sec. 5(b) asks for particular attention to risks with a very low likelihood
+    but major consequences (project rule: consequence >= 4 alerts whatever the band)."""
+    if is_alert_level(level):
+        return f"{level} risk"
+    if consequence >= high_consequence_min():
+        name = consequence_levels()[consequence]["name"]
+        return (
+            f"consequence {consequence} ({name}) although the score band is {level}: "
+            "ADOSH-SF Sec. 5(b) – particular attention to risks with major consequences"
+        )
+    return None
+
+
+def control_types() -> dict[str, dict]:
+    """Hierarchy of controls, ADOSH-SF Sec. 5.3.4(c), in order from most to least effective."""
+    return {c["code"]: c for c in matrix_config()["hierarchy_of_controls"]}
+
+
 def matrix_table() -> list[list[RiskResult]]:
-    """Rows = consequence 5..1, columns = likelihood 1..5 (for display)."""
-    return [[score(c, lk) for lk in LEVELS] for c in reversed(LEVELS)]
+    """Laid out as ADOSH-SF Table 3: rows = likelihood 1..5 (Rare to Frequent), columns = consequence 1..5."""
+    return [[score(c, lk) for c in LEVELS] for lk in LEVELS]
+
+
+def guideline() -> dict:
+    return matrix_config()["guideline"]

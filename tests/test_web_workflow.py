@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 from shms.models import utcnow
-from tests.conftest import login
+from tests.conftest import CLOSE, login
 from tests.test_api import OWNER_DIG, REPORTER, SUPERVISOR, create, h
 
 
@@ -18,7 +18,7 @@ def _open_hazard(client) -> int:
 
 def _pending(client) -> int:
     hid = _open_hazard(client)
-    r = client.post(f"/api/hazards/{hid}/close", headers=h(OWNER_DIG), json={"action": "Hard hat issued"})
+    r = client.post(f"/api/hazards/{hid}/close", headers=h(OWNER_DIG), json={"action": "Hard hat issued", **CLOSE})
     assert r.json()["status"] == "pending_verification"
     return hid
 
@@ -41,7 +41,7 @@ def test_api_reject_then_reopen_after_verify(client):
     hid = _pending(client)
     r = client.post(f"/api/hazards/{hid}/reject", headers=h(SUPERVISOR), json={"reason": "No photo of the fix"})
     assert r.status_code == 200 and r.json()["status"] == "open"
-    client.post(f"/api/hazards/{hid}/close", headers=h(OWNER_DIG), json={"action": "Fixed, photo attached"})
+    client.post(f"/api/hazards/{hid}/close", headers=h(OWNER_DIG), json={"action": "Fixed, photo attached", **CLOSE})
     r = client.post(f"/api/hazards/{hid}/verify", headers=h(REPORTER), json={"note": "Confirmed"})
     assert r.json()["status"] == "closed"
     r = client.post(f"/api/hazards/{hid}/reopen", headers=h(SUPERVISOR), json={"reason": "Recurred"})

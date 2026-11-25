@@ -7,6 +7,11 @@ i.e. before v1.2.0 and v1.3.0); proposal `~/Desktop/Final SEP/Site Hazard Manage
 (no proposal .docx exists in that folder). Fix release: `v1.3.1` (this commit's tag; it contains this file, so its own
 hash cannot be written here – see the final message / handover).
 
+**Status after this audit (v1.4.0, 25 Nov 2026):** the SH17 label audit was completed by the author personally
+(commit `4693bc8`); the synthesized data and layout were reviewed for realism by a refinery safety supervisor
+(November 2026, owner statement); the risk matrix was aligned with the ADOSH-SF guideline v4.0
+([risk_matrix_source.md](risk_matrix_source.md)). Findings below describe v1.3.0/v1.3.1 as audited.
+
 ## Step 1 – Grader's brief
 
 | Requirement | Finding | Status |
@@ -60,7 +65,7 @@ multi-annotator study (it is not, anywhere).
 | Time AND location recorded | delivered | `created_at`; area + optional plan pin (`x`,`y`, migration `0006_report_pin`); `tests/test_site_pins.py` |
 | AI suggests a hazard class; reporter confirms or corrects | delivered | `test_reporter_can_correct_ai`, `test_ai_acceptance_recorded` |
 | Consequence chosen; likelihood from area history | delivered | `test_likelihood_grows_with_similar_history` |
-| 5 × 5 matrix "based on ADOSH-SF", every level defined | partly – structure follows ADOSH-SF; band wording/deadlines **not checked against the guideline text** (owner task) | `/matrix`, `test_risk_matrix_page_separates_guidance_from_project_choices` |
+| 5 × 5 matrix "based on ADOSH-SF", every level defined | partly at this audit (v1.3.1) – structure only; **delivered in v1.4.0**: matrix, names, bands and action texts aligned with the ADOSH-SF guideline v4.0 ([source](risk_matrix_source.md)) | `/matrix`, `test_risk.py::test_every_matrix_cell_matches_the_guideline_table` |
 | Fixed on the spot with action + closing photo | delivered (then verified by a second person) | `test_fixed_on_spot_records_how_and_awaits_verification` |
 | Otherwise routed to Area Owner who plans, closes, documents | delivered | `test_owner_closes_with_documented_action`, `test_workflow_v2.py` |
 | Live dashboard + heat map of refinery layout: open hazards, risk levels, trends by area | delivered / partly – plan view with open-risk, overdue, report-volume overlays per area; weekly trend is site-wide; per-area trend = repeat hotspots | `test_home_and_map.py`, `test_site_layout.py` |
@@ -77,7 +82,7 @@ multi-annotator study (it is not, anywhere).
 | ≥ 80 % accepted unchanged | simulated only (97.2 %, lenient); real acceptance recorded per report | `acceptance_yolo_sh17_yolo9e.json` |
 | Suggestion ≤ 20 s | delivered (YOLOv9e p95 0.15 s; VLM p95 11.1 s) | metrics files |
 | Report on dashboard/heat map ≤ 5 min | delivered (< 5 s) | `test_full_workflow_and_dashboard_update` |
-| Synthesized data "reviewed by a safety supervisor for realism" | **not evidenced** – no record of a review | ❌ owner must state done/not done |
+| Synthesized data "reviewed by a safety supervisor for realism" | not evidenced at this audit; **since recorded by the owner**: reviewed by a refinery safety supervisor, November 2026 (`docs/verification.md`, v1.4.0) | ✅ (owner statement) |
 | Scope: unsafe conditions (spills, steam leaks, missing grating) | partly – PPE AI released; six physical conditions reportable **manually** in every area (incl. floor liquid, missing grating); experimental floor-liquid/walkway inference (synthetic pass; **real photos 0/5**); steam leaks not covered | `taxonomy.json`, `docs/external_floor_liquid.md` |
 
 v1.3.0 claims against the pre-specification `e74aa34`: model, frozen prompt c2, seed, 1024 px, selection rule (indoor

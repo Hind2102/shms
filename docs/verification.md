@@ -1267,3 +1267,58 @@ Revision 0007_photo_capture was applied via shms.db.migrate_to_head on disposabl
 ### Phase 6 follow-up — SH17 label audit, 24 November
 
 Read the existing audit CSV without changing any answers. Its SHA-256 from `shasum -a 256 evaluation/data/label_audit_results.csv` matches the photo-audit summary. Ran `python -m evaluation.label_audit score` to create label_audit.json. Each of four categories has 100 recorded decisions. Agreement for the three released categories was 81/100 for hard hats, 61/100 for eyes/face and 86/100 for gloves. The original vest responses remain in the export. These are single-reviewer label checks. Model evaluations were not rerun. Baseline `pytest -q` and `ruff check .` passed; `pytest --collect-only` collected 316 tests. Updated the README with the completed label-audit results.
+
+# v1.4.0 (2026-11-25) – ADOSH-SF v4.0 risk matrix, hierarchy of controls, residual risk
+
+**Human checks recorded (owner statements, no code):**
+- SH17 label audit: done by the project owner personally (commit `4693bc8`; results in
+  `evaluation/results/label_audit.json`). One reviewer, so it is not a multi-annotator study.
+- Realism review: the synthesized data and the site layout were reviewed for realism by a refinery safety supervisor,
+  November 2026.
+
+**Source.** The ADOSH-SF Technical Guideline "Process of Risk Management" v4.0 (15 July 2024) was downloaded and read
+directly (SHA-256 `f271e33d2bf74601390b1bed05c74a5483844ace5ff55b5a71740ebe9ce263d0`). Table 3 was rendered to an
+image and read cell by cell, and the cell fill colours were also read from the PDF drawing commands: 5 → Moderate,
+9 → High, 10 → High, 16 → Extreme. Wording, pages and the differences from the task are in
+[risk_matrix_source.md](risk_matrix_source.md). There were two differences. The high-consequence text is Sec. 5(b),
+not 5.1(b). Table 2 calls level 5 "Frequent", and "Almost Certain" appears only in Table 3.
+
+**Changes (behaviour, explained as AGENTS.md requires).**
+- `shms/config/risk_matrix.json`: Table 1, 2 and 3 names, definitions, bands and action texts; Table 3 colours; the
+  365-day history mapping; project-defined target days, unchanged per band (30/14/7/1). "Medium" was renamed to
+  "Moderate" everywhere.
+- `shms/risk.py`: `alert_reason` (High/Extreme, or consequence ≥ 4 in any band), `control_types`, the Table 3 layout.
+- `shms/services.py`: closing a hazard (normally or on the spot) requires a control type and a residual consequence.
+  The residual score is the residual consequence × the hazard's likelihood. Alerts state their reason. The manager
+  sees the share of verified closures by control type over 90 days, with its denominator.
+- Migration `0008_adosh_v4`: adds four nullable columns, then re-scores every confirmed hazard. Likelihood is
+  recalculated from the history at the time of each report. Each hazard gets one audit event with old → new values.
+  No alerts are sent and legacy closure fields stay NULL.
+
+**Tests changed, and why.** No assertion was weakened.
+- Calls that close hazards now pass the newly required control type and residual consequence (`tests.conftest.CLOSE`).
+- Expectations that encode the matrix changed with the specification:
+  - the 25 cells, now transcribed from the PDF grid;
+  - the likelihood mapping;
+  - the 365-day look-back (200 → 400 days in the look-back test);
+  - consequence 5 at L1 now alerts (the alert test uses consequence 3);
+  - the outbox tests reach High with 2 reports instead of 4.
+- The migration snapshot ignores only the new `risk_rescored` events. Every row that existed before must still be
+  identical.
+
+**Migration on copies.** The originals were checked by SHA-256 before and after: unchanged.
+
+| Copy | Rows and relationships | Re-score events | Changed band | Of which only renamed Medium → Moderate | New levels |
+|---|---|---|---|---|---|
+| `shms_demo.db` (at 0007) | identical (9 users, 9 areas, 242 hazards, 1,035 earlier events, 217 notifications) | 240 | 218 of 240 | 16 | Extreme 112, High 87, Moderate 27, Low 14 |
+| `backups/shms_2026-11-17.db` (original schema) | identical (9 / 9 / 240 / 1,010 / 200); `api_tokens` added empty by 0005 | 240 | 219 of 240 | 14 | Extreme 114, High 76, Moderate 35, Low 15 |
+
+Most hazards moved up a band. The 365-day look-back and the guideline's lower band limits (High from 8, Extreme from
+15) are both stricter than v1.3. The synthetic 6-month history has about 27 hazards per area, so many area-category
+pairs reach 6 or more similar reports and therefore likelihood 5. This reflects the specified mapping applied to
+synthetic data. It is not a finding about a real site.
+
+**Checks.** `pytest`: 371 passed. `ruff check .` and `ruff format --check .` are clean. Statement coverage
+(`pytest --cov=shms --cov=evaluation`) is 72 % on a fresh clone of the branch with Python 3.12 (2,480 of 3,421;
+2,482 on the development machine). The fresh clone ran 371 tests, all passed, with ruff clean. The Docker smoke test passed: healthy,
+401 without a token, dashboard and `/metrics` with a token, non-root user, no tracebacks.

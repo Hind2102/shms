@@ -9,7 +9,7 @@
   <div><label for="filter-area">Area</label><select id="filter-area" name="area"><option value="">All</option>
     {% for a in areas %}<option value="{{ a.code }}" {% if f.area == a.code %}selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></div>
   <div><label for="filter-level">Risk level</label><select id="filter-level" name="level"><option value="">All</option>
-    {% for l in ('Extreme','High','Medium','Low') %}<option {% if f.level == l %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    {% for l in ('Extreme','High','Moderate','Low') %}<option {% if f.level == l %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
   <div><label for="filter-category">Type</label><select id="filter-category" name="category"><option value="">All</option>
     {% for code in taxonomy.manual_codes() + taxonomy.enabled_codes() %}{% set c = taxonomy.get(code) %}<option value="{{ c.code }}" {% if f.category == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
   <div style="flex:0"><button class="btn" type="submit">Filter</button></div>
@@ -17,12 +17,13 @@
 <div class="card" style="overflow-x:auto">
   <p class="muted small">{{ hazards|length }} hazards{% if hazards|length == 300 %} (first 300){% endif %}</p>
   <table>
-    <tr><th>#</th><th>Reported</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Status</th><th>How closed</th></tr>
+    <tr><th>#</th><th>Reported</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Status</th><th>How closed</th><th>Control type</th></tr>
     {% for h in hazards %}
     <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.created_at | dt }}</td><td>{{ h.area.code }}</td>
       <td>{{ h.category_code | cat }}</td><td>{{ level(h.risk_level) }} {{ h.risk_score }}</td><td>{{ status(h.status) }}</td>
-      <td class="small muted">{{ h.closure_action or '' }}</td></tr>
-    {% else %}<tr><td colspan="7" class="muted">No hazards match these filters. <a href="/hazards">Clear filters</a></td></tr>{% endfor %}
+      <td class="small muted">{{ h.closure_action or '' }}</td>
+      <td class="small muted">{% if h.closed_at %}{{ h.control_type | control }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">No hazards match these filters. <a href="/hazards">Clear filters</a></td></tr>{% endfor %}
   </table>
 </div>
 {% endblock %}

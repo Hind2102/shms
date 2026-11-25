@@ -3,7 +3,7 @@
      signal yellow only for focus/selection. Risk colours are semantic and unchanged. */
   --ink: #1f2a2e; --muted: #66727a; --line: #d9ddda; --bg: #f5f6f4; --card: #fff;
   --brand: #1f2a2e; --accent: #9a3b1b; --accent-dark: #7c2f15; --signal: #e7b416;
-  --low: #2e7d32; --medium: #f9a825; --high: #ef6c00; --extreme: #c62828;
+  --low: #99cc00; --moderate: #ffff00; --high: #ffcc00; --extreme: #ff0000; /* ADOSH-SF Table 3 colours */
   --radius: 4px;
   --display: "DIN Alternate", "DIN Next", Bahnschrift, "Roboto Condensed", "Arial Narrow", sans-serif;
 }
@@ -31,7 +31,7 @@ h2 { font-size: 17px; margin: 0 0 10px; }
 .kpi { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
 .kpi .v { font-size: 26px; font-weight: 700; }
 .kpi .l { color: var(--muted); font-size: 13px; }
-.kpi.warn .v { color: var(--high); }
+.kpi.warn .v { color: #a14f00; }
 .btn { display: inline-block; background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; }
 .btn:hover { background: var(--accent-dark); }
 .btn.secondary { background: #fff; color: var(--brand); border: 1px solid var(--line); }
@@ -39,9 +39,9 @@ h2 { font-size: 17px; margin: 0 0 10px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 13px; }
-.lvl { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; }
-.lvl.Low { background: var(--low); } .lvl.Medium { background: var(--medium); color: #221a00; }
-.lvl.High { background: var(--high); color: #221a00; } .lvl.Extreme { background: var(--extreme); }
+.lvl { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; color: #1d1d1d; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.lvl.Low { background: var(--low); } .lvl.Moderate { background: var(--moderate); }
+.lvl.High { background: var(--high); } .lvl.Extreme { background: var(--extreme); }
 .st { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px; background: #e7ecf2; }
 .st.open { background: #fff1e0; color: #8a4b00; } .st.closed { background: #e6f4e7; color: #1f5f22; }
 .st.planned { background: #e8f0fb; color: #1d4f91; } .st.pending_verification { background: #f3e8fb; color: #5b2a86; }
@@ -70,7 +70,7 @@ textarea { min-height: 80px; }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; } .filters > div { min-width: 140px; flex: 1; }
-.matrix td { text-align: center; font-weight: 700; color: #fff; border: 2px solid #fff; padding: 12px 4px; }
+.matrix td { text-align: center; font-weight: 700; color: #1d1d1d; border: 2px solid #fff; padding: 12px 4px; }
 .login-list button { width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 6px 0; font: inherit; cursor: pointer; }
 .login-list button:hover { border-color: var(--accent); }
 .hide { display: none; }

@@ -153,6 +153,8 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     sign_in(page, base_url, "khalid")
     page.goto(hazard_url)
     page.locator("#action").fill("Isolated the affected walkway and arranged cleanup.")
+    page.locator("input[name=control_type][value=engineering]").check()  # ADOSH-SF hierarchy of controls (v1.4.0)
+    page.locator("#cl-res").select_option("1")
     page.get_by_role("button", name="Close hazard", exact=True).click()
     expect(page.locator("h1 .st")).to_have_text("pending verification")
     audit.check("awaiting_verification")

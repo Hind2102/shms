@@ -28,6 +28,8 @@ templates.env.filters["cat"] = lambda code: taxonomy.get(code).name if code else
 templates.env.filters["ppe"] = lambda code: taxonomy.get(code).ppe
 templates.env.filters["dt"] = lambda d: d.strftime("%d %b %Y %H:%M") if d else ""
 templates.env.filters["fromjson"] = lambda s: json.loads(s or "[]")
+# Legacy closures have no control type: shown as "not recorded", never guessed.
+templates.env.filters["control"] = lambda code: risk.control_types()[code]["name"] if code else "not recorded"
 
 
 class LoginRequired(Exception):
@@ -326,6 +328,8 @@ async def confirm_submit(
     fixed_on_spot: bool = Form(False),
     closure_action: str = Form(""),
     closure_photo: UploadFile | None = File(None),
+    control_type: str = Form(""),
+    residual_consequence: str = Form(""),
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
@@ -341,7 +345,16 @@ async def confirm_submit(
             db,
             h,
             user,
-            services.Confirmation(category_code, consequence, description, fixed_on_spot, closure_action, photo),
+            services.Confirmation(
+                category_code,
+                consequence,
+                description,
+                fixed_on_spot,
+                closure_action,
+                photo,
+                control_type=control_type or None,
+                residual_consequence=_level(residual_consequence),
+            ),
         )
     except (services.WorkflowError, services.PermissionDenied) as exc:
         db.rollback()
@@ -484,10 +497,17 @@ def reopen(hazard_id: int, reason: str = Form(""), user: User = Depends(page_use
     return _do(db, h, lambda: services.reopen(db, h, user, reason))
 
 
+def _level(value: str) -> int | None:
+    """A 1-5 level from a form field; anything else is None and rejected by the service with a clear message."""
+    return int(value) if value.strip().isdigit() else None
+
+
 @router.post("/hazards/{hazard_id}/close")
 async def close(
     hazard_id: int,
     action: str = Form(...),
+    control_type: str = Form(""),
+    residual_consequence: str = Form(""),
     photo: UploadFile | None = File(None),
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
@@ -495,7 +515,15 @@ async def close(
     h = _hazard(db, hazard_id, user)
     try:
         name = await save_photo(photo, prefix="closed_")
-        services.close(db, h, user, action, name)
+        services.close(
+            db,
+            h,
+            user,
+            action,
+            name,
+            control_type=control_type or None,
+            residual_consequence=_level(residual_consequence),
+        )
     except (services.WorkflowError, services.PermissionDenied) as exc:
         db.rollback()
         return RedirectResponse(f"/hazards/{h.id}?error={exc}", status_code=303)

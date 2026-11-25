@@ -8,7 +8,7 @@ Actions are limited by role in services.py (tested in test_workflow_v2.py); here
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import jpeg_bytes, login
+from tests.conftest import CLOSE, jpeg_bytes, login
 from tests.test_api import OWNER_DIG, REPORTER, SUPERVISOR, create, h
 
 OTHER_REPORTER, MANAGER = 2, 9
@@ -80,7 +80,7 @@ def test_read_only_roles_cannot_plan_or_close_through_the_web(client, uid):
     hz = _confirmed(client)
     login(client, uid)
     client.post(f"/hazards/{hz['id']}/plan", data={"planned_action": "x"})
-    client.post(f"/hazards/{hz['id']}/close", data={"action": "x"})
+    client.post(f"/hazards/{hz['id']}/close", data={"action": "x", **CLOSE})
     assert client.get(f"/api/hazards/{hz['id']}", headers=h(SUPERVISOR)).json()["status"] == "open"
 
 
@@ -92,5 +92,5 @@ def test_photo_names_cannot_escape_the_upload_folder(client):
 
 def test_owner_can_still_work_on_their_hazard(client):
     hz = _confirmed(client)
-    r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(OWNER_DIG), json={"action": "Done"})
+    r = client.post(f"/api/hazards/{hz['id']}/close", headers=h(OWNER_DIG), json={"action": "Done", **CLOSE})
     assert r.status_code == 200 and jpeg_bytes()

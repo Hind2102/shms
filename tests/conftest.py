@@ -9,6 +9,10 @@ from shms.detection import get_detector
 from shms.main import create_app
 from shms.settings import override_settings
 
+# Every new closure must record the ADOSH-SF control type and the residual consequence (v1.4.0). Tests that are
+# about something else close hazards with these neutral values.
+CLOSE = {"control_type": "procedural", "residual_consequence": 1}
+
 
 def jpeg_bytes(color="gray", size=(640, 480)) -> bytes:
     buf = io.BytesIO()

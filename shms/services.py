@@ -90,6 +90,28 @@ def _clear_closure(h: Hazard) -> None:
     h.closed_at = h.closed_by_id = h.closure_action = h.closure_photo_path = None
     h.closed_on_spot = False
     h.verified_at = h.verified_by_id = None
+    h.control_type = h.residual_consequence = h.residual_score = h.residual_level = None
+
+
+def _record_controls(h: Hazard, control_type: str | None, residual_consequence: int | None) -> str:
+    """ADOSH-SF Sec. 5.3.4(c) control type and Appendix 2 residual risk, both required for every new closure.
+    Residual risk = residual consequence x the hazard's likelihood. Returns the audit-trail suffix."""
+    controls = risk.control_types()
+    if control_type not in controls:
+        raise WorkflowError("Choose the type of control from the hierarchy of controls")
+    if residual_consequence not in risk.LEVELS:
+        raise WorkflowError("Choose the residual consequence (1-5) after the control")
+    r = risk.score(residual_consequence, h.likelihood)
+    h.control_type, h.residual_consequence, h.residual_score, h.residual_level = (
+        control_type,
+        r.consequence,
+        r.score,
+        r.level,
+    )
+    return (
+        f" [control: {controls[control_type]['name']}; residual risk C{r.consequence} x L{r.likelihood} = "
+        f"{r.score} ({r.level}), was {h.risk_score} ({h.risk_level})]"
+    )
 
 
 def can_act_on(user: User, h: Hazard) -> bool:
@@ -216,6 +238,8 @@ class Confirmation:
     fixed_on_spot: bool = False
     closure_action: str = ""
     closure_photo_path: str | None = None
+    control_type: str | None = None  # required when fixed on the spot
+    residual_consequence: int | None = None  # required when fixed on the spot
 
 
 def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime | None = None) -> Hazard:
@@ -252,23 +276,33 @@ def confirm(db: Session, h: Hazard, actor: User, c: Confirmation, at: datetime |
     )
 
     if c.fixed_on_spot:
+        suffix = _record_controls(h, c.control_type, c.residual_consequence)
         h.closed_on_spot = True
         h.closed_at, h.closed_by_id = now, actor.id
         h.closure_action = c.closure_action.strip()
         h.closure_photo_path = c.closure_photo_path
         h.assignee_id = h.area.owner_id
-        _move(db, h, actor, Status.PENDING_VERIFICATION, "closed", f"Fixed on the spot: {h.closure_action}", at=now)
+        _move(
+            db,
+            h,
+            actor,
+            Status.PENDING_VERIFICATION,
+            "closed",
+            f"Fixed on the spot: {h.closure_action}{suffix}",
+            at=now,
+        )
     else:
         h.assignee_id = h.area.owner_id
         _move(db, h, actor, Status.OPEN, "assigned", f"Routed to Area Owner {h.area.owner.name}", at=now)
 
-    if risk.is_alert_level(r.level):
-        _alert(db, h, actor, now)
+    reason = risk.alert_reason(r.consequence, r.level)
+    if reason:
+        _alert(db, h, actor, now, reason)
     db.flush()
     return h
 
 
-def _alert(db: Session, h: Hazard, actor: User, now: datetime) -> None:
+def _alert(db: Session, h: Hazard, actor: User, now: datetime, reason: str) -> None:
     from . import notify
 
     recipients = list(db.scalars(select(User).where(User.role == Role.SUPERVISOR)))
@@ -276,10 +310,10 @@ def _alert(db: Session, h: Hazard, actor: User, now: datetime) -> None:
         recipients.append(h.area.owner)
     msg = (
         f"{h.risk_level} risk: {taxonomy.get(h.category_code).name} in {h.area.name} "
-        f"(score {h.risk_score}, status {h.status.value})"
+        f"(score {h.risk_score}, status {h.status.value}). Alerted because: {reason}"
     )
     notify.send(db, recipients, h, msg, f"Hazard #{h.id}: {msg}. Target close {h.due_at:%Y-%m-%d}.", at=now)
-    _event(db, h, actor, "alerted", f"Notified {', '.join(u.name for u in recipients)}", at=now)
+    _event(db, h, actor, "alerted", f"Notified {', '.join(u.name for u in recipients)} – {reason}", at=now)
 
 
 # ---------------------------------------------------------------- stage 2: close and document
@@ -317,19 +351,29 @@ def plan_action(
 
 
 def close(
-    db: Session, h: Hazard, actor: User, action: str, photo_path: str | None = None, at: datetime | None = None
+    db: Session,
+    h: Hazard,
+    actor: User,
+    action: str,
+    photo_path: str | None = None,
+    at: datetime | None = None,
+    *,
+    control_type: str | None = None,
+    residual_consequence: int | None = None,
 ) -> Hazard:
-    """OPEN/PLANNED -> PENDING_VERIFICATION: the owner documents what was done; someone else verifies it."""
+    """OPEN/PLANNED -> PENDING_VERIFICATION: the owner documents what was done, the type of control
+    (ADOSH-SF hierarchy of controls) and the residual consequence; someone else verifies it."""
     _require_state(h, {Status.OPEN, Status.PLANNED}, "close")
     if not can_act_on(actor, h):
         raise PermissionDenied("Only the Area Owner or a supervisor can close this hazard")
     _check_move(h, Status.PENDING_VERIFICATION)
     if not action.strip():
         raise WorkflowError("Describe the action taken to close the hazard")
+    suffix = _record_controls(h, control_type, residual_consequence)
     now = at or utcnow()
     h.closed_at, h.closed_by_id = now, actor.id
     h.closure_action, h.closure_photo_path = action.strip(), photo_path
-    _move(db, h, actor, Status.PENDING_VERIFICATION, "closed", h.closure_action, at=now)
+    _move(db, h, actor, Status.PENDING_VERIFICATION, "closed", h.closure_action + suffix, at=now)
     db.flush()
     return h
 
@@ -448,7 +492,7 @@ def dashboard(db: Session, now: datetime | None = None) -> dict:
         "areas": area_rows,
         "weeks": weeks,
         "by_category": [(taxonomy.get(c).name, n) for c, n in by_cat.most_common()],
-        "by_level": {lvl: by_level.get(lvl, 0) for lvl in ("Extreme", "High", "Medium", "Low")},
+        "by_level": {lvl: by_level.get(lvl, 0) for lvl in ("Extreme", "High", "Moderate", "Low")},
     }
 
 
@@ -591,7 +635,7 @@ def ai_monitoring(db: Session, now: datetime | None = None) -> dict:
 # ---------------------------------------------------------------- role home pages (Phase 3)
 
 HIGH_LEVELS = ("High", "Extreme")
-LEVEL_ORDER = {"Low": 1, "Medium": 2, "High": 3, "Extreme": 4}
+LEVEL_ORDER = {"Low": 1, "Moderate": 2, "High": 3, "Extreme": 4}
 
 
 def role_home(db: Session, user: User, now: datetime | None = None) -> dict:
@@ -643,9 +687,15 @@ def closure_performance(db: Session, now: datetime | None = None, window_days: i
     reopened = db.scalar(
         select(func.count()).select_from(HazardEvent).where(HazardEvent.kind == "reopened", HazardEvent.at >= since)
     )
+    by_control = Counter(h.control_type for h in done)
+    names = {code: c["name"] for code, c in risk.control_types().items()}
+    control_share = [{"code": code, "name": name, "n": by_control.get(code, 0)} for code, name in names.items()] + [
+        {"code": None, "name": "Not recorded (closed before v1.4.0)", "n": by_control.get(None, 0)}
+    ]
     return {
         "window_days": window_days,
         "verified_closures": len(done),
+        "by_control_type": control_share,  # denominator: verified_closures
         "on_time": on_time,
         "on_time_share": on_time / len(done) if done else None,
         "median_days_to_verified_close": round(median(days), 1) if days else None,

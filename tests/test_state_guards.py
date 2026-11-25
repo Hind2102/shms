@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from shms import services
 from shms.models import HazardEvent, Role, Status, User
 from shms.services import Confirmation, WorkflowError
-from tests.conftest import login
+from tests.conftest import CLOSE, login
 from tests.test_api import OWNER_DIG, REPORTER, SUPERVISOR, create, h
 from tests.test_workflow import area, report, users
 
@@ -30,7 +30,7 @@ def _in_state(db, state: Status):
     if state in (Status.PLANNED,):
         services.plan_action(db, hz, owner, "Toolbox talk")
     if state in (Status.PENDING_VERIFICATION, Status.CLOSED):
-        services.close(db, hz, owner, "Hard hat issued")
+        services.close(db, hz, owner, "Hard hat issued", **CLOSE)
     if state == Status.CLOSED:
         services.verify(db, hz, sup, "ok")
     assert hz.status == state
@@ -118,7 +118,7 @@ def test_page_reconfirm_redirects_with_message_and_changes_nothing(client, uid):
 
 ACTIONS = {
     "plan": ({Status.OPEN}, lambda db, hz, sup: services.plan_action(db, hz, sup, "Toolbox talk")),
-    "close": ({Status.OPEN, Status.PLANNED}, lambda db, hz, sup: services.close(db, hz, sup, "Done")),
+    "close": ({Status.OPEN, Status.PLANNED}, lambda db, hz, sup: services.close(db, hz, sup, "Done", **CLOSE)),
     "verify": ({Status.PENDING_VERIFICATION}, lambda db, hz, sup: services.verify(db, hz, sup, "ok")),
     "reject": ({Status.PENDING_VERIFICATION}, lambda db, hz, sup: services.reject(db, hz, sup, "not done")),
     "reopen": ({Status.CLOSED}, lambda db, hz, sup: services.reopen(db, hz, sup, "recurred")),
