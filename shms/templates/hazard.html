@@ -12,7 +12,7 @@
         <tr><th>Area</th><td><a href="/areas/{{ h.area.code }}">{{ h.area.name }}</a></td></tr>
         {% if h.x is not none %}<tr><th>Reported map pin</th><td>X {{ h.x }}, Y {{ h.y }}</td></tr>{% endif %}
         <tr><th>Reported</th><td>{{ h.created_at | dt }} by {{ h.reporter.name }}</td></tr>
-        <tr><th>Risk</th><td>Consequence {{ h.consequence }} × Likelihood {{ h.likelihood }} = <strong>{{ h.risk_score }}</strong> {{ level(h.risk_level) }}</td></tr>
+        <tr><th>Risk</th><td>Consequence {{ h.consequence }} × <abbr title="{{ risk.LIKELIHOOD_NOTE }}">Likelihood</abbr> {{ h.likelihood }} = <strong>{{ h.risk_score }}</strong> {{ level(h.risk_level) }}<br><span class="small muted likelihood-note">{{ risk.LIKELIHOOD_NOTE }}</span></td></tr>
         <tr><th>Target close</th><td>{{ h.due_at | dt }}</td></tr>
         <tr><th>Assigned to</th><td>{{ h.assignee.name if h.assignee else '–' }}</td></tr>
         <tr><th>AI</th><td>{% if h.ai_model %}{% if h.ai_top_code %}{{ h.ai_model }} suggested <em>{{ h.ai_top_code | cat }}</em>{% if taxonomy.release_note(h.ai_top_code) %} <span class="caveat small">(AI check {{ taxonomy.release_note(h.ai_top_code) }})</span>{% endif %}{% elif h.ai_error %}{{ h.ai_model }} could not analyse the photo{% else %}{{ h.ai_model }} found none of the checked items missing{% endif %}

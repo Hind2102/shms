@@ -14,6 +14,11 @@ from functools import lru_cache
 from .settings import PACKAGE_DIR
 
 LEVELS = (1, 2, 3, 4, 5)
+# Shown wherever SHMS displays a likelihood (v1.4.1). Keep the 365 in step with lookback_days (tested).
+LIKELIHOOD_NOTE = (
+    "ADOSH-SF likelihood describes how likely harm is; SHMS estimates it from how often similar hazards were "
+    "reported in the same area in the last 365 days – a project heuristic, not the guideline's definition."
+)
 
 
 @dataclass(frozen=True)

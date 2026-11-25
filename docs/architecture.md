@@ -80,7 +80,7 @@ flowchart LR
 5. **Reporting and AI eligibility are separate.** Physical conditions can be confirmed in any area. The same area-level list validates form and API submissions. PPE suggestions are filtered by area and the release gate. Optional floor-liquid and obstruction observations never preselect a category. A new manual category needs a taxonomy entry rather than a database migration.
 6. **Likelihood is computed, not guessed.** It comes from the number of similar hazards in the same area in the
    last 365 days, mapped onto the ADOSH-SF Table 2 levels (0 → Rare, 1 → Possible, 2 → Likely, 3–5 → Often, ≥ 6 →
-   Frequent – a project interpretation). This links individual cases (problem 1 in the proposal) and makes repeat
+   Frequent – a project interpretation). ADOSH-SF likelihood describes how likely harm is; SHMS estimates it from how often similar hazards were reported in the same area in the last 365 days – a project heuristic, not the guideline's definition. This links individual cases (problem 1 in the proposal) and makes repeat
    hazards rise in risk. Matrix, band names and action texts follow the ADOSH-SF Technical Guideline "Process of Risk
    Management" v4.0; close-out targets are project-defined because the guideline sets none.
 7. **Modular monolith, not microservices.** One team, one database and one deployment; modules have clear

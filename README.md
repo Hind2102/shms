@@ -127,12 +127,13 @@ consequence levels and definitions from Table 1 (human health and safety; produc
 likelihood levels from Table 2, and the Table 3 grid with its band names (Low 1–3, Moderate 4–6, High 8–12, Extreme
 15–25; score 5 is Moderate, 9 and 10 High and 16 Extreme, read from the table's cell colours) and action texts. The
 `/matrix` page separates this from what the project defined: the history-based likelihood (similar hazards in the
-same area in the last 365 days: 0 → 1, 1 → 2, 2 → 3, 3–5 → 4, ≥ 6 → 5 – a **project heuristic**, not a validated
-likelihood), the close-out targets (the guideline sets no time frames) and the alert rule (High/Extreme, or
+same area in the last 365 days: 0 → 1, 1 → 2, 2 → 3, 3–5 → 4, ≥ 6 → 5), the close-out targets (the guideline sets no time frames) and the alert rule (High/Extreme, or
 consequence ≥ 4 in any band, after Sec. 5(b)). Closures record the control type from the hierarchy of controls
 (Sec. 5.3.4(c)) and the residual risk (Appendix 2). Source, page numbers and the PDF's SHA-256:
 [docs/risk_matrix_source.md](docs/risk_matrix_source.md). Values are in `shms/config/risk_matrix.json`; hazard
 categories are in `shms/config/taxonomy.json`.
+
+> **Likelihood:** ADOSH-SF likelihood describes how likely harm is; SHMS estimates it from how often similar hazards were reported in the same area in the last 365 days – a project heuristic, not the guideline's definition.
 
 **Upgrading an existing database:** `alembic upgrade head` (back up the `.db` file first). Migration `0008_adosh_v4`
 adds the closure fields and re-scores every confirmed hazard to the v4.0 matrix, writing an audit event
@@ -146,7 +147,7 @@ uvicorn shms.asgi:app --reload       # or: make run
 ```
 
 Open <http://127.0.0.1:8000>. (If port 8000 is busy, add `--port 8765` and open that port instead.) On first start the database is created and filled with a synthesized refinery
-(9 areas, 9 users, ~240 historical hazards). Sign in with one of the **demo accounts** below. The password is the
+(9 areas, 9 users, 150 historical hazards over 6 months, regenerated in v1.4.1 – see *What is implemented*). Sign in with one of the **demo accounts** below. The password is the
 same for all of them and is a documented demo value, **not a secret**: `shms-demo-2026`.
 
 | Username | Person (synthesized) | Role |
@@ -165,7 +166,7 @@ Main workflow:
 1. **Report** – as *Ahmed (Operator)*: *Report hazard* → choose area → take/upload a photo (try
    `data/samples/`). Photograph the floor or access route for a physical condition, or a person and task for missing PPE.
    SHMS reads GPS latitude/longitude and the original capture timestamp from supported photo EXIF metadata before storing the resized JPEG. Review these on the confirmation page. A timestamp without an offset is shown in camera local time. Missing tags leave fields unavailable. The reporting area and optional illustrative map pin are selected separately. The server records the submission time independently. Existing databases require Alembic revision `0007_photo_capture` (see *Upgrading an existing database*).
-2. **Confirm and score** – choose the condition you observed or confirm a PPE suggestion, choose the worst credible consequence. Likelihood is
+2. **Confirm and score** – choose the condition you observed or confirm a PPE suggestion, choose the worst credible consequence. Likelihood is set by the system (a project heuristic, see *Configuration*) and is
    computed from the area's history and the risk level and target close date are shown. Tick *I already fixed it
    on the spot* to record the action taken and a closing photo.
 3. **Plan, close, verify** – the hazard goes to the Area Owner (e.g. *Khalid* for Digestion); High and Extreme
@@ -415,7 +416,7 @@ cause unknown** (details in `docs/verification.md`).
 | **Implemented + tested** | photo report with AI suggestion and manual fallback; risk scoring on the ADOSH-SF v4.0 5 × 5 matrix, alerts for High/Extreme or consequence ≥ 4, control type (hierarchy of controls) and residual risk at closure; workflow draft → open → planned → pending verification → closed with reject/reopen, four-eyes verification and a from/to audit trail; overdue escalation; in-app notifications; sign-in with hashed passwords, signed sessions, CSRF, hashed API tokens, per-object access rules, safe uploads; Alembic migrations; role home pages, process plan, area details, optional pins, illustrative walkway routing, dashboard, risk-matrix page; AI monitoring and `/metrics`; release gate; offline evaluation on SH17 and the external dataset; Docker image; CI |
 | **Simulated** | all people, areas, layout and 6-month hazard history (synthesized); reporter acceptance on held-out data; e-mail (written to a local outbox, never sent); demo accounts with one documented password |
 | **Experimental** | liquid-on-the-floor and obstructed-walkway check (synthetic warehouse benchmark and a small positive-only external liquid check; flag off by default); the vision-language model as a PPE detector |
-| **Human checks done** | SH17 label audit by the author personally (commit `4693bc8`; single reviewer, not a multi-annotator study); realism review of the synthesized data and site layout by a refinery safety supervisor, November 2026; risk matrix checked against the ADOSH-SF v4.0 PDF ([source](docs/risk_matrix_source.md)) |
+| **Human checks done** | SH17 label audit by the author personally (commit `4693bc8`; single reviewer, not a multi-annotator study); realism review by a refinery safety supervisor, November 2026 – it covered the site layout and the **earlier** synthetic history (v1.4.0 and before); the history was regenerated afterwards in v1.4.1 (realistic frequencies per area, consequences mostly C2–C3, mixed closure controls) and that regenerated history has not been reviewed; risk matrix checked against the ADOSH-SF v4.0 PDF ([source](docs/risk_matrix_source.md)) |
 | **Planned / not done** | single sign-on; real refinery photos with multi-annotator labels; external validation of eye protection and gloves |
 
 ## Data, privacy and limitations

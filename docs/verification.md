@@ -1322,3 +1322,70 @@ synthetic data. It is not a finding about a real site.
 (`pytest --cov=shms --cov=evaluation`) is 72 % on a fresh clone of the branch with Python 3.12 (2,480 of 3,421;
 2,482 on the development machine). The fresh clone ran 371 tests, all passed, with ruff clean. The Docker smoke test passed: healthy,
 401 without a token, dashboard and `/metrics` with a token, non-root user, no tracebacks.
+
+# v1.4.1 (2026-11-25) – realistic synthetic history, likelihood label
+
+**Scope of the realism review.** In November 2026 a refinery safety supervisor reviewed the site layout and the
+synthetic history as it stood then (v1.4.0 and earlier). In v1.4.1 the history was regenerated, after that review.
+The regenerated history has not been reviewed.
+
+**What changed (`shms/seed.py` only; the ADOSH-SF matrix, bands and the 365-day rule are unchanged).**
+- 150 reports over 6 months (was 240).
+- Per-area frequencies:
+  - caustic areas (DIG, CLR, FLT, TNK) have more eye/face and glove findings;
+  - bauxite handling and grinding have more hard-hat findings;
+  - calcination has more hot-work glove findings;
+  - the powerhouse has more open panels.
+- Physical conditions are reported in every area.
+- Consequences: missing-PPE findings are mostly C2–C3. C4 appears only with a stated context: no face shield at a
+  caustic sampling point during line breaking, bare hands on a caustic sample valve, or grating removed at a raised
+  edge.
+- Closure controls are mixed. The residual consequence is never higher than the original.
+- The seed is fixed (42). `tests/test_seed_realism.py` checks the targets.
+
+**Distribution after scoring with the v1.4.0 rules** (all 150 open and closed hazards, with `now` = 25 Nov 2026 12:00;
+the history is generated relative to `now`, so the result is the same for any date):
+
+| Band | Hazards | Share | Target |
+|---|---:|---:|---|
+| Low | 60 | 40 % | 30–40 % |
+| Moderate | 53 | 35 % | 30–40 % |
+| High | 36 | 24 % | 15–25 % |
+| Extreme | 1 | 1 % | ≤ 8 % |
+
+| Area | Total | Low | Moderate | High | Extreme |
+|---|---:|---:|---:|---:|---:|
+| BXH Bauxite Handling | 15 | 6 | 5 | 4 | 0 |
+| GRD Grinding & Desilication | 13 | 8 | 5 | 0 | 0 |
+| DIG Digestion | 24 | 6 | 9 | 9 | 0 |
+| CLR Clarification | 23 | 7 | 7 | 9 | 0 |
+| FLT Security Filtration | 20 | 5 | 9 | 5 | 1 |
+| PRC Precipitation | 15 | 7 | 5 | 3 | 0 |
+| CAL Calcination | 12 | 9 | 2 | 1 | 0 |
+| TNK Caustic Tank Farm | 15 | 7 | 6 | 2 | 0 |
+| PWR Powerhouse & Utilities | 13 | 5 | 5 | 3 | 0 |
+
+- Consequence: C1 17, C2 80, C3 48, C4 5.
+- Likelihood: L1 54, L2 41, L3 25, L4 27, L5 3.
+- Status: 136 closed, 4 awaiting verification, 10 open.
+- Types: eye/face 29, gloves 27, floor liquid 26, hard hat 24, corrosion 15, open panel 10, walkway obstruction 8,
+  floor opening 6, other 5.
+
+**Closure-control mix** (140 closures with a control):
+
+| Control | Count | Share |
+|---|---:|---:|
+| Procedural | 56 | 40 % |
+| Engineering / isolation | 49 | 35 % |
+| PPE | 22 | 16 % |
+| Substitution | 7 | 5 % |
+| Elimination | 6 | 4 % |
+
+**Likelihood label.** `risk.LIKELIHOOD_NOTE` reads: "ADOSH-SF likelihood describes how likely harm is; SHMS
+estimates it from how often similar hazards were reported in the same area in the last 365 days – a project
+heuristic, not the guideline's definition."
+- It is shown on the /matrix page twice: under Table 2 and in the project section.
+- On the confirm page it is the tooltip on "Likelihood" and also appears as visible text.
+- On the hazard page it is shown under the risk line.
+- It also appears in the README, architecture.md, risk_matrix_source.md and requirements.md.
+- `tests/test_likelihood_label.py` checks all of these.

@@ -39,6 +39,8 @@ definitions "have been adopted from HB 203:2000" (5.3(l), p. 8).
 
 Table 3 labels level 5 "Frequent/ Almost Certain"; SHMS uses "Frequent / Almost certain".
 
+**ADOSH-SF likelihood describes how likely harm is; SHMS estimates it from how often similar hazards were reported in the same area in the last 365 days – a project heuristic, not the guideline's definition.**
+
 **Project interpretation (not in the guideline):** SHMS sets likelihood from confirmed hazards of the same type in
 the same area in the previous 365 days: 0 → 1, 1 → 2, 2 → 3, 3–5 → 4, ≥ 6 → 5. The guideline allows estimates from
 "past records" (5.3(f)(i)) but defines no counts.

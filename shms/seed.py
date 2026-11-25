@@ -1,5 +1,9 @@
 """Synthesized refinery layout, users and hazard history (deterministic, seed 42).
 
+v1.4.1: 150 reports over 6 months with per-area frequencies (PROFILE), realistic consequences
+(CONSEQUENCE_WEIGHTS) and mixed closure controls (CONTROLS), so that the ADOSH-SF v4.0 bands come out roughly
+Low 40 %, Moderate 35 %, High 24 %, Extreme 1 % (tests/test_seed_realism.py).
+
 Real refinery records and site maps are confidential, so the demo uses a
 synthesized layout that follows the Bayer process flow and a generated
 history that runs through the same service functions as live reports.
@@ -33,7 +37,8 @@ USERS = [
 
 BASE_PPE = "Hard hat, Safety glasses, Gloves, Safety boots, Flame-resistant coverall"
 REQUIRED = "no_hard_hat,no_eye_protection,no_gloves"
-# code, name, owner index, extra PPE shown at the entrance, AI checks, x, y, w, h, relative hazard weight
+# code, name, owner index, extra PPE shown at the entrance, AI checks, x, y, w, h, relative hazard weight (unused since
+# v1.4.1: per-area frequencies are in PROFILE)
 # This refinery uses coveralls, not hi-vis vests, so no area requires a vest (the vest check was also
 # rejected by the release gate). Every area requires hard hat, eye protection and gloves.
 AREAS = [
@@ -92,21 +97,144 @@ AREAS = [
     ),
 ]
 
-CATEGORY_WEIGHTS = {"no_hard_hat": 6, "no_eye_protection": 9, "no_gloves": 8, "no_hi_vis_vest": 5}
-
-ACTIONS = {
-    "no_hard_hat": "Work stopped; worker briefed and hard hat issued. Toolbox talk held with the crew.",
-    "no_eye_protection": "Task paused; safety glasses and face shield issued. Eye-wash station location reconfirmed.",
-    "no_gloves": "Task paused; chemical gloves issued and task risk assessment reviewed.",
-    "no_hi_vis_vest": "Worker briefed; hi-vis vest issued from the area PPE station.",
+# ---------------------------------------------------------------- synthesized history (v1.4.1)
+# Expected findings per area over the 6-month history, by hazard type. Caustic areas (digestion, clarification,
+# filtration, tank farm) have more eye/face and glove findings; bauxite handling and grinding more hard-hat findings
+# (mobile plant, conveyors, overhead work); calcination hot-work gloves; the powerhouse more open panels.
+# Repeats of one type in one area are kept low, as on a site that acts on its findings.
+PPE_FINDINGS = ("no_hard_hat", "no_eye_protection", "no_gloves")
+CAUSTIC = {"DIG", "CLR", "FLT", "TNK"}
+PROFILE: dict[str, dict[str, float]] = {
+    "BXH": {
+        "no_hard_hat": 3,
+        "no_eye_protection": 1,
+        "no_gloves": 1,
+        "walkway_obstruction": 1.5,
+        "surface_corrosion": 1,
+        "open_panel": 0.7,
+        "other_condition": 0.7,
+    },
+    "GRD": {
+        "no_hard_hat": 2.5,
+        "no_eye_protection": 1,
+        "no_gloves": 1,
+        "open_panel": 1,
+        "floor_liquid": 1,
+        "walkway_obstruction": 0.8,
+        "surface_corrosion": 0.6,
+    },
+    "DIG": {
+        "no_hard_hat": 1,
+        "no_eye_protection": 3,
+        "no_gloves": 2.5,
+        "floor_liquid": 2,
+        "surface_corrosion": 1,
+        "floor_opening": 0.6,
+        "other_condition": 0.6,
+    },
+    "CLR": {
+        "no_hard_hat": 1,
+        "no_eye_protection": 2.5,
+        "no_gloves": 2,
+        "floor_liquid": 1.5,
+        "floor_opening": 0.7,
+        "surface_corrosion": 1,
+        "walkway_obstruction": 0.6,
+    },
+    "FLT": {
+        "no_hard_hat": 1,
+        "no_eye_protection": 2.5,
+        "no_gloves": 2,
+        "floor_liquid": 1.5,
+        "walkway_obstruction": 1,
+        "surface_corrosion": 0.8,
+    },
+    "PRC": {
+        "no_hard_hat": 1.5,
+        "no_eye_protection": 1.5,
+        "no_gloves": 1.5,
+        "walkway_obstruction": 1,
+        "floor_opening": 0.7,
+        "surface_corrosion": 0.8,
+        "floor_liquid": 0.7,
+    },
+    "CAL": {
+        "no_hard_hat": 1.5,
+        "no_eye_protection": 1,
+        "no_gloves": 2,
+        "surface_corrosion": 1,
+        "other_condition": 1,
+        "walkway_obstruction": 0.7,
+    },
+    "TNK": {
+        "no_hard_hat": 0.7,
+        "no_eye_protection": 2,
+        "no_gloves": 1.5,
+        "surface_corrosion": 1.5,
+        "floor_liquid": 1,
+        "open_panel": 0.5,
+    },
+    "PWR": {
+        "no_hard_hat": 1,
+        "no_eye_protection": 0.7,
+        "no_gloves": 0.7,
+        "open_panel": 1.5,
+        "other_condition": 1,
+        "surface_corrosion": 0.6,
+    },
 }
-# Synthetic closures issue PPE, so their control type is PPE (the last level of the ADOSH-SF hierarchy). The residual
-# consequence is a fixed synthetic choice (two levels lower, at least 1) – demo data, not an assessment.
-SYNTHETIC_CONTROL = "ppe"
+# Consequence (ADOSH-SF Table 1) as weights for C1..C5. Most missing-PPE findings are C2-C3; C4 only where the
+# context makes it credible (no face shield at a caustic sampling point or during line breaking; an uncovered opening
+# at height). The description says which context applies.
+CONSEQUENCE_WEIGHTS: dict[str, tuple[float, ...]] = {
+    "no_hard_hat": (0, 55, 45, 0, 0),
+    "no_eye_protection": (0, 60, 40, 0, 0),
+    "no_gloves": (5, 60, 35, 0, 0),
+    "floor_liquid": (10, 65, 25, 0, 0),
+    "walkway_obstruction": (25, 65, 10, 0, 0),
+    "open_panel": (0, 45, 55, 0, 0),
+    "floor_opening": (0, 20, 60, 20, 0),
+    "surface_corrosion": (55, 40, 5, 0, 0),
+    "other_condition": (20, 65, 15, 0, 0),
+}
+CAUSTIC_C4 = {"no_eye_protection": 0.12, "no_gloves": 0.04}  # share of caustic-area findings that are C4
+C4_CONTEXT = {
+    "no_eye_protection": "No face shield at a caustic sampling point during line breaking.",
+    "no_gloves": "Bare hands on a caustic sample valve.",
+    "floor_opening": "Grating removed at a raised platform edge.",
+}
+# Closure controls: (control type, weight, how far the residual consequence drops, action text). Residual consequence
+# is never higher than the original. Elimination and substitution are rare.
+CONTROLS: dict[str, list[tuple[str, float, int, str]]] = {
+    "ppe_finding": [
+        ("procedural", 40, 1, "Toolbox talk held with the crew; task permit re-checked for the required PPE."),
+        ("ppe", 33, 1, "PPE issued / replaced from the area store; worker briefed."),
+        ("engineering", 22, 1, "PPE station installed at the area entrance; sign plus barrier at the access point."),
+        ("substitution", 2, 2, "Sampling moved to a closed sampler so the task no longer needs open handling."),
+        ("elimination", 2, 2, "Manual sampling at this point discontinued (online analyser in use)."),
+    ],
+    "condition": [
+        ("procedural", 40, 1, "Housekeeping round added to the shift checklist; area cleaned and re-inspected."),
+        ("engineering", 45, 1, "Barrier and signage placed; drip tray / guard / cover fitted by maintenance."),
+        ("elimination", 5, 2, "Source removed: leaking fitting replaced / redundant item taken out of the walkway."),
+        ("substitution", 3, 2, "Coated grating substituted for the corroded section."),
+        ("ppe", 3, 0, "Interim PPE issued until the repair is made."),
+    ],
+}
+N_HISTORY = 150
 
 
-def _residual(consequence: int) -> int:
-    return max(1, consequence - 2)
+def _consequence(rng: random.Random, area_code: str, cat: str) -> tuple[int, str]:
+    if area_code in CAUSTIC and rng.random() < CAUSTIC_C4.get(cat, 0):
+        return 4, C4_CONTEXT[cat]
+    c = rng.choices((1, 2, 3, 4, 5), CONSEQUENCE_WEIGHTS[cat])[0]
+    return c, C4_CONTEXT.get(cat, "") if c == 4 else ""
+
+
+def _control(rng: random.Random, cat: str, consequence: int) -> tuple[str, int, str]:
+    options = CONTROLS["ppe_finding" if cat in PPE_FINDINGS else "condition"]
+    code, _, drop, text = rng.choices(options, [o[1] for o in options])[0]
+    return code, max(1, consequence - drop), text
 
 
 def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta):
@@ -126,7 +254,7 @@ def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta
     return DetectorResult("yolo:sh17_yolo9e", [Suggestion(code, rng.uniform(0.45, 0.95))], rng.uniform(250, 900))
 
 
-def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_seed: int = 42) -> None:
+def seed(db: Session, n_history: int = N_HISTORY, now: datetime | None = None, rng_seed: int = 42) -> None:
     if db.scalar(select(User).limit(1)) is not None:
         return  # already seeded
     rng = random.Random(rng_seed)
@@ -166,22 +294,22 @@ def seed(db: Session, n_history: int = 240, now: datetime | None = None, rng_see
 
     reporters = [u for u in users if u.role == Role.REPORTER]
     supervisor = next(u for u in users if u.role == Role.SUPERVISOR)
-    area_w = [a[-1] for a in AREAS]
     times = sorted(now - timedelta(days=rng.uniform(0, 180), hours=rng.uniform(0, 12)) for _ in range(n_history))
 
     with notify.no_mail():  # synthetic history: in-app notifications only, no outbox e-mails
-        _history(db, rng, areas, area_w, reporters, supervisor, times, now)
+        _history(db, rng, areas, reporters, supervisor, times, now)
     db.commit()
 
 
-def _history(db, rng, areas, area_w, reporters, supervisor, times, now) -> None:
+def _history(db, rng, areas, reporters, supervisor, times, now) -> None:
+    cells = [(a, cat, w) for a in areas for cat, w in PROFILE[a.code].items()]
     for t in times:
-        area = rng.choices(areas, area_w)[0]
-        cats = area.check_codes
-        cat = rng.choices(cats, [CATEGORY_WEIGHTS[c] for c in cats])[0]
+        area, cat, _ = rng.choices(cells, [w for *_, w in cells])[0]
         reporter = rng.choice(reporters)
-        h = services.create_draft(db, reporter, area, None, _synthetic_ai(rng, area, cat, now - t), at=t)
-        cons = max(1, min(5, taxonomy.get(cat).default_consequence + rng.choice([-1, 0, 0, 0, 1])))
+        ai = _synthetic_ai(rng, area, cat, now - t) if cat in PPE_FINDINGS else None  # AI checks PPE only
+        h = services.create_draft(db, reporter, area, None, ai, at=t)
+        cons, context = _consequence(rng, area.code, cat)
+        control, residual, action = _control(rng, cat, cons)
         on_spot = rng.random() < 0.25 and cons <= 3
         services.confirm(
             db,
@@ -190,11 +318,11 @@ def _history(db, rng, areas, area_w, reporters, supervisor, times, now) -> None:
             services.Confirmation(
                 category_code=cat,
                 consequence=cons,
-                description=f"Synthetic report: {taxonomy.get(cat).name.lower()}.",
+                description=f"Synthetic report: {taxonomy.get(cat).name.lower()}. {context}".strip(),
                 fixed_on_spot=on_spot,
-                closure_action=ACTIONS[cat] if on_spot else "",
-                control_type=SYNTHETIC_CONTROL if on_spot else None,
-                residual_consequence=_residual(cons) if on_spot else None,
+                closure_action=action if on_spot else "",
+                control_type=control if on_spot else None,
+                residual_consequence=residual if on_spot else None,
             ),
             at=t,
         )
@@ -205,13 +333,7 @@ def _history(db, rng, areas, area_w, reporters, supervisor, times, now) -> None:
             if rng.random() < min(0.97, 0.35 + age / 60):
                 close_at = min(now, t + timedelta(days=rng.uniform(0.2, 1.6) * (h.due_at - t).days + 0.1))
                 services.close(
-                    db,
-                    h,
-                    area.owner,
-                    ACTIONS[cat],
-                    at=close_at,
-                    control_type=SYNTHETIC_CONTROL,
-                    residual_consequence=_residual(cons),
+                    db, h, area.owner, action, at=close_at, control_type=control, residual_consequence=residual
                 )
         if close_at is not None:
             # The safety supervisor verifies closures a few days later; recent ones are still waiting.

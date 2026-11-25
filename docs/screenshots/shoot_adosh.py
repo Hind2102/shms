@@ -1,4 +1,4 @@
-"""Screenshots for v1.4.0 (1366 px): the ADOSH-SF risk matrix page, the closure form with control type and residual
+"""Screenshots for v1.4.0/v1.4.1 (1366 px): the manager home, the ADOSH-SF risk matrix page, the closure form with control type and residual
 risk, and the manager's control-type panel. Uses a fresh seeded database, as in shoot.py:
 
     SHMS_DATABASE_URL=sqlite:////tmp/ui.db SHMS_DETECTOR=mock uvicorn shms.asgi:app --port 8765 &
@@ -54,6 +54,8 @@ with sync_playwright() as p:
     ctx.close()
 
     ctx, pg = signed_in(br, "yousef")  # manager
+    fits(pg, "manager home (full page)")
+    pg.screenshot(path=f"{out}/desktop_manager_home.png", full_page=True)
     panel = pg.locator("#control-types")
     panel.scroll_into_view_if_needed()
     fits(pg, "manager home")
