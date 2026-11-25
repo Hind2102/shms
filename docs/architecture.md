@@ -10,7 +10,7 @@ flowchart LR
         Pages["web/pages.py<br/>HTML routes"]
         API["web/api.py<br/>JSON API (/docs)"]
         Svc["services.py<br/>workflow state machine · routing<br/>alerts · dashboard queries"]
-        Risk["risk.py<br/>5×5 matrix · likelihood<br/>from history"]
+        Risk["risk.py<br/>ADOSH-SF v4.0 5×5 matrix · likelihood<br/>from history · alert reason"]
         Tax["taxonomy.py<br/>hazard categories"]
         Det["detection/<br/>HazardDetector interface"]
         Rules["rules.py<br/>boxes → PPE hazards"]
@@ -57,7 +57,7 @@ flowchart LR
 | `web/pages.py`, `templates/` | HTML pages; no business rules | HTTP form posts → service calls |
 | `web/api.py` | JSON API for scripts and tests | `POST /api/hazards`, `/confirm`, `/close`, `GET /api/dashboard`, `POST /api/detect` |
 | `services.py` | Workflow (draft, open, planned, pending verification, closed; reject and reopen), permissions, routing to Area Owner, alerts, dashboard figures | Plain Python functions taking a DB session |
-| `risk.py` | Consequence × likelihood scoring; likelihood from area history | Pure functions; definitions in `config/risk_matrix.json` |
+| `risk.py` | Consequence × likelihood scoring on the ADOSH-SF v4.0 matrix (Tables 1–3); likelihood from area history; alert reason (High/Extreme band or consequence ≥ 4); hierarchy of controls | Pure functions; definitions in `config/risk_matrix.json`, source in [risk_matrix_source.md](risk_matrix_source.md) |
 | `taxonomy.py` | Hazard categories; marks the AI-evaluated subset | `config/taxonomy.json` |
 | `detection/` | `HazardDetector.detect(photo) → DetectorResult` (suggestions, boxes, latency, error) | YOLO, Ollama and mock implementations are interchangeable via `SHMS_DETECTOR` |
 | `detection/rules.py` | Converts PPE/body-part boxes to hazards with explicit geometric rules | Same function scores model output and ground truth |
@@ -79,7 +79,10 @@ flowchart LR
    so no images leave the site and no paid API is needed.
 5. **Reporting and AI eligibility are separate.** Physical conditions can be confirmed in any area. The same area-level list validates form and API submissions. PPE suggestions are filtered by area and the release gate. Optional floor-liquid and obstruction observations never preselect a category. A new manual category needs a taxonomy entry rather than a database migration.
 6. **Likelihood is computed, not guessed.** It comes from the number of similar hazards in the same area in the
-   last 90 days, which links individual cases (problem 1 in the proposal) and makes repeat hazards rise in risk.
+   last 365 days, mapped onto the ADOSH-SF Table 2 levels (0 → Rare, 1 → Possible, 2 → Likely, 3–5 → Often, ≥ 6 →
+   Frequent – a project interpretation). This links individual cases (problem 1 in the proposal) and makes repeat
+   hazards rise in risk. Matrix, band names and action texts follow the ADOSH-SF Technical Guideline "Process of Risk
+   Management" v4.0; close-out targets are project-defined because the guideline sets none.
 7. **Modular monolith, not microservices.** One team, one database and one deployment; modules have clear
    interfaces (pages/API → services → risk/taxonomy/detection → models). Microservices would add network hops
    and distributed-transaction patterns (sagas) that this workflow does not need; the load test measures the
@@ -88,7 +91,10 @@ flowchart LR
 8. **Idempotent reporting.** Site Wi-Fi is unreliable and people double-tap. Each report form carries an
    idempotency key; a retry returns the same report, and reusing a key for a different report is refused (409).
 9. **Integrity in the database, not only in code.** CHECK constraints (levels 1–5, a closed hazard must say how
-   it was closed), foreign keys and indexes that match the likelihood and dashboard queries.
+   it was closed, a control type from the hierarchy of controls), foreign keys and indexes that match the likelihood
+   and dashboard queries. Data changes go through Alembic: migration 0008 re-scored every hazard to the v4.0 matrix
+   and wrote an audit event with old → new values; legacy closures keep control type and residual risk empty
+   ("not recorded") rather than guessed values.
 10. **Evaluate offline, monitor online.** Precision/recall come from the labelled SH17 test set. In use, the
     app tracks latency, errors and how often reporters accept or correct the AI against SLOs
     (`config/slo.json`), exported for Prometheus at `/metrics`. A falling acceptance rate triggers re-evaluation.
