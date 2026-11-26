@@ -266,3 +266,48 @@ def test_migration_0010_copies_existing_photo_gps_as_report_location(tmp_path):
     assert len(rows) == count  # nothing deleted
     assert rows[1] == "photo" and loc == (24.775, 54.7)
     assert all(source == "none" for hid, source in rows.items() if hid != 1)
+
+
+# ------------------------------------------------------------------ closure photos (confirm "fixed on the spot", close)
+
+
+def test_closure_photo_inputs_allow_the_photo_library(client):
+    from pathlib import Path
+
+    for t in ("confirm.html", "hazard.html"):
+        assert 'capture="environment"' not in (Path("shms/templates") / t).read_text(), t
+
+
+def test_rejected_fixed_on_spot_photo_reshows_the_confirm_form(client):
+    hid = _api(client, "a.jpg", jpeg_bytes()).json()["id"]
+    login(client, REPORTER)
+    r = client.post(
+        f"/hazards/{hid}/confirm",
+        data={
+            "category_code": "no_hard_hat",
+            "consequence": 2,
+            "fixed_on_spot": "true",
+            "closure_action": "Issued",
+            "control_type": "ppe",
+            "residual_consequence": "1",
+        },
+        files={"closure_photo": ("fixed.jpg", b"not an image", "image/jpeg")},
+    )
+    assert r.status_code == 422 and _is_page(r)
+    assert "could not be read as a photo" in r.text and 'id="confirm-form"' in r.text
+
+
+def test_rejected_close_photo_shows_the_message_on_the_hazard_page(client):
+    from tests.test_api import OWNER_DIG
+
+    hid = _api(client, "a.jpg", jpeg_bytes()).json()["id"]
+    client.post(
+        f"/api/hazards/{hid}/confirm", headers=h(REPORTER), json={"category_code": "no_hard_hat", "consequence": 3}
+    )
+    login(client, OWNER_DIG)
+    r = client.post(
+        f"/hazards/{hid}/close",
+        data={"action": "Done", "control_type": "ppe", "residual_consequence": "1"},
+        files={"photo": ("done.jpg", b"not an image", "image/jpeg")},
+    )
+    assert r.status_code == 200 and "could not be read as a photo" in r.text

@@ -6,6 +6,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -412,17 +413,18 @@ async def confirm_submit(
                 residual_consequence=_level(residual_consequence),
             ),
         )
-    except (services.WorkflowError, services.PermissionDenied) as exc:
+    except (services.WorkflowError, services.PermissionDenied, PhotoRejected) as exc:
         db.rollback()
         return render(
             request,
             "confirm.html",
             user,
             db,
+            status_code=exc.status_code if isinstance(exc, PhotoRejected) else 200,
             h=h,
             suggestions=json.loads(h.ai_suggestions or "[]"),
             consequences=risk.consequence_levels(),
-            error=str(exc),
+            error=exc.detail if isinstance(exc, PhotoRejected) else str(exc),
         )
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}?created=1", status_code=303)
@@ -580,9 +582,10 @@ async def close(
             control_type=control_type or None,
             residual_consequence=_level(residual_consequence),
         )
-    except (services.WorkflowError, services.PermissionDenied) as exc:
+    except (services.WorkflowError, services.PermissionDenied, PhotoRejected) as exc:
         db.rollback()
-        return RedirectResponse(f"/hazards/{h.id}?error={exc}", status_code=303)
+        message = exc.detail if isinstance(exc, PhotoRejected) else str(exc)
+        return RedirectResponse(f"/hazards/{h.id}?error={quote(message)}", status_code=303)
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}", status_code=303)
 
