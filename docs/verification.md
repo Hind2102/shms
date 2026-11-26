@@ -1503,3 +1503,59 @@ hazard type and control.
 - The optional Arabic / RTL toggle: time box. Safety wording needs a reviewed translation.
 - Area pre-selection from photo GPS: the concept map is not georeferenced.
 - Real user tests with field staff: the timings are scripted estimates.
+
+# v1.6.1 (2026-11-26) – ordinary phone photos, report location, public demo
+
+**Problem reported by the owner.** Uploading ordinary photos from her phone or Mac did not work; no draft was
+created that day (the newest draft in the local `shms.db` was from 2026-11-15).
+
+**Reproduction.** Seven sample files built to match what phones and Macs produce
+(sample generator and upload script kept outside the repo; they post each file through the real `/report` form,
+signed in as a reporter, with `SHMS_DETECTOR=yolo` and `models/sh17_yolo8s.pt`). "Before" = commit `5e51b00`
+(v1.6.0), "after" = this release. What the reporter sees:
+
+| Sample | Size | Before (v1.6.0) | After (v1.6.1) |
+|---|---|---|---|
+| iPhone HEIC, 12 MP, EXIF orientation 6, GPS (`IMG_4821.HEIC`, `image/heic`) | 10.0 MB | 422, raw JSON `{"detail":"File is not a readable image"}` – no draft | draft; stored upright 1536 × 2048; capture time and GPS kept (location source **photo**); "AI found none of the checked items missing … not a confirmation" |
+| 48 MP JPEG, high-detail (`IMG_48MP.jpg`) | 25.1 MB | 413, raw JSON `{"detail":"Photo is larger than 20 MB"}` – no draft | draft; downscaled to 2048 × 1536 (0.3 s); GPS kept |
+| 48 MP JPEG, typical phone compression (`IMG_48MP_typical.jpg`) | 4.0 MB | 422, raw JSON `{"detail":"Photo has too many pixels (max 40 megapixels)"}` – no draft | draft; downscaled to 2048 × 1536 |
+| PNG screenshot with transparency (`Screenshot 2026-11-26 at 10.02.11.png`) | 5.2 MB | draft (alpha dropped) | draft; transparency flattened on white |
+| Photo with no people (outdoor oil-field spill) | 0.3 MB | draft; "found none" note | draft; "found none" note + manual hazard choice; location **none** |
+| Rotated JPEG, EXIF orientation 6, no GPS | 3.0 MB | draft, stored upright | draft, stored upright; capture time from EXIF |
+| WhatsApp copy, EXIF stripped (`WhatsApp Image 2026-11-26 at 10.15.32.jpeg`) | 0.1 MB | draft; capture time "unavailable" | draft; capture time = upload time, labelled as such |
+| File over the limit | 35.2 MB | 413, raw JSON "larger than 20 MB" | 413 on the report form: "This photo is larger than 30 MB. Send a smaller copy …" |
+| PDF renamed `.jpg` | 5 KB | 422, raw JSON "File is not a readable image" | 422 on the report form: "This file could not be read as a photo. Upload a JPEG, HEIC, PNG or WebP photo." |
+| Workers photo (control, SH17 test image) | 0.2 MB | draft, 4 YOLO suggestions with boxes | draft, 4 YOLO suggestions with boxes |
+
+**Causes found.** (1) HEIC was not decodable (no `pillow-heif`). (2) The 20 MB and 40 MP limits rejected modern
+48 MP phone photos instead of reducing them. (3) Every rejection came back as a raw JSON page with no way back to the
+form, so the reporter saw an error and nothing else. (4) The photo input had `capture="environment"`, which on phones
+opens the camera only, so photos already in the library could not be chosen. The server-side reproduction does not
+cover (4); it is a browser behaviour, removed in this release.
+The PNG, rotated, WhatsApp and no-people samples already worked on the server in v1.6.0. If such photos failed on the
+owner's device, the cause was (3)/(4) or a file of types (1)/(2); the original files were not available to confirm.
+
+**Changes.**
+- Uploads (`shms/web/deps.py`): JPEG, PNG, WebP and HEIC/HEIF, recognised from the content. Longest side reduced to
+  2048 px; JPEG is decoded in draft mode, so a 48 MP photo is never decoded at full size. EXIF orientation is
+  applied and all metadata is dropped from the stored copy. Limit 30 MB, with a plain message above it. Hard refusal
+  only above 120 MP, or for a non-JPEG over 40 MP with fewer than 0.01 bytes per pixel (decompression-bomb guard).
+- Every rejection on the report page re-shows the form with a plain-language message; other page errors are an HTML
+  message page, and the JSON API stays JSON (`shms/main.py`).
+- Analysis always gives a visible result. If the detector fails, the draft is still created and the confirm page
+  says the AI could not analyse the photo and asks for a manual choice (`pages.run_detector`). With no findings, the
+  existing note says "found none of the checked items missing – not a confirmation", with manual hazard selection.
+  An "Analysing your photo…" status shows while the form uploads (`shms/static/report-upload.js`).
+- Report location (`services.report_location`, migration `0010_report_location`): the photo's EXIF GPS when present,
+  else the device position from a "Use my current location" button (`navigator.geolocation`, only after a tap; the
+  browser asks for permission; https or localhost only), else none. Stored with its source `photo` / `device` /
+  `none` and the device accuracy. Existing reports with photo GPS are back-filled as `photo`. Capture time falls back
+  to the upload time, labelled "upload time, because the photo has no capture time".
+- **Behaviour change in a listed file** (`shms/services.py`, AGENTS.md rule): `create_draft` takes an optional
+  `device` location and stores the report location; risk scoring and the workflow are unchanged.
+
+**Tests.** `tests/test_photo_uploads_v161.py` (each format, wrong MIME type, 48 MP downscaling, 20–30 MB accepted,
+PNG transparency, orientation, WhatsApp fallback, metadata stripped, every rejection message on the page, HTML vs
+JSON errors, no-people result, detector crash, location sources photo/device/none, invalid device positions, the
+migration back-fill). `tests/test_uploads.py`: the size-limit test now checks 30 MB. It was changed because the owner
+raised the limit; it was not loosened to make it pass.
