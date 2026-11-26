@@ -9,6 +9,7 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip-link" href="#main">Skip to main content</a>
+{% if get_settings().demo_mode %}<div class="demo-banner" role="note">Public demo – do not upload confidential, personal or site photos; data resets on restart.</div>{% endif %}
 {% set nav_links = [('/', 'Home'), ('/report', 'Report hazard'), ('/site', 'Site plan'), ('/dashboard', 'Dashboard'), ('/hazards', 'Hazards')]
    + ([('/queue', 'My queue')] if user and user.role.value in ('area_owner', 'supervisor') else [])
    + [('/matrix', 'Risk matrix')]

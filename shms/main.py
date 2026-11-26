@@ -15,11 +15,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import services
+from . import demo, services
 from .db import create_all, init_engine, new_session
 from .seed import seed
 from .settings import PACKAGE_DIR, get_settings
-from .web import api, pages, telemetry
+from .web import api, pages, ratelimit, telemetry
 
 log = logging.getLogger("shms")
 
@@ -44,8 +44,27 @@ def _warm_up() -> None:
         log.warning("AI detector failed to load: %s", exc)
 
 
+def _banner() -> str:
+    return f'<div class="demo-banner" role="note">{escape(demo.BANNER)}</div>' if get_settings().demo_mode else ""
+
+
+def message_page(title: str, message: str, status: int) -> HTMLResponse:
+    """Pages never show raw JSON: a plain-language message, readable on a phone, with a way back."""
+    return HTMLResponse(
+        '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, '
+        f'initial-scale=1"><title>{escape(title)}</title><link rel="stylesheet" href="/static/style.css">'
+        f'{_banner()}<main id="main" class="container"><h1>{escape(title)}</h1><div class="alert err" role="alert">'
+        f'{escape(message)}</div><p><a class="btn primary" href="javascript:history.back()">Go back</a> '
+        '<a class="btn secondary" href="/">Home</a></p></main></html>',
+        status_code=status,
+    )
+
+
 def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastAPI:
     settings = get_settings()
+    if settings.demo_mode:
+        demo.check_config(settings)
+        demo.reset_data(settings, database_url or settings.database_url)
     init_engine(database_url or settings.database_url)
     create_all()
     if seed_demo:
@@ -63,6 +82,8 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
     app.middleware("http")(telemetry.timing_middleware)
+    if settings.rate_limit_per_min > 0:
+        app.middleware("http")(ratelimit.middleware(ratelimit.RateLimiter(settings.rate_limit_per_min), message_page))
     app.include_router(api.router)
     app.include_router(telemetry.router)
     app.include_router(pages.router)
@@ -74,7 +95,7 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
         if req.url.path.startswith("/api") or req.url.path == "/metrics":
             return JSONResponse({"detail": "Internal server error"}, status_code=500)
         return HTMLResponse(
-            "<!doctype html><title>Error</title><h1>Something went wrong</h1>"
+            f"<!doctype html><title>Error</title>{_banner()}<h1>Something went wrong</h1>"
             "<p>The error has been logged. Please go back and try again; if it keeps happening, tell the safety "
             "supervisor.</p><p><a href='/'>Back to the dashboard</a></p>",
             status_code=500,
@@ -83,29 +104,18 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
     def _machine(req: Request) -> bool:
         return req.url.path.startswith("/api") or req.url.path == "/metrics"
 
-    def _message_page(title: str, message: str, status: int) -> HTMLResponse:
-        # Pages never show raw JSON: a plain-language message, readable on a phone, with a way back.
-        return HTMLResponse(
-            '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, '
-            f'initial-scale=1"><title>{escape(title)}</title><link rel="stylesheet" href="/static/style.css">'
-            f'<main id="main" class="container"><h1>{escape(title)}</h1><div class="alert err" role="alert">'
-            f'{escape(message)}</div><p><a class="btn primary" href="javascript:history.back()">Go back</a> '
-            '<a class="btn secondary" href="/">Home</a></p></main></html>',
-            status_code=status,
-        )
-
     @app.exception_handler(StarletteHTTPException)
     async def _http(req: Request, exc: StarletteHTTPException):
         if _machine(req) or exc.status_code in (401, 405) or exc.headers:
             return await http_exception_handler(req, exc)
         titles = {404: "Not found", 403: "Not allowed", 413: "Photo too large", 422: "Cannot use this input"}
-        return _message_page(titles.get(exc.status_code, "Cannot complete this"), str(exc.detail), exc.status_code)
+        return message_page(titles.get(exc.status_code, "Cannot complete this"), str(exc.detail), exc.status_code)
 
     @app.exception_handler(RequestValidationError)
     async def _invalid(req: Request, exc: RequestValidationError):
         if _machine(req):
             return await request_validation_exception_handler(req, exc)
-        return _message_page(
+        return message_page(
             "Form incomplete", "Some required information was missing or not valid. Go back and check the form.", 422
         )
 
