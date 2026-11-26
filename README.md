@@ -23,6 +23,44 @@ Two local AI back-ends are compared: **YOLO** detectors trained on SH17 and a **
 
 ---
 
+## Live demo
+
+**<https://hind2102-shms-demo.hf.space>**: a public demo on a free Hugging Face Space (Docker, 2 CPU cores, no GPU).
+Open that address directly; inside the frame on the Space's own page, sign-in and location sharing do not work.
+
+> **Public demo – do not upload confidential, personal or site photos; data resets on restart.**
+
+| Username | Role | Try |
+|---|---|---|
+| `ahmed` | reporter | *Report hazard* → take or choose a photo → AI suggestions → confirm |
+| `khalid` | Area Owner (Digestion side) | *My queue* → act on a report, close it with a control |
+| `sara` | safety supervisor | verify closures, AI monitoring, control-room board |
+| `yousef` | manager (read-only) | dashboard, site plan, risk matrix |
+
+The password for all accounts is the documented demo value `shms-demo-2026` (not a secret).
+
+**What the demo can do.**
+- The whole workflow, from report to verified closure, on synthesized refinery data.
+- Real AI: YOLOv8s trained on SH17, on CPU.
+- Photos from phones: JPEG, HEIC, PNG and WebP, up to 30 MB; large photos are reduced.
+- "Use my current location".
+- Site plan, dashboard and control-room board.
+
+**What it cannot do.**
+- No data is kept: the database and photos are reset to fresh demo data whenever the Space restarts or wakes from
+  sleep (after about 48 h without visitors).
+- It runs YOLOv8s, not the larger YOLOv9e used for the main evaluation; a report takes a few seconds on the shared
+  CPU.
+- No e-mail is sent; notifications appear in the app only.
+- The experimental unsafe-condition model and the Ollama vision-language model are not available.
+- Submissions are limited to 30 per minute per IP address.
+
+Deploying the demo: `hf auth login` once (the token stays in `~/.cache/huggingface`, never in this repo), then
+`scripts/deploy_hf_space.sh`. It uploads the committed code with `deploy/hf-space/Dockerfile.demo` appended. The
+SH17 weights are downloaded at build time from the authors' release, checksum-verified. `SHMS_SECRET_KEY` is set as
+a Space secret. The local setup below is unchanged.
+
+
 ## Project structure
 
 ```
@@ -123,6 +161,8 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_DEMO_HEADER_AUTH` | `0` | `1` lets the API accept an `X-User-Id` header instead of a token – tests and local scripts only |
 | `SHMS_SHIFT_START_HOUR` | `6` | Start of the day shift in local time; 12-hour shifts (project setting for the supervisor's "since start of shift" counts) |
 | `SHMS_SITE_UTC_OFFSET_H` | `4` | Site time zone offset from UTC, used for shift and "today" views (the database stores UTC) |
+| `SHMS_DEMO_MODE` | `0` | `1` = public demo: warning banner on every page, data wiped and re-seeded on every start; requires `SHMS_SECRET_KEY` and a real detector |
+| `SHMS_RATE_LIMIT_PER_MIN` | `0` | Form/API submissions allowed per client IP per minute (`0` = no limit; the demo uses 30) |
 
 The risk matrix follows the **ADOSH-SF Technical Guideline "Process of Risk Management", version 4.0 (15 July 2024)**:
 consequence levels and definitions from Table 1 (human health and safety; production loss and cost shown as guidance),
