@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import policy, services
 from ..db import get_session
-from ..detection import get_detector
+from ..detection import get_detector  # noqa: F401 - the detector seam tests patch (pages.run_detector is used)
 from ..models import Area, Hazard, Status, User
 from .deps import current_user, photo_file, save_photo, store_photo
 
@@ -66,6 +66,12 @@ def hazard_out(h: Hazard) -> dict:
         "photo_captured_at": h.photo_captured_at,
         "photo_latitude": h.photo_latitude,
         "photo_longitude": h.photo_longitude,
+        "location": {
+            "latitude": h.location_latitude,
+            "longitude": h.location_longitude,
+            "accuracy_m": h.location_accuracy_m,
+            "source": h.location_source,
+        },
         "category_code": h.category_code,
         "ai_model": h.ai_model,
         "ai_top_code": h.ai_top_code,
@@ -121,8 +127,10 @@ def health() -> dict:
 @router.post("/detect")
 async def detect(photo: UploadFile = File(...), user: User = Depends(current_user)) -> dict:
     """Run the configured AI detector on a photo without creating a report."""
+    from .pages import run_detector
+
     name = await save_photo(photo, prefix="detect_")
-    r = get_detector().detect(photo_file(name))
+    r = run_detector(photo_file(name))
     return {
         "model": r.model,
         "latency_ms": round(r.latency_ms, 1),
@@ -138,6 +146,9 @@ async def create_hazard(
     x: int | None = Form(None),
     y: int | None = Form(None),
     photo: UploadFile = File(...),
+    device_lat: str = Form(""),
+    device_lon: str = Form(""),
+    device_accuracy: str = Form(""),
     idempotency_key: str | None = Header(None, max_length=64),
     user: User = Depends(current_user),
     db: Session = Depends(get_session),
@@ -146,6 +157,7 @@ async def create_hazard(
     if area is None:
         raise HTTPException(422, f"Unknown area {area_code}")
     services.validate_pin(area, x, y)
+    device = services.parse_device_location(device_lat, device_lon, device_accuracy)
     try:
         existing = services.replay_or_conflict(db, user, area, idempotency_key, x, y)
     except services.IdempotencyConflict as exc:
@@ -156,19 +168,20 @@ async def create_hazard(
     name, capture = await store_photo(photo, capture=True)
     if name is None:
         raise HTTPException(422, "A photo is required")
-    from .pages import _experimental
+    from .pages import _experimental, run_detector
 
     h = services.create_draft(
         db,
         user,
         area,
         name,
-        get_detector().detect(photo_file(name)),
+        run_detector(photo_file(name)),
         idem_key=idempotency_key,
         x=x,
         y=y,
         experimental=_experimental(photo_file(name)),
         capture=capture,
+        device=device,
     )
     db.commit()
     return {**hazard_out(h), "replayed": False}

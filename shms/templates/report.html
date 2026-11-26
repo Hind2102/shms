@@ -14,7 +14,9 @@
     <label for="photo" class="photo-drop"><span class="photo-icon" aria-hidden="true">
       <svg viewBox="0 0 48 48" width="40" height="40"><rect x="5" y="13" width="38" height="27" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M17 13l3-5h8l3 5" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="26" r="7" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>
       <span><strong>1 · Take or choose a photo</strong><br><span class="small">Capture time and GPS are read from the photo when available.</span></span></label>
-    <input id="photo" type="file" name="photo" accept="image/*" capture="environment" required>
+    {# No capture attribute: on phones it opens only the camera, so photos already in the library could not be chosen. #}
+    <input id="photo" type="file" name="photo" accept="image/*,.heic,.heif" required aria-describedby="photo-status" data-max-mb="{{ max_upload_mb }}">
+    <div id="photo-status" class="photo-status small" role="status" aria-live="polite">JPEG, HEIC, PNG or WebP, up to {{ max_upload_mb }} MB. Large photos are reduced automatically.</div>
     <label for="area">2 · Where is the hazard?</label>
     <select id="area" name="area_id" required>
       {% if not area_id %}<option value="" selected disabled>Choose the area</option>{% endif %}
@@ -25,6 +27,15 @@
       {% endfor %}
     </select>
     {% if area_id and area_source %}<p class="small muted" id="area-hint">{{ 'Area from the link you followed.' if area_source == 'link' else 'Pre-selected: the area of your last report. Change it if you are somewhere else.' }}</p>{% endif %}
+    <fieldset class="locate">
+      <legend>3 · Your location (optional)</legend>
+      <p class="small">If the photo has GPS, that is used. Otherwise you can share where you are now; your phone asks for permission first.</p>
+      <button type="button" id="use-location" class="btn secondary" hidden>Use my current location</button>
+      <div id="location-status" class="small" role="status" aria-live="polite"><noscript>Sharing your location needs JavaScript.</noscript></div>
+      <input type="hidden" name="device_lat" id="device-lat" value="">
+      <input type="hidden" name="device_lon" id="device-lon" value="">
+      <input type="hidden" name="device_accuracy" id="device-accuracy" value="">
+    </fieldset>
     <details id="pin-picker" {% if x is defined and (x is not none or y is not none) %}open{% endif %}>
       <summary>Add a map pin (optional)</summary>
       <p>Tap a point in the outlined zone. Leave it empty to report by area. The map is a concept layout; positions are indicative.</p>
@@ -43,8 +54,11 @@
       <noscript><p>Coordinate ranges on the concept map</p><ul>{% for code, u in bounds.items() %}<li>{{ code }} · X {{ u.x }}–{{ u.x + u.w }}, Y {{ u.y }}–{{ u.y + u.h }}</li>{% endfor %}</ul></noscript>
     </details>
     <button class="btn primary block desktop-only" type="submit">Analyse photo and continue</button>
+    <div id="analysing" class="analysing" role="status" aria-live="assertive" hidden><span class="spinner" aria-hidden="true"></span>
+      <span><strong>Analysing your photo…</strong><br><span class="small">Uploading and checking it usually takes a few seconds. Keep this page open.</span></span></div>
   </form>
 </div>
 <script src="/static/report-pin.js" defer></script>
+<script src="/static/report-upload.js" defer></script>
 {% endblock %}
 {% block bottom_action %}<button class="btn primary" type="submit" form="hazard-report">Analyse photo and continue</button>{% endblock %}

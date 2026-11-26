@@ -6,10 +6,14 @@ import io
 import logging
 import threading
 from contextlib import asynccontextmanager
+from html import escape
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import services
 from .db import create_all, init_engine, new_session
@@ -74,6 +78,35 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
             "<p>The error has been logged. Please go back and try again; if it keeps happening, tell the safety "
             "supervisor.</p><p><a href='/'>Back to the dashboard</a></p>",
             status_code=500,
+        )
+
+    def _machine(req: Request) -> bool:
+        return req.url.path.startswith("/api") or req.url.path == "/metrics"
+
+    def _message_page(title: str, message: str, status: int) -> HTMLResponse:
+        # Pages never show raw JSON: a plain-language message, readable on a phone, with a way back.
+        return HTMLResponse(
+            '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, '
+            f'initial-scale=1"><title>{escape(title)}</title><link rel="stylesheet" href="/static/style.css">'
+            f'<main id="main" class="container"><h1>{escape(title)}</h1><div class="alert err" role="alert">'
+            f'{escape(message)}</div><p><a class="btn primary" href="javascript:history.back()">Go back</a> '
+            '<a class="btn secondary" href="/">Home</a></p></main></html>',
+            status_code=status,
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http(req: Request, exc: StarletteHTTPException):
+        if _machine(req) or exc.status_code in (401, 405) or exc.headers:
+            return await http_exception_handler(req, exc)
+        titles = {404: "Not found", 403: "Not allowed", 413: "Photo too large", 422: "Cannot use this input"}
+        return _message_page(titles.get(exc.status_code, "Cannot complete this"), str(exc.detail), exc.status_code)
+
+    @app.exception_handler(RequestValidationError)
+    async def _invalid(req: Request, exc: RequestValidationError):
+        if _machine(req):
+            return await request_validation_exception_handler(req, exc)
+        return _message_page(
+            "Form incomplete", "Some required information was missing or not valid. Go back and check the form.", 422
         )
 
     @app.exception_handler(pages.CsrfError)

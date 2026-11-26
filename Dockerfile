@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2
 # 1) heavy, rarely-changing dependencies (CPU-only PyTorch keeps the image ~2 GB instead of ~6 GB)
 RUN pip install torch==2.15.0 torchvision==0.29.2 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install "ultralytics>=8.3" "fastapi>=0.110" "uvicorn>=0.29" "sqlalchemy>=2.0" "jinja2>=3.1" \
-        "python-multipart>=0.0.9" "pillow>=10.0" "httpx>=0.27" "alembic>=1.13"
+        "python-multipart>=0.0.9" "pillow>=10.0" "pillow-heif>=0.18" "httpx>=0.27" "alembic>=1.13"
 
 # 2) the application code (changes most often -> last, so rebuilds take seconds)
 RUN useradd --create-home --uid 1000 app

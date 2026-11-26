@@ -235,3 +235,14 @@ header.top nav.nav-wide a { min-width: 48px; justify-content: center; }
 header.top .nav-menu nav a { min-height: 48px; min-width: 48px; display: flex; }
 .seg label { min-height: 48px; display: inline-flex; align-items: center; position: relative; }
 .seg input { inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; cursor: pointer; }
+
+/* v1.6.1 – upload feedback and device location */
+.photo-status { margin: calc(-1 * var(--s1)) 0 var(--s2); }
+.photo-status.err { color: #a4000f; font-weight: 600; }
+fieldset.locate { border: 1px solid #c5cdd6; border-radius: 8px; padding: var(--s2); margin: var(--s2) 0; }
+fieldset.locate legend { font-weight: 600; padding: 0 4px; }
+.analysing { display: flex; gap: var(--s2); align-items: center; margin-top: var(--s2); padding: var(--s2); border-radius: 8px; background: #e8f0fb; border: 1px solid #005eb8; }
+.analysing[hidden] { display: none; }
+.spinner { width: 28px; height: 28px; flex: none; border-radius: 50%; border: 4px solid #b8cde8; border-top-color: #005eb8; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
