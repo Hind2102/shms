@@ -61,6 +61,10 @@ class Settings:
     mail_outbox: Path = field(default_factory=lambda: Path(_env("MAIL_OUTBOX", str(PROJECT_DIR / "outbox"))))
     # Minimum AI confidence for a suggestion to be pre-selected in the report form.
     suggest_threshold: float = field(default_factory=lambda: float(_env("SUGGEST_THRESHOLD", "0.35")))
+    # Project setting for "since start of shift": 12-hour shifts, day shift starting at this local hour
+    # (night shift starts 12 h later), and the site's offset from UTC (the database stores naive UTC).
+    shift_start_hour: int = field(default_factory=lambda: int(_env("SHIFT_START_HOUR", "6")))
+    site_utc_offset_h: float = field(default_factory=lambda: float(_env("SITE_UTC_OFFSET_H", "4")))
 
 
 _settings: Settings | None = None

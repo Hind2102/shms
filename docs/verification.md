@@ -1442,3 +1442,64 @@ PPE 21 %, Elimination 4 %, Substitution 3 %.
   - the migration snapshot in `test_migrations.py`, which now ignores only the six new zones.
 - `docs/screenshots/audit_ui.py` (axe-core 4.10.3, 1366 and 390 px) passed: 48 page states, 0 findings, no
   horizontal overflow, no server errors.
+
+# Phase 7 – v1.6.0 (2026-11-26) – layout and usability polish (final feature release)
+
+**Users.** Field operators, contractors, visitors, Area Owners, supervisors and managers in an alumina refinery:
+gloves, sunlight, one hand, little time. The review was committed before any code change (`e48314f`,
+[docs/ux_review.md](ux_review.md)): Nielsen's 10 heuristics per role at 390 and 1366 px, with severities 0–4 and fixes.
+
+**Kept unchanged:** evaluation results, risk-matrix logic, workflow rules, the pin and route rules, and the v1.4.1
+band distribution of the seed. The seed's random sequence is identical; only the closure texts changed, now chosen by
+hazard type and control.
+
+**Changes.**
+- **Layout.** One header (Alerts and Menu on phones), one card pattern, one button hierarchy
+  (`.btn` primary / `.btn.secondary` / `.btn.danger`), spacing 8/16/24/32, all controls ≥ 48 × 48 px, phone text
+  ≥ 16 px.
+- **Bottom bar on phones.** Each page puts its main action there: "Report a hazard", or the page's submit / verify.
+- **Reporting.** Photo first; area pre-selected from the reporter's last report or from `?area=CODE`; step
+  indicator; consequence on five labelled cards; description optional.
+- **Site plan.** Map at full content width (main column up to 1,680 px), the drawing's title strip hidden (the
+  "Concept layout only" note is kept below the map), larger zone labels and an HTML key, pinch zoom on touch
+  screens. The area card sits directly under the map; choosing a zone shows its route at once; pins sit in a
+  collapsed list.
+- **"Check before entering" card.** Required PPE as our own blue-circle pictograms with labels (not ISO 7010
+  artwork), open hazards with badges, the suggested route, "Permits and site rules still apply", and "Report a
+  hazard here".
+- **Risk badges.** The word plus a shape icon (○ ◆ ▲ ■); the closed status shows ✓. Safety colours: red danger,
+  amber caution, green completed, blue mandatory PPE.
+- **Home pages.** Supervisor: "since start of shift" counts (`SHMS_SHIFT_START_HOUR`, `SHMS_SITE_UTC_OFFSET_H`).
+  Area Owner: "My areas today" first.
+- **`/board`.** Control-room view: sign-in required, read-only, open-risk map, Extreme/High list, overdue count,
+  60 s auto-refresh that the viewer can pause, dark option, large type.
+- **Empty states.** "No … are recorded"; never "safe".
+
+**Verification.**
+- **Task timing, before → after.** Script [docs/ux/time_tasks.py](ux/time_tasks.py), estimated seconds:
+  - Report a hazard (phone): 7 → 5 taps, 0 typed, 16 → 14 s.
+  - Check an area (phone): 4 → 3 taps, 3 → 2 pages, 12 → 9 s.
+  - Verify a closure (desktop): 2 taps and 1 typed field, unchanged.
+- **Page audit** ([docs/ux/page_audit.py](ux/page_audit.py), every main page per role at 390 and 1366 px):
+  - 0 interactive elements under 48 × 48 px (before: 10–24 per page);
+  - 0 phone text blocks under 16 px;
+  - 0 horizontal overflow (before: `/monitoring` 23 px).
+- **axe-core 4.10.3** (`docs/screenshots/audit_ui.py`): 52 states at 390 and 1366 px, **0 findings**. During the
+  work it found two problems in the new code, both fixed: an unpausable timed refresh and non-focusable scrolling
+  tables.
+- **Tests.** New `tests/test_ux_v16.py` covers:
+  - the area-card contents;
+  - `/board` sign-in, read-only, refresh control, dark option and overdue count;
+  - badge text and icons;
+  - the phone bottom bar on every page, plus the report, confirm and verify actions;
+  - consequence cards;
+  - area pre-selection;
+  - closure text matching the hazard type;
+  - shift-window rules;
+  - the owner's "today" view;
+  - no page saying "safe" when there is no data, for every role.
+
+**Not done.**
+- The optional Arabic / RTL toggle: time box. Safety wording needs a reviewed translation.
+- Area pre-selection from photo GPS: the concept map is not georeferenced.
+- Real user tests with field staff: the timings are scripted estimates.

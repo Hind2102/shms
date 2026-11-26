@@ -22,6 +22,7 @@ from .settings import PACKAGE_DIR
 MAP_FILE = PACKAGE_DIR / "static" / "ata_concept_map.svg"
 MAP_URL = "/static/ata_concept_map.svg"
 VIEW_W, VIEW_H = 1920, 1080
+TITLE_STRIP_H = 66  # the drawing's own title strip; hidden in the app, whose page heading already names the site
 FOOTER_NOTE = (
     "Concept layout only — roads, equipment and facility positions are indicative and require a verified site "
     "plot plan."

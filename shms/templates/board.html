@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control-room board · Site Hazard Management</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/board.css">
+</head>
+<body class="board-page{% if dark %} dark{% endif %}">
+{% from '_macros.html' import level %}
+<main id="main" class="board-main">
+  <header class="board-top">
+    <h1>Site hazards – control room</h1>
+    <p class="board-meta">Updated {{ (now | localtime).strftime('%H:%M') }} local time · refreshes every {{ refresh_s }} s · read-only ·
+      <a href="/board?theme={{ 'light' if dark else 'dark' }}">{{ 'Light' if dark else 'Dark' }} background</a> · <a href="/">Back to SHMS</a>
+      <button type="button" id="refresh-toggle" class="btn secondary" aria-pressed="false" data-seconds="{{ refresh_s }}">Pause auto-refresh</button></p>
+  </header>
+  <section class="board-kpis" aria-label="Totals">
+    <div class="bk danger"><span class="bk-v">{{ urgent | length }}</span><span class="bk-l">Active High or Extreme</span></div>
+    <div class="bk caution"><span class="bk-v">{{ overdue }}</span><span class="bk-l">Overdue actions</span></div>
+    <div class="bk"><span class="bk-v">{{ active }}</span><span class="bk-l">Active hazards (all levels)</span></div>
+  </section>
+  <div class="board-grid">
+    <section class="board-map" aria-label="Open risk by zone">
+      <svg viewBox="0 {{ site_layout.TITLE_STRIP_H }} {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H - site_layout.TITLE_STRIP_H }}" role="img" aria-label="Concept site map with open risk per zone">
+        <defs><pattern id="no-records" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(42)"><path d="M0 0V10" stroke="#73858c" stroke-width="2.5"/></pattern></defs>
+        <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}"/>
+        {% for code, z in zones.items() if code in rows %}{% set a = rows[code] %}
+        <rect x="{{ z.x + 2 }}" y="{{ z.y + z.h - 38 }}" width="{{ z.w - 4 }}" height="36" fill="{{ '#9b472c' if a.value else 'url(#no-records)' }}" fill-opacity="{{ (0.3 + 0.6*a.ratio) if a.value else 0.6 }}"/>
+        <text x="{{ z.x + z.w - 10 }}" y="{{ z.y + z.h - 11 }}" text-anchor="end" class="board-label">{{ code }} · {{ a.value if a.value else 'none recorded' }}</text>
+        {% endfor %}
+      </svg>
+      <p class="board-note">Open risk = sum of risk scores of active hazards reported in the last 90 days, per zone. Hatching: no recorded hazards in this window – not a statement about conditions. {{ site_layout.FOOTER_NOTE }}</p>
+    </section>
+    <section class="board-list" aria-labelledby="urgent-h">
+      <h2 id="urgent-h">Extreme and High – still active</h2>
+      <ol>
+        {% for h in urgent[:12] %}<li>{{ level(h.risk_level) }} <strong>{{ h.area.code }}</strong> {{ h.category_code | cat }}{% if h.due_at and h.due_at < now %} <span class="overdue">overdue</span>{% endif %}</li>
+        {% else %}<li class="empty">No active High or Extreme hazards are recorded.</li>{% endfor %}
+      </ol>
+      {% if urgent | length > 12 %}<p class="board-note">+ {{ urgent | length - 12 }} more in the hazard register.</p>{% endif %}
+    </section>
+  </div>
+</main>
+<script>
+/* Auto-refresh every {{ refresh_s }} s, with a control to pause it (WCAG 2.2.1); the choice is kept per screen. */
+(() => {
+  const btn = document.getElementById('refresh-toggle'), key = 'shms-board-paused';
+  let paused = false, timer;
+  try { paused = localStorage.getItem(key) === '1'; } catch (e) {}
+  const arm = () => { clearTimeout(timer); if (!paused) timer = setTimeout(() => location.reload(), btn.dataset.seconds * 1000); };
+  const show = () => { btn.textContent = paused ? 'Resume auto-refresh' : 'Pause auto-refresh'; btn.setAttribute('aria-pressed', String(paused)); };
+  btn.addEventListener('click', () => { paused = !paused; try { localStorage.setItem(key, paused ? '1' : '0'); } catch (e) {} show(); arm(); });
+  show(); arm();
+})();
+</script>
+</body>
+</html>

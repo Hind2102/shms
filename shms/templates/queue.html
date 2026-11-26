@@ -24,7 +24,7 @@
     <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.area.code }}</td><td>{{ h.category_code | cat }}</td>
       <td>{{ level(h.risk_level) }} {{ h.risk_score }}</td>
       <td>{{ h.due_at | dt }}</td><td class="small">{{ h.planned_action or '–' }}</td></tr>
-    {% else %}<tr><td colspan="6" class="muted">Nothing open. Well done.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="6" class="empty">No hazards are waiting for action.</td></tr>{% endfor %}
   </table>
 </div>
 {% endblock %}

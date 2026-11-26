@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% from "_macros.html" import photo %}
 {% block title %}Confirm report #{{ h.id }}{% endblock %}
+{% block bottom_action %}<button class="btn primary" type="submit" form="confirm-form">Submit report</button>{% endblock %}
 {% block content %}
 {% set req = suggestions | selectattr('required') | list %}{% set top = req[0] if req else None %}
 <h1>Confirm report #{{ h.id }} – {{ h.area.name }}</h1>
+<ol class="steps" aria-label="Report steps"><li>Photo and area</li><li aria-current="step">Confirm</li><li>Sent</li></ol>
 {% if error %}<div class="alert err" role="alert">{{ error }}</div>{% endif %}
 <div class="grid two confirm-evidence">
   <div class="card">
@@ -38,7 +40,7 @@
   </div>
 </div>
 
-<form class="card" method="post" action="/hazards/{{ h.id }}/confirm" enctype="multipart/form-data">
+<form class="card" method="post" action="/hazards/{{ h.id }}/confirm" enctype="multipart/form-data" id="confirm-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <h2>Step 2 of 2 – confirm and score</h2>
   <p class="muted small">Choose the hazard you observed, then rate its worst credible consequence. Check the floor and access route yourself. The experimental model missed liquid in all five labelled indoor water photos in a separate test.</p>
@@ -51,17 +53,19 @@
   </select>
   <p class="muted small">PPE required in {{ h.area.name }}: {{ h.area.check_codes | map('ppe') | join(', ') }}.</p>
 
-  <fieldset class="radio-list"><legend>Worst credible consequence (ADOSH-SF Table 1)</legend>
-  {% for lvl, spec in consequences.items() | reverse %}
-    <label><input type="radio" name="consequence" value="{{ lvl }}" required {% if top and taxonomy.get(top.code).default_consequence == lvl %}checked{% endif %}>
-      <span><strong>{{ lvl }} – {{ spec.name }}</strong><br><span class="small">Health and safety: {{ spec.definition }}</span>
-        <br><span class="muted small">Also as guidance – production: {{ spec.production_loss }} Cost: {{ spec.cost }}</span></span></label>
+  <fieldset class="cons-cards"><legend>Worst credible consequence (ADOSH-SF Table 1)</legend>
+  {% for lvl, spec in consequences.items() %}
+    <label class="cons-card cons-{{ lvl }}"><input type="radio" name="consequence" value="{{ lvl }}" required {% if top and taxonomy.get(top.code).default_consequence == lvl %}checked{% endif %}>
+      <span class="cons-num" aria-hidden="true">{{ lvl }}</span>
+      <span><strong>{{ spec.name }}</strong><br><span class="small">{{ spec.definition }}</span></span></label>
   {% endfor %}
   </fieldset>
+  <details class="small"><summary>Production loss and cost guidance (ADOSH-SF Table 1)</summary>
+    <ul>{% for lvl, spec in consequences.items() %}<li><strong>{{ lvl }} {{ spec.name }}:</strong> {{ spec.production_loss }} {{ spec.cost }}</li>{% endfor %}</ul></details>
   <p class="muted small"><abbr title="{{ risk.LIKELIHOOD_NOTE }}">Likelihood</abbr> is set by the system, not by you.
     <span class="likelihood-note">{{ risk.LIKELIHOOD_NOTE }}</span> Consequence 4 or 5 always alerts the safety supervisor. <a href="/matrix" target="_blank">See the risk matrix</a>.</p>
 
-  <label for="desc">What did you see? (optional)</label>
+  <label for="desc">What did you see? (optional – the photo is usually enough)</label>
   <textarea id="desc" name="description" placeholder="e.g. liquid pooled across the walkway beside the digestion pump"></textarea>
 
   <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="fixed" name="fixed_on_spot" value="true" style="width:auto"> I already fixed it on the spot</label>
@@ -72,7 +76,8 @@
     <label for="cphoto">Closing photo (optional)</label>
     <input id="cphoto" type="file" name="closure_photo" accept="image/*" capture="environment">
   </div>
-  <br><button class="btn block" type="submit">Submit report</button>
+  <br><button class="btn primary block desktop-only" type="submit">Submit report</button>
+  <p class="small"><a href="/report">Back: start a new report</a></p>
 </form>
 <script>
   const fx = document.getElementById('fixed'), ff = document.getElementById('fixfields');

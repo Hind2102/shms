@@ -121,6 +121,8 @@ All settings are environment variables (or lines in `.env`); see [`.env.example`
 | `SHMS_INSTANCE_DIR` | `instance` | Where that generated key is kept (Docker: `/data/instance`) |
 | `SHMS_EXPERIMENTAL_CONDITIONS` | `0` | `1` enables the EXPERIMENTAL unsafe-condition check (liquid on the floor, obstructed walkway; needs Ollama) |
 | `SHMS_DEMO_HEADER_AUTH` | `0` | `1` lets the API accept an `X-User-Id` header instead of a token – tests and local scripts only |
+| `SHMS_SHIFT_START_HOUR` | `6` | Start of the day shift in local time; 12-hour shifts (project setting for the supervisor's "since start of shift" counts) |
+| `SHMS_SITE_UTC_OFFSET_H` | `4` | Site time zone offset from UTC, used for shift and "today" views (the database stores UTC) |
 
 The risk matrix follows the **ADOSH-SF Technical Guideline "Process of Risk Management", version 4.0 (15 July 2024)**:
 consequence levels and definitions from Table 1 (human health and safety; production loss and cost shown as guidance),
@@ -141,6 +143,16 @@ adds the closure fields and re-scores every confirmed hazard to the v4.0 matrix,
 risk empty ("not recorded"). Migration `0009_ata_site_map` (v1.5.0) renames the nine existing areas to the zone names
 of the approved map (codes, ids, hazards and pins kept), adds the six new zones (EVP, HYD, ALS, LIM, WKS, WTR) with
 project-assumed PPE, and moves existing report pins proportionally into their zone on the new map.
+
+**Field use (v1.6.0).** Pages are built for gloves, sunlight, one hand and little time:
+- every control is at least 48 × 48 px, and phone text is at least 16 px;
+- on phones, a bottom bar carries the main action ("Report a hazard", or the page's submit);
+- reporting starts with the photo, and the area is pre-selected from your last report;
+- consequence is chosen on large labelled cards;
+- risk badges always show the word and a shape icon (○ Low, ◆ Moderate, ▲ High, ■ Extreme);
+- the "Check before entering" card shows required PPE as our own blue-circle pictograms with labels.
+
+See [docs/ux_review.md](docs/ux_review.md) for the heuristic review and the before/after task timings.
 
 ## Usage
 
@@ -188,6 +200,9 @@ Main workflow:
    report volume – each stating its calculation, window and site total; an area with nothing recorded is hatched and
    labelled as such, never as "safe", and report volume is shown in a neutral colour because it is not a measure of
    danger. The dashboard (`/dashboard`) keeps the KPIs, trend, repeat hotspots and the hazard register.
+   **Control-room board** (`/board`, v1.6.0): a read-only large-screen page with the site map (open-risk overlay), the
+   active Extreme/High list and the overdue count. It refreshes every 60 s (pausable), has a dark-background option
+   and requires sign-in.
    Select a reporting zone to inspect required PPE, active cases, overdue actions and recent closures.
    **Check before entering** can draw a suggested route from the south gate along the road centre-lines that avoids
    every road beside a zone with active High or Extreme cases, or says honestly why no route is available. Follow site
@@ -252,7 +267,7 @@ created before migrations existed (no `alembic_version` table) are recognised an
 pytest                 # or: make test
 ```
 
-The 418-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
+The 446-test suite runs without a model or GPU (the YOLO tests run automatically when the weights are present); about 2 minutes on
 GitHub's Ubuntu runners, 30–80 s on the test laptop depending on load. They cover every cell of the risk matrix against the ADOSH-SF Table 3 grid, the alert rules, the hierarchy-of-controls and residual-risk closure fields, the
 PPE rules, area-specific PPE checks, idempotent reporting, database constraints and migrations (an old database is
 upgraded with identical rows, and the v4.0 re-scoring with its audit events), every state-machine transition and every action from every wrong state, permissions

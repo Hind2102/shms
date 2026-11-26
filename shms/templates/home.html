@@ -12,7 +12,7 @@
     {% if 'due' in show %}<td>{{ h.due_at | dt }}{% if h.due_at and h.due_at < home.now %} <strong class="late-tag">overdue</strong>{% endif %}</td>{% endif %}
     <td>{{ status(h.status) }}{% if h.escalation_level %} <span class="small">escalated to level {{ h.escalation_level }}</span>{% endif %}</td>
   </tr>
-  {% else %}<tr><td colspan="6" class="muted">{{ empty }}</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="6" class="empty">{{ empty }}</td></tr>{% endfor %}
 </table>
 {%- endmacro %}
 
@@ -20,6 +20,7 @@
 <section class="board">
   <div class="board-head"><h1>Your reports</h1><a class="btn big" href="/report">Report a hazard</a></div>
   <p class="muted">Seen something unsafe? A photo and two taps is enough – the area owner is told straight away.</p>
+  <p><a class="btn secondary check-area" href="/site#unit">Check an area before entering</a></p>
   {% if home.to_verify %}
   <div class="panel attention"><h2>Closures to check</h2>
     <p class="small">These were closed by the area owner. Look at the closing note and photo, then verify or reject.</p>
@@ -30,21 +31,41 @@
 
 {% elif home.role == 'area_owner' %}
 <section class="board">
-  <div class="board-head"><h1>Your open hazards</h1><a class="btn secondary" href="/queue">Open my queue</a></div>
+  <div class="board-head"><h1>My areas today</h1><a class="btn secondary" href="/queue">Open my queue</a></div>
+  <div class="today-grid">
+    {% for t in home.today %}
+    <a class="today-card{% if t.overdue %} has-overdue{% endif %}" href="/site?unit={{ t.area.code }}#unit-detail">
+      <strong>{{ t.area.code }} · {{ t.area.name }}</strong>
+      <span>{{ t.new_today }} new today · {{ t.due_today }} due today · <b>{{ t.overdue }} overdue</b></span>
+      <span>{{ t.active }} active{% if t.highest %} · highest {{ level(t.highest) }}{% else %} · no active hazards recorded{% endif %}</span>
+    </a>
+    {% else %}<p class="empty">No areas are assigned to you.</p>{% endfor %}
+  </div>
+  <h2>Your open hazards</h2>
   <p class="muted">Sorted by target close date. Plan an action, then close it with what was done; a supervisor or the reporter verifies it.</p>
   {% if home.due_soon %}<div class="panel attention"><h2>Due within 3 days or overdue</h2>{{ hazard_rows(home.due_soon, '', ['due']) }}</div>{% endif %}
-  <div class="panel">{{ hazard_rows(home.my_work, 'Nothing is waiting for you.', ['due']) }}</div>
-  <div class="panel"><h2>Closed by you, waiting for verification</h2>{{ hazard_rows(home.waiting_verification, 'None.', []) }}</div>
+  <div class="panel">{{ hazard_rows(home.my_work, 'No hazards are waiting for your action.', ['due']) }}</div>
+  <div class="panel"><h2>Closed by you, waiting for verification</h2>{{ hazard_rows(home.waiting_verification, 'No closures of yours are waiting for verification.', []) }}</div>
 </section>
 
 {% elif home.role == 'supervisor' %}
 <section class="board">
-  <div class="board-head"><h1>Waiting for your verification</h1><a class="btn secondary" href="/site">Site plan</a></div>
+  {% set s = home.shift %}
+  <div class="board-head"><h1>{{ s.name }} – since {{ (s.start | localtime).strftime('%H:%M') }}</h1><a class="btn secondary" href="/site">Site plan</a></div>
+  <dl class="shift-kpis" aria-label="Since start of shift">
+    <div><dt>Reported</dt><dd>{{ s.reported }}</dd></div>
+    <div><dt>High or Extreme</dt><dd>{{ s.high }}</dd></div>
+    <div><dt>Alerts sent</dt><dd>{{ s.alerts }}</dd></div>
+    <div><dt>Closures verified</dt><dd>{{ s.verified }}</dd></div>
+    <div><dt>Waiting for verification (any date)</dt><dd>{{ s.waiting }}</dd></div>
+  </dl>
+  <p class="small muted">Shift times are a project setting (day shift from {{ '%02d' % get_settings().shift_start_hour }}:00 local time, 12-hour shifts).</p>
+  <h2>Waiting for your verification</h2>
   <p class="muted">A closure is only final when someone other than the person who closed it has checked it.</p>
   <div class="panel attention">{{ hazard_rows(home.to_verify, 'No closures are waiting.', []) }}</div>
   <div class="cols">
-    <div class="panel"><h2>Urgent: High and Extreme, still active</h2>{{ hazard_rows(home.urgent[:10], 'None.', ['due']) }}</div>
-    <div class="panel"><h2>Escalated (past target date)</h2>{{ hazard_rows(home.escalated[:10], 'None.', ['due']) }}</div>
+    <div class="panel"><h2>Urgent: High and Extreme, still active</h2>{{ hazard_rows(home.urgent[:10], 'No active High or Extreme hazards are recorded.', ['due']) }}</div>
+    <div class="panel"><h2>Escalated (past target date)</h2>{{ hazard_rows(home.escalated[:10], 'No escalated hazards are recorded.', ['due']) }}</div>
   </div>
 </section>
 
@@ -54,7 +75,7 @@
   <p class="muted">The highest-risk hazards that are still active, then what is overdue and how closures are performing.</p>
   <div class="panel attention">{{ hazard_rows(home.priorities, 'No active hazards are recorded.', ['due']) }}</div>
   <div class="cols">
-    <div class="panel"><h2>Overdue actions ({{ home.overdue | length }})</h2>{{ hazard_rows(home.overdue[:10], 'None.', ['due']) }}</div>
+    <div class="panel"><h2>Overdue actions ({{ home.overdue | length }})</h2>{{ hazard_rows(home.overdue[:10], 'No overdue actions are recorded.', ['due']) }}</div>
     <div class="panel"><h2>Closure performance, last {{ home.closure.window_days }} days</h2>
       {% set c = home.closure %}
       <dl class="facts">

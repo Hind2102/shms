@@ -5,28 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}SHMS{% endblock %} · Site Hazard Management</title>
   <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 <a class="skip-link" href="#main">Skip to main content</a>
+{% set nav_links = [('/', 'Home'), ('/report', 'Report hazard'), ('/site', 'Site plan'), ('/dashboard', 'Dashboard'), ('/hazards', 'Hazards')]
+   + ([('/queue', 'My queue')] if user and user.role.value in ('area_owner', 'supervisor') else [])
+   + [('/matrix', 'Risk matrix')]
+   + ([('/monitoring', 'AI monitoring'), ('/board', 'Control-room board')] if user and user.role.value in ('supervisor', 'manager') else []) %}
 <header class="top"><div class="bar">
-  <a class="logo" href="/"><span class="tri"></span>SHMS</a>
+  <a class="logo" href="/"><span class="tri" aria-hidden="true"></span>SHMS</a>
   {% if user %}
-  <nav>
-    <a href="/">Home</a>
-    <a href="/report"><strong>Report hazard</strong></a>
-    <a href="/site">Site plan</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/hazards">Hazards</a>
-    {% if user.role.value in ('area_owner', 'supervisor') %}<a href="/queue">My queue</a>{% endif %}
-    <a href="/matrix">Risk matrix</a>
-    {% if user.role.value in ('supervisor', 'manager') %}<a href="/monitoring">AI monitoring</a>{% endif %}
+  <nav class="nav-wide" aria-label="Main">
+    {% for href, text in nav_links %}<a href="{{ href }}"{% if href == '/report' %} class="nav-primary"{% endif %}>{{ text }}</a>{% endfor %}
     <a href="/notifications">Alerts{% if unread %}<span class="badge-count">{{ unread }}</span>{% endif %}</a>
   </nav>
-  <div class="who">{{ user.name }} · <form method="post" action="/logout" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="linkbtn" type="submit">sign out</button></form></div>
+  <div class="who">{{ user.name }} · <form method="post" action="/logout" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="linkbtn" type="submit">Sign out</button></form></div>
+  <div class="nav-phone">
+    <a href="/notifications" class="nav-chip">Alerts{% if unread %}<span class="badge-count">{{ unread }}</span>{% endif %}</a>
+    <details class="nav-menu">
+      <summary class="nav-chip">Menu</summary>
+      <nav aria-label="Main (phone)">
+        {% for href, text in nav_links %}<a href="{{ href }}">{{ text }}</a>{% endfor %}
+        <span class="who-phone">{{ user.name }}</span>
+        <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn secondary" type="submit">Sign out</button></form>
+      </nav>
+    </details>
+  </div>
   {% endif %}
 </div></header>
 <main id="main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
+{% if user %}
+<div class="bottom-bar" role="region" aria-label="Main action">
+  {% block bottom_action %}<a class="btn primary report-fab" href="/report">Report a hazard</a>{% endblock %}
+</div>
+{% endif %}
+<script>
+/* Wide tables scroll sideways inside a wrapper on phones; a scrolling wrapper must be reachable by keyboard and named
+   (axe: scrollable-region-focusable). The table keeps its own table semantics. */
+for (const t of document.querySelectorAll('main table:not(.worklist)')) {
+  if (t.parentElement.classList.contains('table-scroll')) continue;
+  const wrap = document.createElement('div');
+  wrap.className = 'table-scroll';
+  t.replaceWith(wrap);
+  wrap.appendChild(t);
+  if (wrap.scrollWidth > wrap.clientWidth + 1) {
+    wrap.tabIndex = 0;
+    wrap.setAttribute('role', 'region');
+    wrap.setAttribute('aria-label', (wrap.closest('section, .card, .panel')?.querySelector('h2, h3')?.textContent?.trim() || 'Table') + ' (scrolls sideways)');
+  }
+}
+</script>
 </body>
 </html>

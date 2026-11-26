@@ -1,12 +1,12 @@
 (() => {
   const svg = document.getElementById('plan');
   const box = svg.viewBox.baseVal;
-  const width = box.width, height = box.height;
-  let x = 0, y = 0, w = width, h = height;
-  const bound = (value, max) => Math.max(0, Math.min(max, value));
+  const x0 = box.x, y0 = box.y, width = box.width, height = box.height;
+  let x = x0, y = y0, w = width, h = height;
+  const bound = (value, lo, span) => Math.max(lo, Math.min(lo + span, value));
   function render() {
-    x = bound(x, width - w);
-    y = bound(y, height - h);
+    x = bound(x, x0, width - w);
+    y = bound(y, y0, height - h);
     svg.setAttribute('viewBox', [x, y, w, h].join(' '));
     svg.classList.toggle('is-zoomed', w < width);
   }
@@ -24,7 +24,7 @@
     y += motion[1] * h / 5;
     render();
   }
-  function reset() { w = width; h = height; x = y = 0; render(); }
+  function reset() { w = width; h = height; x = x0; y = y0; render(); }
   function changeZoom(action) {
     if (action === 'reset') reset();
     else zoom(action === 'in' ? 0.7 : 1 / 0.7);
@@ -48,6 +48,25 @@
     const p = point(e);
     zoom(e.deltaY < 0 ? 0.85 : 1 / 0.85, p.x, p.y);
   }, {passive: false});
+  // Pinch to zoom on touch screens (two pointers); one finger pans once zoomed.
+  const touches = new Map();
+  let pinch = null;
+  svg.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touches.set(e.pointerId, e); });
+  svg.addEventListener('pointermove', e => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, e);
+    if (touches.size !== 2) return;
+    const [a, b] = [...touches.values()];
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const mid = point({clientX: (a.clientX + b.clientX) / 2, clientY: (a.clientY + b.clientY) / 2});
+    if (pinch) zoom(pinch / dist, mid.x, mid.y);
+    pinch = dist;
+    drag = null;
+    e.preventDefault();
+  });
+  const lift = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+  svg.addEventListener('pointerup', lift);
+  svg.addEventListener('pointercancel', lift);
   let drag = null, moved = false;
   svg.addEventListener('pointerdown', e => {
     moved = false;

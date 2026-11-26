@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -17,16 +17,19 @@ from .. import auth, escalate, policy, risk, services, site_layout, taxonomy
 from ..db import get_session
 from ..detection import get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User, utcnow
-from ..settings import PACKAGE_DIR
+from ..settings import PACKAGE_DIR, get_settings
 from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo, store_photo
 
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
-templates.env.globals.update(taxonomy=taxonomy, risk=risk, Status=Status, Role=Role, site_layout=site_layout)
+templates.env.globals.update(
+    taxonomy=taxonomy, risk=risk, Status=Status, Role=Role, site_layout=site_layout, get_settings=get_settings
+)
 templates.env.filters["cat"] = lambda code: taxonomy.get(code).name if code else "Not classified"
 templates.env.filters["ppe"] = lambda code: taxonomy.get(code).ppe
 templates.env.filters["dt"] = lambda d: d.strftime("%d %b %Y %H:%M") if d else ""
+templates.env.filters["localtime"] = lambda d: d + timedelta(hours=get_settings().site_utc_offset_h) if d else d
 templates.env.filters["fromjson"] = lambda s: json.loads(s or "[]")
 # Legacy closures have no control type: shown as "not recorded", never guessed.
 templates.env.filters["control"] = lambda code: risk.control_types()[code]["name"] if code else "not recorded"
@@ -213,6 +216,34 @@ def monitoring(request: Request, user: User = Depends(page_user), db: Session = 
     )
 
 
+@router.get("/board")
+def board(request: Request, theme: str = "light", user: User = Depends(page_user), db: Session = Depends(get_session)):
+    """Read-only control-room view for a large screen: open-risk map, High/Extreme list, overdue count.
+    Refreshes every 60 s; sign-in required like every other page."""
+    now = utcnow()
+    view = services.site_overview(db, overlay="open_risk", window_days=90, now=now)
+    active = list(db.scalars(select(Hazard).where(Hazard.status.in_(services.ACTIVE))))
+    urgent = sorted(
+        (h for h in active if h.risk_level in services.HIGH_LEVELS), key=lambda h: (-(h.risk_score or 0), h.id)
+    )
+    overdue = sum(1 for h in active if h.status in services.AWAITING_ACTION and h.due_at and h.due_at < now)
+    return render(
+        request,
+        "board.html",
+        user,
+        db,
+        v=view,
+        zones=site_layout.REPORTING,
+        rows={a["code"]: a for a in view["areas"]},
+        urgent=urgent,
+        overdue=overdue,
+        active=len(active),
+        now=now,
+        dark=theme == "dark",
+        refresh_s=60,
+    )
+
+
 @router.get("/matrix")
 def matrix(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
     return render(request, "matrix.html", user, db, table=risk.matrix_table())
@@ -235,9 +266,17 @@ def _report_form(request: Request, user: User, db: Session, idem_key: str, **fie
 
 
 @router.get("/report")
-def report_form(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
+def report_form(request: Request, area: str = "", user: User = Depends(page_user), db: Session = Depends(get_session)):
     # A fresh idempotency key per form: a double submit or a browser retry returns the same draft.
-    return _report_form(request, user, db, uuid.uuid4().hex)
+    # The area is pre-selected: ?area=CODE (from an area card), else the area of this reporter's last report.
+    chosen = db.scalar(select(Area).where(Area.code == area)) if area else None
+    if chosen is None:
+        last = db.scalar(
+            select(Hazard).where(Hazard.reporter_id == user.id).order_by(Hazard.created_at.desc()).limit(1)
+        )
+        chosen = last.area if last else None
+    fields = {"area_id": chosen.id, "area_source": "link" if area and chosen else "last"} if chosen else {}
+    return _report_form(request, user, db, uuid.uuid4().hex, **fields)
 
 
 @router.post("/report")
