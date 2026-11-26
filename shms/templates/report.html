@@ -3,42 +3,48 @@
 {% block content %}
 <link rel="stylesheet" href="/static/site-plan.css">
 <link rel="stylesheet" href="/static/pins.css">
-<div class="card" style="max-width:640px">
+<div class="card report-card">
   <h1>Report a hazard</h1>
-  <p>Step 1 of 2 · Choose the area and photograph the condition you observed, such as liquid on the floor or an obstruction across a walkway. You can also report missing PPE. Review the photo and choose the hazard in step 2.</p>
+  <ol class="steps" aria-label="Report steps"><li aria-current="step">Photo and area</li><li>Confirm</li><li>Sent</li></ol>
+  <p>Photograph what you see – liquid on the floor, a blocked walkway, missing PPE. You choose the hazard on the next screen.</p>
   {% if error %}<div class="alert err" role="alert">{{ error }}</div>{% endif %}
   <form method="post" action="/report" enctype="multipart/form-data" id="hazard-report">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="idem_key" value="{{ idem_key }}">
-    <label for="area">Where is the hazard?</label>
+    <label for="photo" class="photo-drop"><span class="photo-icon" aria-hidden="true">
+      <svg viewBox="0 0 48 48" width="40" height="40"><rect x="5" y="13" width="38" height="27" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M17 13l3-5h8l3 5" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="26" r="7" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>
+      <span><strong>1 · Take or choose a photo</strong><br><span class="small">Capture time and GPS are read from the photo when available.</span></span></label>
+    <input id="photo" type="file" name="photo" accept="image/*" capture="environment" required>
+    <label for="area">2 · Where is the hazard?</label>
     <select id="area" name="area_id" required>
+      {% if not area_id %}<option value="" selected disabled>Choose the area</option>{% endif %}
       {% for a in areas %}
       {% set u = bounds.get(a.code) %}
       <option value="{{ a.id }}" {% if area_id == a.id %}selected{% endif %}
               {% if u %}data-x="{{ u.x }}" data-y="{{ u.y }}" data-w="{{ u.w }}" data-h="{{ u.h }}" data-points="{{ u.points_attr }}"{% endif %}>{{ a.name }} ({{ a.code }})</option>
       {% endfor %}
     </select>
+    {% if area_id and area_source %}<p class="small muted" id="area-hint">{{ 'Area from the link you followed.' if area_source == 'link' else 'Pre-selected: the area of your last report. Change it if you are somewhere else.' }}</p>{% endif %}
     <details id="pin-picker" {% if x is defined and (x is not none or y is not none) %}open{% endif %}>
       <summary>Add a map pin (optional)</summary>
-      <p>Tap a point in the selected zone or enter both coordinates. Leave them blank to report by area. The map is a concept layout; positions are indicative.</p>
+      <p>Tap a point in the outlined zone. Leave it empty to report by area. The map is a concept layout; positions are indicative.</p>
       <svg id="report-map" viewBox="0 0 {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H }}" role="img" aria-label="Concept map of the selected reporting zone" hidden>
         <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}"/>
         <polygon id="pin-bounds" fill="#ffffff" fill-opacity=".18" stroke="#263b43" stroke-dasharray="6 4" stroke-width="2.5"/>
         <g id="picked-point" style="display:none" aria-hidden="true"><circle r="8" fill="#232e35" stroke="white" stroke-width="2.5"/><circle r="2.4" fill="white"/></g>
       </svg>
+      <div id="pin-status" role="status" class="small"></div>
+      <button id="clear-pin" class="btn secondary" type="button" hidden>Clear pin</button>
+      <details class="coords"><summary>Enter coordinates instead</summary>
       <div class="pin-fields">
         <div><label for="pin-x">X coordinate</label><input id="pin-x" name="x" type="number" step="1" value="{{ x if x is defined and x is not none else '' }}"></div>
         <div><label for="pin-y">Y coordinate</label><input id="pin-y" name="y" type="number" step="1" value="{{ y if y is defined and y is not none else '' }}"></div>
-        <button id="clear-pin" class="btn secondary" type="button" hidden>Clear pin</button>
-      </div>
-      <div id="pin-status" role="status" class="small"></div>
+      </div></details>
       <noscript><p>Coordinate ranges on the concept map</p><ul>{% for code, u in bounds.items() %}<li>{{ code }} · X {{ u.x }}–{{ u.x + u.w }}, Y {{ u.y }}–{{ u.y + u.h }}</li>{% endfor %}</ul></noscript>
     </details>
-    <label for="photo">Photo</label>
-    <p class="small muted">Capture time and GPS coordinates are filled from the photo when available. Choose the reporting area above.</p>
-    <input id="photo" type="file" name="photo" accept="image/*" capture="environment" required>
-    <br><button class="btn block" type="submit">Analyse and continue</button>
+    <button class="btn primary block desktop-only" type="submit">Analyse photo and continue</button>
   </form>
 </div>
 <script src="/static/report-pin.js" defer></script>
 {% endblock %}
+{% block bottom_action %}<button class="btn primary" type="submit" form="hazard-report">Analyse photo and continue</button>{% endblock %}

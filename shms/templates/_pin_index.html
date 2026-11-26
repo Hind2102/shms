@@ -1,6 +1,6 @@
 <link rel="stylesheet" href="/static/pins.css">
-<section class="pin-index card" aria-labelledby="pin-heading">
-  <h2 id="pin-heading">Open hazard pins</h2>
+<details class="pin-index card">
+  <summary id="pin-heading">Show open hazard pins ({{ v.pin_groups | map('length') | sum }})</summary>
   <p>Only open, planned or awaiting-verification cases with a reported point appear as pins. Area totals also include cases reported by area alone.{% if v.overlay == 'reports' %} The reports overlay also counts closed cases.{% endif %}</p>
   {% if v.pin_groups %}
   <p>Each marker shows the number of nearby cases in the same unit. Its colour shows the highest risk in the group.</p>
@@ -11,4 +11,4 @@
   </div>
   {% endfor %}
   {% else %}<p>No open hazards with pins match this view.</p>{% endif %}
-</section>
+</details>

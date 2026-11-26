@@ -1,0 +1,31 @@
+{# Required-PPE pictograms in the familiar mandatory style (blue circle, white symbol). The symbols are this
+   project's own simple drawings – not ISO 7010 artwork – and every icon has a text label. #}
+{% macro ppe_defs() -%}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="ppe-hat" viewBox="0 0 48 48"><path d="M10 30a14 14 0 0 1 28 0z" fill="#fff"/><rect x="7" y="30" width="34" height="5" rx="2" fill="#fff"/><rect x="22" y="14" width="4" height="9" fill="#005eb8"/></symbol>
+    <symbol id="ppe-glasses" viewBox="0 0 48 48"><circle cx="16" cy="25" r="7" fill="none" stroke="#fff" stroke-width="4"/><circle cx="32" cy="25" r="7" fill="none" stroke="#fff" stroke-width="4"/><path d="M23 24h2M9 24l-3-3M39 24l3-3" stroke="#fff" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="ppe-shield" viewBox="0 0 48 48"><path d="M12 13h24v4c0 11-6 18-12 20-6-2-12-9-12-20z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M12 13h24" stroke="#fff" stroke-width="5"/></symbol>
+    <symbol id="ppe-gloves" viewBox="0 0 48 48"><path d="M15 38V21c0-2 3-2 3 0v-7c0-2 3-2 3 0v-2c0-2 3-2 3 0v2c0-2 3-2 3 0v9l3-3c2-2 4 0 3 2l-5 8v8z" fill="#fff"/></symbol>
+    <symbol id="ppe-boots" viewBox="0 0 48 48"><path d="M16 10h10v18l12 4c2 1 2 7 0 7H14c-1 0-2-1-2-2z" fill="#fff"/></symbol>
+    <symbol id="ppe-suit" viewBox="0 0 48 48"><path d="M17 9l7 4 7-4 8 6-3 8-4-2v18H16V21l-4 2-3-8z" fill="#fff"/></symbol>
+    <symbol id="ppe-mask" viewBox="0 0 48 48"><path d="M12 21c4-3 20-3 24 0v6c0 6-6 10-12 10s-12-4-12-10z" fill="#fff"/><path d="M12 22l-4-3M36 22l4-3" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M18 27h12M18 31h12" stroke="#005eb8" stroke-width="2"/></symbol>
+    <symbol id="ppe-ears" viewBox="0 0 48 48"><path d="M14 26a10 12 0 0 1 20 0" fill="none" stroke="#fff" stroke-width="4"/><rect x="9" y="24" width="8" height="13" rx="3" fill="#fff"/><rect x="31" y="24" width="8" height="13" rx="3" fill="#fff"/></symbol>
+    <symbol id="ppe-lifejacket" viewBox="0 0 48 48"><path d="M17 9h5v10h4V9h5l5 8v22H12V17z" fill="#fff"/><path d="M12 29h24" stroke="#005eb8" stroke-width="3"/></symbol>
+    <symbol id="ppe-generic" viewBox="0 0 48 48"><circle cx="24" cy="14" r="5" fill="#fff"/><path d="M15 39V24c0-3 3-5 9-5s9 2 9 5v15z" fill="#fff"/></symbol>
+  </defs>
+</svg>
+{%- endmacro %}
+
+{% macro ppe_key(item) -%}
+{%- set t = item | lower -%}
+{%- if 'hard hat' in t or 'helmet' in t %}hat{% elif 'face shield' in t %}shield{% elif 'glasses' in t or 'goggles' in t %}glasses{% elif 'glove' in t %}gloves{% elif 'boot' in t %}boots{% elif 'mask' in t or 'respir' in t %}mask{% elif 'hearing' in t or 'ear' in t %}ears{% elif 'life jacket' in t %}lifejacket{% elif 'coverall' in t or 'suit' in t or 'clothing' in t %}suit{% else %}generic{% endif -%}
+{%- endmacro %}
+
+{% macro ppe_list(items) -%}
+<ul class="ppe-icons" aria-label="Required PPE">
+  {% for item in items %}
+  <li><svg class="ppe-sign" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><circle cx="24" cy="24" r="23" fill="#005eb8"/><use href="#ppe-{{ ppe_key(item) }}"/></svg><span>{{ item }}</span></li>
+  {% else %}<li class="empty">No PPE requirements recorded for this area.</li>{% endfor %}
+</ul>
+{%- endmacro %}
