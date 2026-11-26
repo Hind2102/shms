@@ -87,7 +87,11 @@ class Audit:
 
 
 def sign_out(page: Page) -> None:
-    page.locator("form[action='/logout'] button").click()
+    # Desktop and phone headers each have a sign-out form; submit the first (works at any width).
+    if not page.locator("form[action='/logout']").count():  # e.g. the control-room board has no header
+        page.goto(page.url.split("/", 3)[0] + "//" + page.url.split("/", 3)[2] + "/")
+    page.locator("form[action='/logout']").first.evaluate("f => f.submit()")
+    page.wait_for_url("**/login")
 
 
 def check_map(audit: Audit, base_url: str) -> None:
@@ -126,9 +130,10 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     sign_in(page, base_url, "ahmed")
     page.goto(f"{base_url}/report")
     page.locator("#area").select_option(label="Digestion (DIG)")
-    page.locator("#pin-picker summary").click()
+    page.locator("#pin-picker > summary").click()
     page.locator("#report-map").click()
     expect(page.locator("#picked-point")).to_be_visible()
+    page.locator(".coords summary").click()
     page.locator("#pin-x").fill("282")  # inside the Digestion zone of the concept map
     page.locator("#pin-y").fill("571")
     page.locator("#pin-y").press("Tab")
@@ -137,16 +142,16 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     # Generate a plain synthetic PNG for the mock detector, without using a site photo.
     png = page.evaluate("() => document.createElement('canvas').toDataURL('image/png').split(',')[1]")
     page.locator("#photo").set_input_files({"name": "synthetic.png", "mimeType": "image/png", "buffer": b64decode(png)})
-    page.locator("form[action='/report'] button[type=submit]").click()
+    page.get_by_role("button", name="Analyse photo and continue").click()  # in the form, or the phone bottom bar
     page.wait_for_url("**/confirm")
-    audit.check("confirm")
+    audit.check("confirm", capture=True, full_page=True)
     page.select_option("#cat", value="floor_liquid")
     page.locator("input[name='consequence'][value='2']").check()
     page.locator("#desc").fill("Synthetic demonstration: pooled liquid on the digestion walkway.")
     page.get_by_role("button", name="Submit report").click()
     expect(page.get_by_text("Report submitted.", exact=False)).to_be_visible()
     hazard_url = page.url.split("?")[0]
-    audit.check("submitted")
+    audit.check("submitted", capture=True, full_page=True)
     sign_out(page)
     sign_in(page, base_url, "yousef")
     check_map(audit, base_url)
@@ -163,7 +168,7 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     sign_in(page, base_url, "sara")
     page.goto(hazard_url)
     page.locator("#vn").fill("Checked the walkway after the cleanup.")
-    page.get_by_role("button", name="Verify and close").click()
+    page.get_by_role("button", name="Verify and close").first.click()
     expect(page.locator("h1 .st")).to_have_text("closed")
     audit.check("verified_closure")
     sign_out(page)
@@ -175,16 +180,30 @@ def check_pages(audit: Audit, base_url: str) -> None:
     audit.check("login")
     for username, role in [("sara", "supervisor"), ("khalid", "owner"), ("ahmed", "reporter"), ("yousef", "manager")]:
         sign_in(page, base_url, username)
-        audit.check(f"{role}_home")
+        audit.check(f"{role}_home", capture=role in ("supervisor", "manager"), full_page=True)
         if role in ("supervisor", "owner"):
             page.goto(f"{base_url}/queue")
             audit.check(f"{role}_queue")
         if role != "manager":
             sign_out(page)
-    for route in ["dashboard", "hazards", "report", "matrix", "areas/DIG", "monitoring", "notifications"]:
+    for route in [
+        "dashboard",
+        "hazards",
+        "report",
+        "matrix",
+        "areas/DIG",
+        "monitoring",
+        "notifications",
+        "board",
+        "board?theme=dark",
+    ]:
         response = page.goto(f"{base_url}/{route}")
         assert response and response.ok, route
-        audit.check(route)
+        audit.check(
+            route.replace("/", "_").replace("?theme=", "_"),
+            capture=route in ("matrix", "board", "board?theme=dark"),
+            full_page=True,
+        )
     sign_out(page)
     check_workflow(audit, base_url)
 

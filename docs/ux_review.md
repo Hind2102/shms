@@ -79,3 +79,63 @@ state machine refuses illegal steps and says why.
 ## After (v1.6.0)
 
 The after-measurements are added at the end of this file, below this line, by the verification step.
+
+### Task timing – before / after
+
+Same script, same fresh synthetic database and the same counting rules. The "after" flow is scripted as a user of v1.6.0
+would do it.
+
+| Task | View | Before: taps · typed · pages · est. s | After: taps · typed · pages · est. s | What changed |
+|---|---|---|---|---|
+| Report a hazard | phone | 7 · 0 · 3 · 16 | **5 · 0 · 3 · 14** | Photo first; area pre-selected from the reporter's last report; submit in the bottom bar |
+| Check an area before entering | phone | 4 · 0 · 3 · 12 | **3 · 0 · 2 · 9** | "Check an area before entering" on the home page; choosing a zone shows its card **and** route at once |
+| Verify a closure | desktop | 2 · 1 · 2 · 14 | 2 · 1 · 2 · 14 | Unchanged on desktop. On phones the "Verify and close" button sits in the bottom bar. |
+
+Notes:
+- A reporter with no earlier report still picks the area: 2 more taps.
+- The pre-selection does not use photo GPS. The concept map is not georeferenced, so a GPS position cannot be placed
+  in a zone honestly.
+- The estimated seconds use the keystroke-level model above, not observed users.
+
+### Page audit – after
+
+- **Tap targets:** 0 interactive elements under 48 × 48 px on any audited page, per role, at 390 and 1366 px. Before:
+  10–24 per page. ([`docs/ux/page_audit.py`](ux/page_audit.py))
+- **Phone text:** 0 text blocks under 16 px. Before: up to 1,657 per page.
+- **Horizontal overflow:** none. The 23 px overflow on `/monitoring` is fixed; wide tables scroll inside a focusable,
+  named region.
+- **axe-core 4.10.3:** 52 page states (all roles, report flow, every overlay, area card, route, `/board` light and
+  dark) at 390 and 1366 px. **0 findings of any severity.**
+  - Two findings came up during the work and were fixed:
+    - the board's timed refresh is now pausable (WCAG 2.2.1);
+    - tables that scroll sideways are now keyboard-focusable.
+
+### Problems from the table above – status
+
+| Problem | Status |
+|---|---|
+| No shift view for supervisors | Fixed: "Day/Night shift – since HH:MM" with reported, High/Extreme, alerts, verified and waiting counts (setting `SHMS_SHIFT_START_HOUR`, `SHMS_SITE_UTC_OFFSET_H`) |
+| Area Owner sees no "today" | Fixed: "My areas today" cards first (new today, due today, overdue, active, highest level) |
+| Report step status unclear | Fixed: step indicator 1 Photo and area · 2 Confirm · 3 Sent, and a fixed bottom action bar |
+| PPE as a text list | Fixed: own blue-circle pictograms, each with its text label (not ISO 7010 artwork) |
+| Closure texts not matching the hazard | Fixed in the seed only: the text depends on the hazard type and the control; the v1.4.1 distribution is unchanged |
+| Inconsistent buttons and spacing | Fixed: `.btn` primary / `.btn.secondary` / `.btn.danger` (Reject); spacing 8/16/24/32; one card pattern |
+| Colour carrying the risk level | Fixed: badge word plus shape icon (○ Low, ◆ Moderate, ▲ High, ■ Extreme); closed status shows ✓ |
+| Typing coordinates | Fixed: tapping the map is primary; coordinates sit behind "Enter coordinates instead" |
+| Picking the area every time | Fixed (last area or `?area=` from an area card); GPS not used (see above) |
+| Consequence radio rows | Fixed: five large labelled cards; production and cost guidance one tap away |
+| Reporting from any phone page | Fixed: "Report a hazard" in a bottom bar on every phone page |
+| No control-room view | Fixed: `/board` (sign-in required, read-only, 60 s pausable refresh, dark option, large type) |
+| Site plan on phones | Fixed: map at full content width (up to 1,680 px on desktop), title strip hidden, pinch zoom, area card under the map, pins collapsed |
+| 4-line phone header | Fixed: logo, Alerts and Menu |
+| Clipped tables on phones | Fixed: work lists stack as rows; other tables scroll inside their card |
+| Empty states | Fixed: "No … are recorded" messages; a test checks every page of every role, with no data, for the word "safe" |
+| Pin cleared on area change | **Not changed** (severity 1): the pin is still cleared, because a pin from one zone is never valid in another |
+| Help text below the map | Partly: the short help is in the map toolbar; the full calculation note stays below |
+
+### Not done
+
+- **Arabic / RTL toggle** (optional in the brief): not started. The 6-hour time box went to the required items. A partial
+  translation of the reporting flow without review by an Arabic-speaking safety professional would risk wrong safety
+  wording.
+- **No real user tests:** the timings are scripted and estimated, not observed with field staff wearing gloves.

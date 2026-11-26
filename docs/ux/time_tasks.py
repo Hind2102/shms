@@ -97,7 +97,7 @@ def report(page: Page, base: str, flow: str):
         t.photo(page.locator("#photo"), png(page))
         if not page.locator("#area").input_value():
             t.choose(page.locator("#area"), label="Digestion (DIG)")
-        t.tap(page.locator("form#hazard-report button[type=submit]"))
+        t.tap(page.get_by_role("button", name="Analyse photo and continue"))  # phone: the bottom action bar
         page.wait_for_url("**/confirm")
         if not page.locator("#cat").input_value():
             t.choose(page.locator("#cat"), value="no_hard_hat")
@@ -110,11 +110,15 @@ def report(page: Page, base: str, flow: str):
 
 def check_area(page: Page, base: str, flow: str):
     t = Task(page, "Check an area before entering", "phone")
-    t.tap(page.get_by_role("link", name="Site plan"))
+    if flow == "after":  # v1.6.0: "Check an area" on the phone home; choosing a zone shows its route at once
+        t.tap(page.locator("a.check-area"))
+    else:
+        t.tap(page.get_by_role("link", name="Site plan"))
     t.choose(page.locator("#unit"), value="ALS")
     page.wait_for_url(lambda url: "unit=ALS" in url)
     expect(page.locator("#unit-detail")).to_be_visible()
-    t.tap(page.locator("#unit-detail a[href*='route=1']"))
+    if not page.locator("#route-status").count():
+        t.tap(page.locator("#unit-detail a[href*='route=1']"))
     expect(page.locator("#route-status")).to_be_visible()
     return t.result()
 
