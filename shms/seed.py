@@ -228,6 +228,74 @@ CONTROLS: dict[str, list[tuple[str, float, int, str]]] = {
         ("ppe", 3, 0, "Interim PPE issued until the repair is made."),
     ],
 }
+# v1.6.0: closure action texts that match the hazard type and the control (the control is still drawn from CONTROLS,
+# so the random sequence and the v1.4.1 distribution are unchanged). PPE findings close with PPE issued, a briefing or a
+# PPE station; physical conditions with a barrier, cover, housekeeping or repair.
+ACTION_TEXT: dict[str, dict[str, str]] = {
+    "no_hard_hat": {
+        "procedural": "Toolbox talk on head protection; task permit re-checked for hard hats.",
+        "ppe": "Hard hat issued from the area store; worker briefed.",
+        "engineering": "Hard-hat station installed at the area entrance with a mandatory-PPE sign.",
+        "substitution": "Overhead work re-planned to ground level, removing the head-strike exposure.",
+        "elimination": "Overhead lifting over the walkway stopped; the task was re-routed.",
+    },
+    "no_eye_protection": {
+        "procedural": "Briefing on eye and face protection at caustic points; permit re-checked.",
+        "ppe": "Safety glasses and face shield issued; worker briefed.",
+        "engineering": "Face-shield station fitted at the sampling point, with sign and barrier.",
+        "substitution": "Sampling moved to a closed sampler so the task no longer needs open handling.",
+        "elimination": "Manual sampling at this point discontinued (online analyser in use).",
+    },
+    "no_gloves": {
+        "procedural": "Toolbox talk on glove selection; task permit re-checked.",
+        "ppe": "Chemical gloves issued / replaced; worker briefed.",
+        "engineering": "Glove dispenser installed at the area entrance.",
+        "substitution": "Closed sampler fitted so the valve is no longer handled by hand.",
+        "elimination": "Manual valve operation replaced by remote actuation.",
+    },
+    "floor_liquid": {
+        "procedural": "Spill cleaned up; housekeeping round added to the shift checklist.",
+        "engineering": "Drip tray fitted under the leaking flange; area barriered until dry.",
+        "elimination": "Leaking fitting replaced by maintenance.",
+        "substitution": "Hose connection replaced with a dry-break coupling.",
+        "ppe": "Interim: slip-resistant overshoes issued until the leak is repaired.",
+    },
+    "walkway_obstruction": {
+        "procedural": "Materials moved to the laydown area; housekeeping check added.",
+        "engineering": "Walkway re-marked and a barrier fitted to keep it clear.",
+        "elimination": "Redundant equipment removed from the walkway.",
+        "substitution": "Temporary hoses re-routed overhead instead of across the walkway.",
+        "ppe": "Interim: crew briefed and safety footwear checked until the item is moved.",
+    },
+    "open_panel": {
+        "procedural": "Panel closed and isolation checked; added to the inspection round.",
+        "engineering": "Panel cover refitted and guard bolted in place.",
+        "elimination": "Redundant panel opening blanked off.",
+        "substitution": "Hinged cover replaced with an interlocked cover.",
+        "ppe": "Interim: arc-rated gloves required at the panel until the cover is refitted.",
+    },
+    "floor_opening": {
+        "procedural": "Opening barricaded; permit and handover notes re-checked.",
+        "engineering": "Grating replaced and secured; toe board fitted.",
+        "elimination": "Opening permanently closed with a steel plate.",
+        "substitution": "Removable grating replaced with bolted grating.",
+        "ppe": "Interim: fall-arrest harness required at the opening until repaired.",
+    },
+    "surface_corrosion": {
+        "procedural": "Corrosion check added to the maintenance inspection round.",
+        "engineering": "Corroded section repaired and coated.",
+        "elimination": "Corroded redundant bracket removed.",
+        "substitution": "Coated grating substituted for the corroded section.",
+        "ppe": "Interim: gloves required for handling until the repair is made.",
+    },
+    "other_condition": {
+        "procedural": "Condition reported to maintenance; housekeeping check added.",
+        "engineering": "Barrier and signage placed; repair completed by maintenance.",
+        "elimination": "Source of the condition removed.",
+        "substitution": "Material replaced with a less hazardous alternative.",
+        "ppe": "Interim PPE issued until the repair is made.",
+    },
+}
 N_HISTORY = 210  # v1.5.0: 15 reporting zones (was 150 for 9 zones in v1.4.1)
 
 
@@ -240,8 +308,8 @@ def _consequence(rng: random.Random, area_code: str, cat: str) -> tuple[int, str
 
 def _control(rng: random.Random, cat: str, consequence: int) -> tuple[str, int, str]:
     options = CONTROLS["ppe_finding" if cat in PPE_FINDINGS else "condition"]
-    code, _, drop, text = rng.choices(options, [o[1] for o in options])[0]
-    return code, max(1, consequence - drop), text
+    code, _, drop, _generic = rng.choices(options, [o[1] for o in options])[0]
+    return code, max(1, consequence - drop), ACTION_TEXT[cat][code]
 
 
 def _synthetic_ai(rng: random.Random, area: Area, true_code: str, age: timedelta):
