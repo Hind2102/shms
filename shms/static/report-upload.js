@@ -27,7 +27,7 @@
     if (!form.checkValidity()) return;
     const box = document.querySelector('#analysing');
     box.hidden = false;
-    box.scrollIntoView({ block: 'nearest' });
+    box.scrollIntoView({ block: 'center' });  // centre: on phones the bottom action bar covers the lower edge
   });
 
   // Browser location: only after the reporter taps the button; needs https or localhost (a secure context).
