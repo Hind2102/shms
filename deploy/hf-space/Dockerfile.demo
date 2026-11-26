@@ -1,0 +1,21 @@
+
+# ---------------------------------------------------------------------------------------------------------------
+# Public demo on a Hugging Face Space (appended to the project Dockerfile by scripts/deploy_hf_space.sh).
+# The SH17 weights are downloaded from the dataset authors' release and checksum-verified; they are not
+# redistributed in the Space repository. YOLOv8s: fast enough on the free 2-vCPU CPU tier.
+RUN curl -fsSL -o /app/models/sh17_yolo8s.pt \
+        https://github.com/ahmadmughees/SH17dataset/releases/download/v1/yolo8s.pt \
+    && echo "dfaf451bdda3f92fe4012327e337225929ad7af22146b00e0d6989c2f4e40a4b  /app/models/sh17_yolo8s.pt" \
+       | sha256sum -c -
+# SHMS_SECRET_KEY comes from a Space secret (never from this file). Data lives in the container only and is
+# wiped on every start (demo mode).
+ENV SHMS_DEMO_MODE=1 \
+    SHMS_RATE_LIMIT_PER_MIN=30 \
+    SHMS_DETECTOR=yolo \
+    SHMS_YOLO_WEIGHTS=/app/models/sh17_yolo8s.pt
+EXPOSE 7860
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsS http://localhost:7860/api/health || exit 1
+# --proxy-headers: the Space proxy terminates https; the app sees the visitor's IP (rate limit) and https (secure
+# cookies, browser location permission).
+CMD ["uvicorn", "shms.asgi:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
