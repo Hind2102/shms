@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import level, status, photo %}
 {% block title %}Hazard #{{ h.id }}{% endblock %}
+{% block bottom_action %}{% if h.status.value == 'pending_verification' and can_verify %}<button class="btn primary" type="submit" form="verify-form">Verify and close</button>{% elif h.status.value in ('open', 'planned') and can_act %}<a class="btn primary" href="#close-form">Close this hazard</a>{% else %}<a class="btn primary report-fab" href="/report">Report a hazard</a>{% endif %}{% endblock %}
 {% block content %}
 {% if created %}<div class="alert ok">Report submitted.{% if h.status.value == 'open' %} Routed to {{ h.assignee.name }}.{% endif %}{% if risk.alert_reason(h.consequence, h.risk_level) %} Safety supervisor alerted ({{ risk.alert_reason(h.consequence, h.risk_level) }}).{% endif %}</div>{% endif %}
 {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
@@ -50,7 +51,7 @@
       <br><br><button class="btn secondary" type="submit">Save plan</button>
     </form>
     {% endif %}
-    <form class="card" method="post" action="/hazards/{{ h.id }}/close" enctype="multipart/form-data">
+    <form class="card" method="post" action="/hazards/{{ h.id }}/close" enctype="multipart/form-data" id="close-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <h2>Close hazard</h2>
       <label for="action">Action taken (required)</label>
@@ -59,25 +60,25 @@
       <label for="cp">Closing photo</label>
       <input id="cp" type="file" name="photo" accept="image/*" capture="environment">
       <p class="muted small">A safety supervisor or the reporter then verifies the closure.</p>
-      <button class="btn" type="submit">Close hazard</button>
+      <button class="btn primary" type="submit">Close hazard</button>
     </form>
     {% elif h.status.value in ('open', 'planned') %}
     <div class="alert info small">Only {{ h.area.owner.name }} or a safety supervisor can plan and close this hazard.</div>
     {% elif h.status.value == 'pending_verification' and can_verify %}
-    <form class="card" method="post" action="/hazards/{{ h.id }}/verify">
+    <form class="card" method="post" action="/hazards/{{ h.id }}/verify" id="verify-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <h2>Verify closure</h2>
       <p class="small">Original risk {{ level(h.risk_level) }} {{ h.risk_score }} → residual {% if h.residual_level %}{{ level(h.residual_level) }} {{ h.residual_score }}{% else %}not recorded{% endif %}; control: {{ h.control_type | control }}.</p>
       <label for="vn">What you checked</label>
       <textarea id="vn" name="note" placeholder="e.g. checked on site, closing photo shows the hard hat"></textarea>
-      <br><br><button class="btn" type="submit">Verify and close</button>
+      <br><br><button class="btn primary" type="submit">Verify and close</button>
     </form>
     <form class="card" method="post" action="/hazards/{{ h.id }}/reject">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <h2>Reject closure</h2>
       <label for="rr">Reason (required)</label>
       <textarea id="rr" name="reason" required placeholder="Why the closure is not sufficient"></textarea>
-      <br><br><button class="btn secondary" type="submit">Reject – back to open</button>
+      <br><br><button class="btn danger" type="submit">Reject – back to open</button>
     </form>
     {% elif h.status.value == 'pending_verification' %}
     <div class="alert info small">Awaiting verification by a safety supervisor or the reporter.</div>

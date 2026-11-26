@@ -71,9 +71,10 @@
     updatePoint();
   });
   form.addEventListener('submit', () => {
-    const submit = form.querySelector('button[type=submit]');
-    submit.disabled = true;
-    submit.textContent = 'Analysing photo…';
+    for (const submit of document.querySelectorAll('#hazard-report button[type=submit], button[type=submit][form=hazard-report]')) {
+      submit.disabled = true;
+      submit.textContent = 'Analysing photo…';
+    }
   });
   map.removeAttribute('hidden');
   clear.hidden = false;

@@ -650,6 +650,7 @@ def role_home(db: Session, user: User, now: datetime | None = None) -> dict:
         out["my_reports"] = list(mine.all())[:20]
         out["to_verify"] = [h for h in active if h.status == Status.PENDING_VERIFICATION and h.reporter_id == user.id]
     elif user.role == Role.AREA_OWNER:
+        out["today"] = my_areas_today(db, user, now)
         mine = [h for h in active if h.status in AWAITING_ACTION and user.id in (h.assignee_id, h.action_owner_id)]
         out["my_work"] = sorted(mine, key=lambda h: h.due_at or now)
         out["due_soon"] = [h for h in out["my_work"] if h.due_at and h.due_at <= now + timedelta(days=3)]
@@ -657,6 +658,7 @@ def role_home(db: Session, user: User, now: datetime | None = None) -> dict:
             h for h in active if h.status == Status.PENDING_VERIFICATION and h.closed_by_id == user.id
         ]
     elif user.role == Role.SUPERVISOR:
+        out["shift"] = shift_summary(db, user, now)
         out["to_verify"] = sorted(
             (h for h in active if h.status == Status.PENDING_VERIFICATION and h.closed_by_id != user.id),
             key=lambda h: h.closed_at or now,
@@ -671,6 +673,74 @@ def role_home(db: Session, user: User, now: datetime | None = None) -> dict:
         out["closure"] = closure_performance(db, now)
         out["weeks"] = dashboard(db, now)["weeks"]
     return out
+
+
+def shift_window(now: datetime) -> tuple[str, datetime]:
+    """Current 12-hour shift (project setting): its name and its start in UTC."""
+    from .settings import get_settings
+
+    s = get_settings()
+    offset = timedelta(hours=s.site_utc_offset_h)
+    local = now + offset
+    day_start = local.replace(hour=s.shift_start_hour % 24, minute=0, second=0, microsecond=0)
+    if local < day_start:
+        day_start -= timedelta(days=1)
+    elapsed = local - day_start
+    if elapsed < timedelta(hours=12):
+        return "Day shift", day_start - offset
+    return "Night shift", day_start + timedelta(hours=12) - offset
+
+
+def local_midnight(now: datetime) -> datetime:
+    """Start of the site's local day, in UTC."""
+    from .settings import get_settings
+
+    offset = timedelta(hours=get_settings().site_utc_offset_h)
+    return (now + offset).replace(hour=0, minute=0, second=0, microsecond=0) - offset
+
+
+def shift_summary(db: Session, user: User, now: datetime) -> dict:
+    """Supervisor: what happened since the start of the current shift (counts, with the window stated)."""
+    name, start = shift_window(now)
+    confirmed = list(db.scalars(select(Hazard).where(Hazard.status != Status.DRAFT, Hazard.confirmed_at >= start)))
+    verified = db.scalar(
+        select(func.count()).select_from(HazardEvent).where(HazardEvent.kind == "verified", HazardEvent.at >= start)
+    )
+    alerts = db.scalar(
+        select(func.count()).select_from(HazardEvent).where(HazardEvent.kind == "alerted", HazardEvent.at >= start)
+    )
+    waiting = db.scalar(select(func.count()).select_from(Hazard).where(Hazard.status == Status.PENDING_VERIFICATION))
+    return {
+        "name": name,
+        "start": start,
+        "reported": len(confirmed),
+        "high": sum(1 for h in confirmed if h.risk_level in HIGH_LEVELS),
+        "alerts": alerts or 0,
+        "verified": verified or 0,
+        "waiting": waiting or 0,
+    }
+
+
+def my_areas_today(db: Session, user: User, now: datetime) -> list[dict]:
+    """Area Owner: per owned area, what happened today (local day) and what is due or overdue."""
+    midnight = local_midnight(now)
+    end_of_day = midnight + timedelta(days=1)
+    rows = []
+    for area in db.scalars(select(Area).where(Area.owner_id == user.id).order_by(Area.code)):
+        active = [h for h in area.hazards if h.status in ACTIVE]
+        rows.append(
+            {
+                "area": area,
+                "new_today": sum(1 for h in area.hazards if h.status != Status.DRAFT and h.created_at >= midnight),
+                "active": len(active),
+                "overdue": sum(1 for h in active if h.status in AWAITING_ACTION and h.due_at and h.due_at < now),
+                "due_today": sum(
+                    1 for h in active if h.status in AWAITING_ACTION and h.due_at and now <= h.due_at < end_of_day
+                ),
+                "highest": max(active, key=lambda h: h.risk_score or 0).risk_level if active else None,
+            }
+        )
+    return rows
 
 
 def closure_performance(db: Session, now: datetime | None = None, window_days: int = 90) -> dict:

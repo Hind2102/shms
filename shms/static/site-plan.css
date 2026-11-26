@@ -3,7 +3,7 @@
 .map-toolbar { justify-content: space-between; padding: 5px 10px; border-bottom: 1px solid #bbc7c4; }
 .map-toolbar label { margin: 0; font-weight: 500; }
 .map-buttons button { background: white; border: 1px solid #9daba9; border-radius: 3px; min-height: 36px; min-width: 38px; font: inherit; cursor: pointer; }
-#plan { width: 100%; display: block; aspect-ratio: 16 / 9; touch-action: pan-y; background: #f1e3c4; }
+#plan { width: 100%; display: block; aspect-ratio: 1920 / 1014; touch-action: pan-y; background: #f1e3c4; }
 #plan.is-zoomed { touch-action: none; cursor: grab; }
 #plan.is-zoomed:active { cursor: grabbing; }
 .base-drawing text, .metric-label { font-family: var(--display),sans-serif; fill: #223a3d; }
@@ -32,3 +32,27 @@
   .plan-filters > div { min-width: 125px; }
   .plan-filters select { min-width: 0; width: 100%; }
 }
+/* v1.6.0: full content width, readable key, area card under the map */
+body.wide main { max-width: 1680px; }
+.map-shell { border-radius: 8px; overflow: hidden; }
+.map-buttons button { min-height: 48px; min-width: 48px; font-size: 18px; }
+.map-key { font-size: 15px; color: var(--ink); }
+.key-main { border-top: 8px solid #3b3f45; } .key-service { border-top: 6px solid #b9bdc2; }
+.map-note { margin: 0; padding: 6px 12px 10px; font-size: 14px; color: var(--ink); background: #fff; }
+.metric-label { font-size: 22px; }
+.entry-panel { border-top: 4px solid var(--ppe-blue); }
+.entry-summary .lvl { font-size: 15px; }
+.ppe-icons { list-style: none; padding: 0; margin: 0 0 var(--s1); display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s1); }
+.ppe-icons li { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 600; }
+.ppe-sign { width: 44px; height: 44px; flex: none; }
+.entry-hazards { list-style: none; padding: 0; } .entry-hazards li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+.permit-note { border-left: 6px solid var(--caution); background: #fff6e5; padding: 10px 12px; }
+.entry-actions { display: flex; flex-wrap: wrap; gap: var(--s1); margin: var(--s2) 0; }
+.pin-index > summary { font-size: 17px; }
+@media (max-width: 700px) {
+  body.wide main { padding-left: 8px; padding-right: 8px; }
+  .map-toolbar > span { display: none; }
+  .map-buttons { width: 100%; display: grid; grid-template-columns: repeat(6, 1fr) auto; gap: 4px; }
+  .map-key { font-size: 15px; }
+}
+@media (max-width: 700px) { .map-note { font-size: 16px; } }
