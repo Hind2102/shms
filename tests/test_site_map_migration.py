@@ -1,4 +1,7 @@
-"""Migration 0009 (approved concept map): renames, new zones, proportional pin re-mapping; nothing deleted."""
+"""Migration 0009 (approved concept map): renames, new zones, proportional pin re-mapping; nothing deleted.
+
+Since v1.7.0 the app uses the Al Taweelah image (migration 0011), so these tests stop at 0009 and compare with the v1.5
+concept-map geometry as recorded independently in migration 0011 (OLD_RECT)."""
 
 import importlib
 import sqlite3
@@ -6,11 +9,46 @@ import sqlite3
 import sqlalchemy as sa
 
 from shms import db as dbmod
-from shms import site_layout
-from shms.seed import ZONE_PPE
 from tests.test_migrations import _old_db, _snapshot
 
 MIGRATION = importlib.import_module("shms.migrations.versions.0009_ata_site_map")
+LATER = importlib.import_module("shms.migrations.versions.0011_taweelah_map")
+V15_NAMES = {  # zone names of the v1.5 concept map (history; v1.7.0 renamed FLT and PWR)
+    "BXH": "Bauxite storage & handling",
+    "DIG": "Digestion",
+    "GRD": "Grinding & slurry preparation",
+    "CLR": "Clarification",
+    "FLT": "Security filtration",
+    "PRC": "Precipitation",
+    "EVP": "Evaporation",
+    "CAL": "Calcination",
+    "HYD": "Hydrate filtration",
+    "ALS": "Alumina storage",
+    "TNK": "Caustic & reagents",
+    "LIM": "Lime handling",
+    "PWR": "Water & utilities",
+    "WKS": "Workshops & stores",
+    "WTR": "Water basins",
+}
+V15_PPE = {  # required PPE seeded in v1.5/v1.6 (history; v1.7.0 takes PPE from the area profiles)
+    "WTR": "Hard hat, Safety glasses, Life jacket (near open water)",
+    "ALS": "Hard hat, Safety glasses, Gloves, Dust mask",
+}
+
+
+class V15Zone:
+    """A v1.5 zone rectangle, with the attributes the tests below used from site_layout."""
+
+    def __init__(self, code):
+        self.name = V15_NAMES[code]
+        self.x, self.y, self.w, self.h = LATER.OLD_RECT[code]
+
+    def contains(self, px, py):
+        return self.x <= px <= self.x + self.w and self.y <= py <= self.y + self.h
+
+
+def v15(code):
+    return V15Zone(code)
 
 
 def _at_0008_with_pins(tmp_path):
@@ -29,7 +67,7 @@ def _at_0008_with_pins(tmp_path):
 def test_existing_rows_relationships_and_ids_are_kept(tmp_path):
     url = _at_0008_with_pins(tmp_path)
     before = _snapshot(url)
-    dbmod.migrate_to_head(url)
+    dbmod.migrate_to_head(url, "0009_ata_site_map")
     after = _snapshot(url)
     assert after == before  # every existing row and relationship (the snapshot ignores only the six new zones)
     con = sqlite3.connect(tmp_path / "old.db")
@@ -39,14 +77,14 @@ def test_existing_rows_relationships_and_ids_are_kept(tmp_path):
 
 def test_areas_take_map_names_and_new_zones_get_owner_ppe_and_released_checks(tmp_path):
     url = _at_0008_with_pins(tmp_path)
-    dbmod.migrate_to_head(url)
+    dbmod.migrate_to_head(url, "0009_ata_site_map")
     eng = sa.create_engine(url)
     with eng.connect() as c:
         rows = {r.code: r for r in c.execute(sa.text("SELECT * FROM areas"))}
     eng.dispose()
     assert rows["DIG"].name == "Digestion" and rows["DIG"].id == 1
     for code in ("EVP", "HYD", "ALS", "LIM", "WKS", "WTR"):
-        z = site_layout.zone(code)
+        z = v15(code)
         assert rows[code].name == z.name and (rows[code].x, rows[code].y, rows[code].w, rows[code].h) == (
             z.x,
             z.y,
@@ -55,18 +93,18 @@ def test_areas_take_map_names_and_new_zones_get_owner_ppe_and_released_checks(tm
         )
         assert rows[code].owner_id == 2  # the only Area Owner in the old database
         assert rows[code].ai_checks == "no_hard_hat,no_eye_protection,no_gloves"
-    assert rows["WTR"].required_ppe == "Hard hat, Safety glasses, Life jacket (near open water)"
-    assert rows["ALS"].required_ppe == "Hard hat, Safety glasses, Gloves, Dust mask"
+    assert rows["WTR"].required_ppe == V15_PPE["WTR"]
+    assert rows["ALS"].required_ppe == V15_PPE["ALS"]
 
 
 def test_pins_move_proportionally_into_the_new_polygon(tmp_path):
     url = _at_0008_with_pins(tmp_path)
-    dbmod.migrate_to_head(url)
+    dbmod.migrate_to_head(url, "0009_ata_site_map")
     eng = sa.create_engine(url)
     with eng.connect() as c:
         pins = dict(((i, (x, y)) for i, x, y in c.execute(sa.text("SELECT id, x, y FROM hazards ORDER BY id"))))
     eng.dispose()
-    dig = site_layout.zone("DIG")
+    dig = v15("DIG")
     assert pins[2] == (dig.x, dig.y)  # corner stays the corner
     assert abs(pins[1][0] - (dig.x + dig.w / 2)) <= 2 and abs(pins[1][1] - (dig.y + dig.h / 2)) <= 3  # centre
     assert all(dig.contains(*p) for p in pins.values())
@@ -76,7 +114,7 @@ def test_downgrade_restores_names_and_pins_and_keeps_added_areas(tmp_path):
     from alembic import command
 
     url = _at_0008_with_pins(tmp_path)
-    dbmod.migrate_to_head(url)
+    dbmod.migrate_to_head(url, "0009_ata_site_map")
     eng = sa.create_engine(url)
     cfg = dbmod._alembic_config()
     with eng.begin() as conn:
@@ -88,11 +126,13 @@ def test_downgrade_restores_names_and_pins_and_keeps_added_areas(tmp_path):
     eng.dispose()
 
 
-def test_frozen_migration_values_match_the_map_and_the_seed():
+def test_frozen_migration_values_match_the_v15_map():
+    """0009's frozen geometry and names agree with the v1.5 map as recorded by 0011."""
     for code, (_, new_name, _, _, rect) in MIGRATION.EXISTING.items():
-        z = site_layout.zone(code)
+        z = v15(code)
         assert (new_name, rect) == (z.name, (z.x, z.y, z.w, z.h)), code
-    ppe = {code: p for code, _, p in ZONE_PPE}
     for code, (name, required, _, rect) in MIGRATION.NEW.items():
-        z = site_layout.zone(code)
-        assert (name, rect, required) == (z.name, (z.x, z.y, z.w, z.h), ppe[code]), code
+        z = v15(code)
+        assert (name, rect) == (z.name, (z.x, z.y, z.w, z.h)), code
+        if code in V15_PPE:
+            assert required == V15_PPE[code]

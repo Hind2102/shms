@@ -1,9 +1,114 @@
 {
+ "_note": "Project-defined reporting zones and road centre-lines traced on the illustrative Al Taweelah concept image (image pixels, origin top left). Approved by the owner on 2026-11-27. Not a verified site plot plan.",
  "image": {
-  "file": "al_taweelah_map.png",
+  "url": "/static/site_map/al_taweelah_map.webp",
   "width": 1672,
-  "height": 941
+  "height": 941,
+  "title_strip_h": 64,
+  "max_zoom_px_per_image_px": 2.0
  },
+ "gate": [
+  1320,
+  868
+ ],
+ "perimeter": [
+  75,
+  132,
+  1592,
+  868
+ ],
+ "roads": [
+  [
+   [
+    75,
+    292
+   ],
+   [
+    1592,
+    292
+   ]
+  ],
+  [
+   [
+    75,
+    803
+   ],
+   [
+    1320,
+    803
+   ]
+  ],
+  [
+   [
+    418,
+    292
+   ],
+   [
+    418,
+    803
+   ]
+  ],
+  [
+   [
+    1320,
+    292
+   ],
+   [
+    1320,
+    868
+   ]
+  ],
+  [
+   [
+    418,
+    443
+   ],
+   [
+    755,
+    443
+   ]
+  ],
+  [
+   [
+    418,
+    715
+   ],
+   [
+    685,
+    715
+   ]
+  ],
+  [
+   [
+    685,
+    688
+   ],
+   [
+    1320,
+    688
+   ]
+  ],
+  [
+   [
+    1320,
+    478
+   ],
+   [
+    1592,
+    478
+   ]
+  ],
+  [
+   [
+    685,
+    688
+   ],
+   [
+    685,
+    803
+   ]
+  ]
+ ],
  "zones": {
   "BXH": {
    "name": "Bauxite storage & handling",
@@ -80,16 +185,24 @@
      305
     ],
     [
-     1145,
+     1305,
      305
     ],
     [
-     1145,
+     1305,
      478
     ],
     [
-     763,
+     690,
      478
+    ],
+    [
+     690,
+     450
+    ],
+    [
+     763,
+     450
     ]
    ]
   },
@@ -115,7 +228,7 @@
    ]
   },
   "PRC": {
-   "name": "Precipitation (incl. classification)",
+   "name": "Precipitation",
    "polygon": [
     [
      688,
@@ -178,7 +291,7 @@
    ]
   },
   "FLT": {
-   "name": "Security filtration \u2192 map: 550 | CCL wash",
+   "name": "CCL wash (550)",
    "polygon": [
     [
      945,
@@ -262,7 +375,7 @@
    ]
   },
   "PWR": {
-   "name": "Water & utilities \u2192 map: 4664 | Cooling water",
+   "name": "Cooling water & utilities (4664)",
    "polygon": [
     [
      1335,
@@ -300,6 +413,27 @@
     [
      1335,
      692
+    ]
+   ]
+  },
+  "LAB": {
+   "name": "Laboratory & offices",
+   "polygon": [
+    [
+     1335,
+     700
+    ],
+    [
+     1575,
+     700
+    ],
+    [
+     1575,
+     858
+    ],
+    [
+     1335,
+     858
     ]
    ]
   },

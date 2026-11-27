@@ -1,4 +1,4 @@
-"""Approved concept map (v1.5.0): zone geometry, road graph routing and the entry check."""
+"""Site geometry (v1.7.0: Al Taweelah illustrative image; v1.5.0: concept map): zones, road-graph routing, entry check."""
 
 from datetime import timedelta
 from itertools import combinations
@@ -29,12 +29,13 @@ REPORTING_CODES = {
     "PWR",
     "WKS",
     "WTR",
+    "LAB",  # v1.7.0: Laboratory & offices became a reporting zone (owner decision 2026-11-27)
 }
 
 
 def test_every_reporting_code_has_geometry_inside_the_map():
     assert set(site_layout.REPORTING) == REPORTING_CODES == {row[0] for row in AREAS}
-    assert [z.code for z in site_layout.ZONES if not z.reporting] == ["LAB"]  # support area, no hazard totals
+    assert all(z.reporting for z in site_layout.ZONES)  # v1.7.0: no support-only zones remain
     for z in site_layout.ZONES:
         assert len(z.points) >= 3 and z.name
         assert 0 <= z.x < z.x + z.w <= site_layout.VIEW_W and 0 <= z.y < z.y + z.h <= site_layout.VIEW_H
@@ -44,11 +45,20 @@ def test_seed_names_come_from_the_map():
     assert {row[0]: row[1] for row in AREAS} == {code: z.name for code, z in site_layout.REPORTING.items()}
 
 
+def _segments_cross(p1, p2, q1, q2):
+    def orient(a, b, c):
+        v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+        return (v > 0) - (v < 0)
+
+    return orient(p1, p2, q1) * orient(p1, p2, q2) < 0 and orient(q1, q2, p1) * orient(q1, q2, p2) < 0
+
+
 def test_zones_do_not_overlap():
+    # v1.7.0: zones are polygons (EVP is L-shaped), so overlap is tested on the polygons, not their bounding boxes.
     for a, b in combinations(site_layout.ZONES, 2):
-        apart = a.x + a.w <= b.x or b.x + b.w <= a.x or a.y + a.h <= b.y or b.y + b.h <= a.y
-        assert apart, (a.code, b.code)
-        assert not any(b.contains(*p) and b.distance(p) == 0 and not _on_outline(b, p) for p in a.points)
+        assert not any(_segments_cross(*e, *f) for e in a.edges() for f in b.edges()), (a.code, b.code)
+        assert not any(b.contains(*p) and not _on_outline(b, p) for p in a.points), (a.code, b.code)
+        assert not any(a.contains(*p) and not _on_outline(a, p) for p in b.points), (a.code, b.code)
 
 
 def _on_outline(z, p):
@@ -84,7 +94,7 @@ def _graph_edges_on(path):
 
 @pytest.mark.parametrize(
     "dest,flagged",
-    [("HYD", {"WTR"}), ("DIG", {"GRD", "CLR"}), ("CLR", {"PRC", "HYD"}), ("TNK", {"EVP"}), ("WKS", {"ALS", "PWR"})],
+    [("HYD", {"FLT"}), ("BXH", {"EVP"}), ("CLR", {"PRC", "HYD"}), ("TNK", {"EVP"}), ("WKS", {"ALS", "PWR"})],
 )
 def test_route_avoids_every_road_beside_a_flagged_zone(dest, flagged):
     path = site_layout.walk_route(dest, flagged)
@@ -108,11 +118,13 @@ def test_every_road_stretch_beside_a_flagged_zone_is_closed():
 
 def test_route_detours_and_refuses_honestly():
     direct = site_layout.walk_route("HYD", set())
-    detour = site_layout.walk_route("HYD", {"WTR"})
+    detour = site_layout.walk_route("HYD", {"FLT"})
     assert detour and detour != direct
     assert site_layout.walk_route("DIG", {"DIG"}) == []  # destination flagged
-    assert site_layout.walk_route("DIG", {"BXH", "GRD", "CLR", "FLT", "WTR"}) == []  # every approach blocked
-    assert site_layout.walk_route("LAB", set()) == []  # support area
+    # The south gate lies beside the water basins and the laboratory: a flagged WTR or LAB closes every approach,
+    # and the page says so (the rule is not relaxed for the gate).
+    assert site_layout.walk_route("DIG", {"WTR"}) == [] and site_layout.walk_route("DIG", {"LAB"}) == []
+    assert site_layout.walk_route("LAB", set())  # v1.7.0: LAB is a reporting zone with a route
     assert site_layout.walk_route("UNKNOWN", set()) == []
 
 
@@ -148,13 +160,13 @@ def test_blocked_route_names_the_flagged_zones(client, db):
     login(client, 9)
     for h in db.scalars(select(Hazard).where(Hazard.status.in_(ACTIVE))):
         h.risk_level = "Low"  # start from no flagged zones
-    for code in ("BXH", "GRD", "CLR", "FLT", "WTR"):
+    for code in ("WTR",):  # beside the south gate: closes every approach
         area = db.scalar(select(Area).where(Area.code == code))
         h = report(db, code="no_gloves")
         h.area_id, h.risk_level = area.id, "High"
     db.commit()
     page = client.get("/site?unit=DIG&route=1").text
-    assert "block every road approach" in page and "BXH, CLR, FLT, GRD, WTR" in page
+    assert "hazards in WTR block every road approach" in page
     assert 'id="walk-route"' not in page
 
 
@@ -171,11 +183,14 @@ def test_every_role_can_check_entry_conditions(client, user_id):
     assert 'id="walk-route"' in page.text or "Route unavailable" in page.text
 
 
-@pytest.mark.parametrize("overlay", ["open_risk", "overdue", "reports"])
-def test_site_page_shows_every_reporting_zone_with_its_overlay(client, overlay):
+@pytest.mark.parametrize("status", ["active", "overdue", "closed", "all"])
+def test_site_page_shows_every_reporting_zone_with_the_heat_layer(client, status):
     login(client, 9)
-    page = client.get("/site", params={"overlay": overlay}).text
-    assert 'href="/static/ata_concept_map.svg"' in page
+    page = client.get("/site", params={"status": status}).text
+    assert (
+        f'href="{site_layout.MAP_URL}"' in page
+        and f'href="/site/heat.png?window=0&amp;category=&amp;status={status}"' in page
+    )
     for code in REPORTING_CODES:
         assert f"unit={code}" in page
-    assert "Calculation:" in page and "No matching records" in page
+    assert "Calculation:" in page and "Denominator:" in page and "not a statement about conditions" in page

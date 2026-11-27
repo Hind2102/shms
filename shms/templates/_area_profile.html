@@ -1,0 +1,15 @@
+{# Area hazard profile (project assumption) + required PPE pictograms. Needs `area` or `detail.area` and ppe_defs(). #}
+{% from '_ppe.html' import ppe_list %}
+{% set pa = area if area is defined and area else detail.area %}
+<div class="area-profile">
+  <h3>What the work here involves</h3>
+  {% set summary = area_profiles.summary(pa.code) %}
+  {% if summary %}<p>{{ summary }}</p>{% endif %}
+  <ul class="chips" aria-label="Typical hazards in {{ pa.name }}">
+    {% for c in area_profiles.typical_hazards(pa.code) %}<li class="chip">{{ c.name }}</li>{% else %}<li class="empty">No area profile recorded.</li>{% endfor %}
+  </ul>
+  <p class="small muted">Typical hazards describe the work in this area – they are not recorded reports.</p>
+  <h3>Required PPE</h3>
+  {{ ppe_list(pa.ppe_list) }}
+  <p class="small muted">Area profile and PPE list are project assumptions, not the site's verified requirements.</p>
+</div>

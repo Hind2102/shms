@@ -3,7 +3,7 @@
 .map-toolbar { justify-content: space-between; padding: 5px 10px; border-bottom: 1px solid #bbc7c4; }
 .map-toolbar label { margin: 0; font-weight: 500; }
 .map-buttons button { background: white; border: 1px solid #9daba9; border-radius: 3px; min-height: 36px; min-width: 38px; font: inherit; cursor: pointer; }
-#plan { width: 100%; display: block; aspect-ratio: 1920 / 1014; touch-action: pan-y; background: #f1e3c4; }
+#plan { width: 100%; display: block; touch-action: pan-y; background: #f1e3c4; }
 #plan.is-zoomed { touch-action: none; cursor: grab; }
 #plan.is-zoomed:active { cursor: grabbing; }
 .base-drawing text, .metric-label { font-family: var(--display),sans-serif; fill: #223a3d; }
@@ -56,3 +56,15 @@ body.wide main { max-width: 1680px; }
   .map-key { font-size: 15px; }
 }
 @media (max-width: 700px) { .map-note { font-size: 16px; } }
+
+/* v1.7.0 – weather-style heat map */
+.unit-link .lot-target { stroke: rgba(22, 40, 48, .35); stroke-width: 1.5px; }
+.unit-link.no-data .lot-target { stroke: #4d5b61; stroke-width: 2px; }
+.no-data-label { font-size: 16px; paint-order: stroke; stroke: #fff; stroke-width: 5px; }
+.heat-legend { border-top: 1px solid #bbc7c4; padding: 8px 12px; }
+.heat-legend p { margin: 6px 0 0; }
+.heat-scale { display: flex; align-items: center; gap: 10px; font-size: 13px; flex-wrap: wrap; }
+.heat-bar { display: inline-block; flex: 1 1 160px; max-width: 360px; height: 14px; border-radius: 3px; border: 1px solid #8a6d3b;
+  background: linear-gradient(90deg, #fff3b0 0%, #ffd228 35%, #fa8214 65%, #c4121c 100%); }
+.key-pin { height: 14px; width: 14px !important; border-radius: 50%; background: #c4121c; border: 2px solid #162830; }
+.heat-legend .map-key { border-top: 0; padding: 6px 0 0; }

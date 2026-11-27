@@ -820,10 +820,10 @@ OVERLAYS = ("open_risk", "overdue", "reports")
 WINDOWS = (30, 90, 180)
 
 
-PIN_CLUSTER_RADIUS = 48  # map units on the 1920-wide concept map (was 30 on the 1200-wide plan)
+PIN_CLUSTER_RADIUS = 42  # image pixels on the 1672-wide Al Taweelah image (48 on the 1920-wide concept map)
 
 
-def _pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
+def pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
     """Group nearby active cases within a unit. The highest-risk member anchors and colours each marker."""
     pinned = (h for h in pool if h.status in ACTIVE and h.x is not None and h.y is not None)
     groups: list[list[Hazard]] = []
@@ -915,5 +915,5 @@ def site_overview(
         "areas": rows,
         "site_total": total,
         "hazards_counted": len(pool),
-        "pin_groups": _pin_groups(pool),
+        "pin_groups": pin_groups(pool),
     }

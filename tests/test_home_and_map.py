@@ -133,16 +133,16 @@ def test_each_role_gets_its_own_home_page(client, uid, heading):
 
 def test_plan_view_page_is_labelled_illustrative_and_explains_the_overlay(client):
     login(client, MANAGER)
-    for overlay in ("open_risk", "overdue", "reports"):
-        page = _visible(client.get(f"/site?overlay={overlay}&window=30").text)
-        assert "Concept layout only" in page and "require a verified site plot plan" in page  # v1.5.0 map note
+    for status in ("active", "overdue", "closed", "all"):
+        page = _visible(client.get(f"/site?status={status}&window=30").text)
+        assert "Illustrative concept image, not a verified site plot plan" in page  # v1.7.0 map note
         assert "Calculation:" in page
         assert not re.search(r"\bsafe\b", page, re.I)
 
 
 def test_plan_view_ignores_unknown_filter_values(client):
     login(client, MANAGER)
-    assert client.get("/site?overlay=boom&window=-5&level=xyz").status_code == 200
+    assert client.get("/site?status=boom&window=-5&category=xyz").status_code == 200
 
 
 def test_risk_matrix_page_separates_guidance_from_project_choices(client):

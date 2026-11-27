@@ -6,6 +6,7 @@
   <title>Control-room board · Site Hazard Management</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/board.css">
+  <link rel="stylesheet" href="/static/site-plan.css">
 </head>
 <body class="board-page{% if dark %} dark{% endif %}">
 {% if get_settings().demo_mode %}<div class="demo-banner" role="note">Public demo – do not upload confidential, personal or site photos; data resets on restart.</div>{% endif %}
@@ -23,16 +24,18 @@
     <div class="bk"><span class="bk-v">{{ active }}</span><span class="bk-l">Active hazards (all levels)</span></div>
   </section>
   <div class="board-grid">
-    <section class="board-map" aria-label="Open risk by zone">
-      <svg viewBox="0 {{ site_layout.TITLE_STRIP_H }} {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H - site_layout.TITLE_STRIP_H }}" role="img" aria-label="Concept site map with open risk per zone">
-        <defs><pattern id="no-records" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(42)"><path d="M0 0V10" stroke="#73858c" stroke-width="2.5"/></pattern></defs>
+    <section class="board-map" aria-label="Risk heat map">
+      <svg viewBox="0 {{ site_layout.TITLE_STRIP_H }} {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H - site_layout.TITLE_STRIP_H }}" role="img" aria-label="Site risk heat map of active hazards. Zones with records: {% for c, zh in heat.zones.items() if zh.count %}{{ zh.name }} {{ zh.count }}{{ ', ' if not loop.last }}{% endfor %}.">
+        <defs><pattern id="no-records" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(42)"><rect width="10" height="10" fill="#ffffff" fill-opacity=".55"/><path d="M0 0V10" stroke="#37474f" stroke-width="3"/></pattern></defs>
         <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}"/>
-        {% for code, z in zones.items() if code in rows %}{% set a = rows[code] %}
-        <rect x="{{ z.x + 2 }}" y="{{ z.y + z.h - 38 }}" width="{{ z.w - 4 }}" height="36" fill="{{ '#9b472c' if a.value else 'url(#no-records)' }}" fill-opacity="{{ (0.3 + 0.6*a.ratio) if a.value else 0.6 }}"/>
-        <text x="{{ z.x + z.w - 10 }}" y="{{ z.y + z.h - 11 }}" text-anchor="end" class="board-label">{{ code }} · {{ a.value if a.value else 'none recorded' }}</text>
+        <image href="/site/heat.png?{{ heat.filters.query() }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}" preserveAspectRatio="none"/>
+        {% for code, z in zones.items() %}{% set zh = heat.zones[code] %}
+        {% if not zh.count %}<polygon points="{{ z.points_attr }}" fill="url(#no-records)" stroke="#37474f" stroke-width="2"/>{% endif %}
+        <text x="{{ z.centre[0] }}" y="{{ z.centre[1] + 7 }}" text-anchor="middle" class="board-label">{{ code }} · {{ zh.count if zh.count else 'no records' }}</text>
         {% endfor %}
       </svg>
-      <p class="board-note">Open risk = sum of risk scores of active hazards reported in the last 90 days, per zone. Hatching: no recorded hazards in this window – not a statement about conditions. {{ site_layout.FOOTER_NOTE }}</p>
+      <div class="heat-scale board-note"><span>Low but recorded</span><i class="heat-bar" aria-hidden="true"></i><span>≥ one open Extreme hazard at a spot</span></div>
+      <p class="board-note">Heat = risk-weighted density of active hazards (open, planned, awaiting verification), any report date; number = active hazards per zone. Hatching: no records – not a statement about conditions. {{ calculation }} {{ site_layout.FOOTER_NOTE }}</p>
     </section>
     <section class="board-list" aria-labelledby="urgent-h">
       <h2 id="urgent-h">Extreme and High – still active</h2>

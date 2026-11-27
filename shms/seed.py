@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import auth, notify, services, taxonomy
+from . import area_profiles, auth, notify, services, taxonomy
 from .models import Area, Hazard, Role, Status, User, utcnow
 
 DEMO_PASSWORD = "shms-demo-2026"  # documented demo password for the synthesized users – not a secret
@@ -39,28 +39,32 @@ USERS = [
 
 BASE_PPE = "Hard hat, Safety glasses, Gloves, Safety boots, Flame-resistant coverall"
 REQUIRED = "no_hard_hat,no_eye_protection,no_gloves"
+LAB_CHECKS = "no_eye_protection,no_gloves"  # a laboratory does not require a hard hat
 # Reporting zones of the approved concept map (v1.5.0): code, owner index, required PPE shown at the entrance.
 # Names and geometry come from the map (shms/site_layout.py). PPE lists are project assumptions, not verified site
 # requirements. This refinery uses coveralls, not hi-vis vests, so no area requires a vest (the vest check was also
 # rejected by the release gate). AI checks are the released PPE checks only (REQUIRED ∩ release gate).
 # The first nine keep their v1.4 order (and ids); the six new zones follow, as migration 0009 adds them.
-ZONE_PPE = [
-    ("BXH", 3, f"{BASE_PPE}, Dust mask, Hearing protection"),
-    ("GRD", 3, f"{BASE_PPE}, Hearing protection"),
-    ("DIG", 3, f"{BASE_PPE}, Face shield over glasses (caustic), Chemical gloves"),
-    ("CLR", 4, f"{BASE_PPE}, Face shield over glasses (caustic), Chemical gloves"),
-    ("FLT", 4, f"{BASE_PPE}, Face shield over glasses (caustic), Chemical gloves"),
-    ("PRC", 5, f"{BASE_PPE}, Chemical gloves"),
-    ("CAL", 5, f"{BASE_PPE}, Heat-resistant gloves, Dust mask"),
-    ("TNK", 6, f"{BASE_PPE}, Face shield (caustic transfers), Chemical suit"),
-    ("PWR", 6, f"{BASE_PPE}, Hearing protection, Arc-rated clothing (switchrooms)"),
-    ("EVP", 5, "Hard hat, Face shield, Chemical gloves"),
-    ("HYD", 5, "Hard hat, Face shield, Chemical gloves"),
-    ("ALS", 5, "Hard hat, Safety glasses, Gloves, Dust mask"),
-    ("LIM", 6, "Hard hat, Goggles, Gloves, Dust mask"),
-    ("WKS", 6, "Hard hat, Safety glasses, Gloves, Hearing protection"),
-    ("WTR", 6, "Hard hat, Safety glasses, Life jacket (near open water)"),
+ZONE_OWNER = [  # v1.4 order first (ids), then the v1.5 zones, then LAB (v1.7.0, migration 0011)
+    ("BXH", 3),
+    ("GRD", 3),
+    ("DIG", 3),
+    ("CLR", 4),
+    ("FLT", 4),
+    ("PRC", 5),
+    ("CAL", 5),
+    ("TNK", 6),
+    ("PWR", 6),
+    ("EVP", 5),
+    ("HYD", 5),
+    ("ALS", 5),
+    ("LIM", 6),
+    ("WKS", 6),
+    ("WTR", 6),
+    ("LAB", 6),
 ]
+# v1.7.0: required PPE per zone from the area profiles (project assumptions, shms/config/area_profiles.json).
+ZONE_PPE = [(code, owner, ", ".join(area_profiles.get(code)["required_ppe"])) for code, owner in ZONE_OWNER]
 
 
 def _area_rows():
@@ -68,7 +72,8 @@ def _area_rows():
 
     for code, owner, ppe in ZONE_PPE:
         z = REPORTING[code]
-        yield code, z.name, owner, ppe, REQUIRED, z.x, z.y, z.w, z.h
+        checks = LAB_CHECKS if code == "LAB" else REQUIRED
+        yield code, z.name, owner, ppe, checks, z.x, z.y, z.w, z.h
 
 
 AREAS = list(_area_rows())  # code, name, owner index, required PPE, AI checks, x, y, w, h (map bounding box)
@@ -296,6 +301,67 @@ ACTION_TEXT: dict[str, dict[str, str]] = {
         "ppe": "Interim PPE issued until the repair is made.",
     },
 }
+# v1.7.0: closure texts for the area-profile hazard types (manual categories), one per control used below.
+ACTION_TEXT.update(
+    {
+        "steam_leak": {
+            "engineering": "Leaking steam joint isolated and repaired by maintenance; barrier kept until re-tested.",
+            "procedural": "Steam leak tagged and added to the shutdown work list; barrier and warning sign placed.",
+        },
+        "excessive_noise": {
+            "engineering": "Silencer fitted to the vacuum-pump exhaust; noise level re-measured below the limit.",
+            "ppe": "Hearing protection issued from the area store; crew briefed on the hearing-protection zone.",
+        },
+        "hot_surface": {
+            "engineering": "Insulation and a guard fitted over the hot pipe section.",
+            "procedural": "Hot-surface warning signs added; the task was re-planned to avoid contact.",
+        },
+        "caustic_leak": {
+            "engineering": "Leaking flange repaired and a splash guard fitted; spill neutralised and cleaned up.",
+            "procedural": "Line isolated and tagged for repair; area barriered and spill cleaned up.",
+        },
+        "dust_release": {
+            "engineering": "Dust-extraction hood repaired and the conveyor skirt rubber replaced.",
+            "procedural": "Spillage removed with the vacuum truck; dust check added to the housekeeping round.",
+        },
+        "work_at_height": {
+            "engineering": "Handrail and toe-board reinstated on the platform edge.",
+            "procedural": "Work stopped until a permit and a harness anchor point were in place.",
+        },
+        "confined_space": {
+            "procedural": "Entry stopped; permit, gas test and standby person arranged before re-entry.",
+            "engineering": "Manway locked closed and a confined-space sign fitted.",
+        },
+        "electrical_hazard": {
+            "engineering": "Damaged cable replaced and the panel cover refitted by an electrician.",
+            "procedural": "Equipment isolated, locked out and tagged until the electrician's repair.",
+        },
+    }
+)
+PROFILE_CONSEQUENCE = {  # weights for consequence 1..5 (project assumption; at most 4, as in the main history)
+    "steam_leak": (0, 5, 50, 45, 0),
+    "excessive_noise": (0, 10, 55, 35, 0),
+    "hot_surface": (0, 10, 55, 35, 0),
+    "caustic_leak": (0, 5, 50, 45, 0),
+    "dust_release": (0, 10, 55, 35, 0),
+    "work_at_height": (0, 5, 50, 45, 0),
+    "confined_space": (0, 5, 50, 45, 0),
+    "electrical_hazard": (0, 5, 50, 45, 0),
+}
+PROFILE_CONTEXT = {  # what was seen, so every synthetic report states its context
+    "steam_leak": "Steam plume from a flange on the heater line; area not yet barriered.",
+    "excessive_noise": "Pump enclosure door left open; noise clearly above normal.",
+    "hot_surface": "Insulation missing on a hot pipe section next to the walkway.",
+    "caustic_leak": "Caustic dripping from a valve gland onto the platform.",
+    "dust_release": "Dust cloud at the conveyor transfer point; extraction not working.",
+    "work_at_height": "Platform handrail removed for maintenance and not reinstated.",
+    "confined_space": "Tank manway open with no permit board or standby person.",
+    "electrical_hazard": "Damaged cable insulation on a portable pump in a wet area.",
+}
+CONTROL_DROP = {"engineering": 1, "procedural": 1, "ppe": 0, "elimination": 2}
+N_PROFILE_HISTORY = 48  # v1.7.0: extra synthetic reports of the area-profile hazard types (separate random stream)
+PIN_SHARE = 0.7  # v1.7.0: share of synthetic reports with a map pin (separate random stream)
+
 N_HISTORY = 210  # v1.5.0: 15 reporting zones (was 150 for 9 zones in v1.4.1)
 
 
@@ -373,11 +439,14 @@ def seed(db: Session, n_history: int = N_HISTORY, now: datetime | None = None, r
 
     with notify.no_mail():  # synthetic history: in-app notifications only, no outbox e-mails
         _history(db, rng, areas, reporters, supervisor, times, now)
+        # v1.7.0 additions use their own random streams, so the v1.4.1/v1.5 history above is unchanged.
+        _profile_history(db, random.Random(rng_seed + 1), areas, reporters, supervisor, now)
+    _place_pins(db, random.Random(rng_seed + 2))
     db.commit()
 
 
 def _history(db, rng, areas, reporters, supervisor, times, now) -> None:
-    cells = [(a, cat, w) for a in areas for cat, w in PROFILE[a.code].items()]
+    cells = [(a, cat, w) for a in areas if a.code in PROFILE for cat, w in PROFILE[a.code].items()]
     for t in times:
         area, cat, _ = rng.choices(cells, [w for *_, w in cells])[0]
         reporter = rng.choice(reporters)
@@ -415,6 +484,62 @@ def _history(db, rng, areas, reporters, supervisor, times, now) -> None:
             verify_at = close_at + timedelta(days=rng.uniform(0.5, 3))
             if verify_at < now:
                 services.verify(db, h, supervisor, "Checked on site (synthetic)", at=verify_at)
+
+
+def _profile_history(db, rng, areas, reporters, supervisor, now) -> None:
+    """Reports of the area-profile hazard types (steam leak, noise, …) in every zone, LAB included."""
+    for _ in range(N_PROFILE_HISTORY):
+        area = rng.choice(areas)
+        # The area's two main profile hazards: repeats in one area are what raise likelihood on a real site.
+        cats = [c for c in area_profiles.get(area.code)["typical_hazards"] if c in PROFILE_CONSEQUENCE][:2]
+        if not cats:
+            continue
+        cat = rng.choice(cats)
+        t = now - timedelta(days=rng.uniform(0, 180), hours=rng.uniform(0, 12))
+        h = services.create_draft(db, rng.choice(reporters), area, None, None, at=t)
+        cons = rng.choices((1, 2, 3, 4, 5), PROFILE_CONSEQUENCE[cat])[0]
+        control = rng.choice(sorted(ACTION_TEXT[cat]))
+        residual = max(1, cons - CONTROL_DROP[control])
+        services.confirm(
+            db,
+            h,
+            h.reporter,
+            services.Confirmation(
+                category_code=cat,
+                consequence=cons,
+                description=f"Synthetic report: {taxonomy.get(cat).name.lower()}. {PROFILE_CONTEXT[cat]}",
+            ),
+            at=t,
+        )
+        if rng.random() < min(0.95, 0.3 + (now - t).days / 60):
+            close_at = min(now, t + timedelta(days=rng.uniform(0.2, 1.5) * max(1, (h.due_at - t).days)))
+            services.close(
+                db,
+                h,
+                area.owner,
+                ACTION_TEXT[cat][control],
+                at=close_at,
+                control_type=control,
+                residual_consequence=residual,
+            )
+            verify_at = close_at + timedelta(days=rng.uniform(0.5, 3))
+            if verify_at < now:
+                services.verify(db, h, supervisor, "Checked on site (synthetic)", at=verify_at)
+
+
+def _place_pins(db, rng) -> None:
+    """Give most synthetic reports a map pin at a random point inside their zone (reporters tap the exact spot)."""
+    from .site_layout import REPORTING
+
+    for h in db.scalars(select(Hazard).where(Hazard.x.is_(None)).order_by(Hazard.id)):
+        z = REPORTING.get(h.area.code)
+        if z is None or rng.random() >= PIN_SHARE:
+            continue
+        for _ in range(50):
+            x, y = rng.randint(z.x + 8, z.x + z.w - 8), rng.randint(z.y + 8, z.y + z.h - 8)
+            if z.contains(x, y):
+                h.x, h.y = x, y
+                break
 
 
 def main() -> None:

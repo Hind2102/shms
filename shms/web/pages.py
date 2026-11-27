@@ -9,12 +9,12 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import auth, escalate, policy, risk, services, site_layout, taxonomy
+from .. import area_profiles, auth, escalate, heatmap, policy, risk, services, site_layout, taxonomy
 from ..db import get_session
 from ..detection import DetectorResult, get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User, utcnow
@@ -25,7 +25,13 @@ log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
 templates.env.globals.update(
-    taxonomy=taxonomy, risk=risk, Status=Status, Role=Role, site_layout=site_layout, get_settings=get_settings
+    taxonomy=taxonomy,
+    risk=risk,
+    Status=Status,
+    Role=Role,
+    site_layout=site_layout,
+    get_settings=get_settings,
+    area_profiles=area_profiles,
 )
 templates.env.filters["cat"] = lambda code: taxonomy.get(code).name if code else "Not classified"
 templates.env.filters["ppe"] = lambda code: taxonomy.get(code).ppe
@@ -146,17 +152,17 @@ def home(request: Request, user: User = Depends(page_user), db: Session = Depend
 @router.get("/site")
 def site_plan(
     request: Request,
-    overlay: str = "open_risk",
-    window: str = "90",
-    level: str = "",
+    window: str = "",
+    category: str = "",
+    status: str = "",
     unit: str = "",
     route: str = "",
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    window_days = next((days for days in services.WINDOWS if str(days) == window), 90)
-    view = services.site_overview(db, overlay=overlay, window_days=window_days, min_level=level or None)
-
+    """Weather-style risk heat map from live data, with the check-before-entering card for a chosen zone."""
+    filters = heatmap.Filters.parse(window, category, status)
+    heat = heatmap.compute(db, filters)
     selected = site_layout.REPORTING.get(unit)
     area = db.scalar(select(Area).where(Area.code == unit)) if selected else None
     detail = services.area_overview(db, area) if area else None
@@ -172,15 +178,30 @@ def site_plan(
         "site.html",
         user,
         db,
-        v=view,
-        windows=services.WINDOWS,
+        heat=heat,
+        v={"pin_groups": services.pin_groups(heat.hazards), "overlay": "heat"},
+        statuses=heatmap.STATUSES,
+        windows=heatmap.WINDOWS,
+        calculation=heatmap.CALCULATION,
         zones=site_layout.REPORTING,
-        rows={a["code"]: a for a in view["areas"]},
         detail=detail,
         route_requested=route == "1",
         path=path,
         flagged=flagged,
     )
+
+
+@router.get("/site/heat.png")
+def site_heat(
+    window: str = "",
+    category: str = "",
+    status: str = "",
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
+    """The heat layer for the current filters, computed from the live database on every request."""
+    heat = heatmap.compute(db, heatmap.Filters.parse(window, category, status))
+    return Response(heatmap.png(heat), media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/dashboard")
@@ -222,7 +243,6 @@ def board(request: Request, theme: str = "light", user: User = Depends(page_user
     """Read-only control-room view for a large screen: open-risk map, High/Extreme list, overdue count.
     Refreshes every 60 s; sign-in required like every other page."""
     now = utcnow()
-    view = services.site_overview(db, overlay="open_risk", window_days=90, now=now)
     active = list(db.scalars(select(Hazard).where(Hazard.status.in_(services.ACTIVE))))
     urgent = sorted(
         (h for h in active if h.risk_level in services.HIGH_LEVELS), key=lambda h: (-(h.risk_score or 0), h.id)
@@ -233,9 +253,9 @@ def board(request: Request, theme: str = "light", user: User = Depends(page_user
         "board.html",
         user,
         db,
-        v=view,
+        heat=heatmap.compute(db, heatmap.Filters(), now=now),
+        calculation=heatmap.CALCULATION,
         zones=site_layout.REPORTING,
-        rows={a["code"]: a for a in view["areas"]},
         urgent=urgent,
         overdue=overdue,
         active=len(active),

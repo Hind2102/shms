@@ -47,8 +47,9 @@ INSERT INTO notifications VALUES (1,3,1,'High risk',0,'2026-11-01 08:00:00');
 TABLES = ("users", "areas", "hazards", "hazard_events", "notifications")
 # Migration 0008 adds one audit event per re-scored hazard by design; every row that existed before is kept.
 NOT_RESCORE = "kind != 'risk_rescored'"
-# Migration 0009 adds the six new zones of the approved concept map by design; every area that existed is kept.
-NOT_NEW_ZONE = "code NOT IN ('EVP','HYD','ALS','LIM','WKS','WTR')"
+# Migration 0009 adds the six new zones of the approved concept map, and 0011 the LAB zone of the Al Taweelah map, by
+# design; every area that existed is kept.
+NOT_NEW_ZONE = "code NOT IN ('EVP','HYD','ALS','LIM','WKS','WTR','LAB')"
 
 
 def _old_db(path) -> str:
