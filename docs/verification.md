@@ -1559,3 +1559,60 @@ PNG transparency, orientation, WhatsApp fallback, metadata stripped, every rejec
 JSON errors, no-people result, detector crash, location sources photo/device/none, invalid device positions, the
 migration back-fill). `tests/test_uploads.py`: the size-limit test now checks 30 MB. It was changed because the owner
 raised the limit; it was not loosened to make it pass.
+
+## v1.6.1 Part B – public demo: no hosted demo
+
+**Plan.** Deploy the demo as a free Hugging Face Docker Space (`Hind2102/shms-demo`), with:
+- YOLOv8s on CPU;
+- fresh data on every start;
+- a secret key from a Space secret;
+- a warning banner and a per-IP rate limit.
+
+**Result: not deployed.** Creating the Space returned **402 Payment Required**: Hugging Face now requires a PRO
+subscription for Docker (and Gradio) Spaces on `cpu-basic`. The owner decided not to pay, so **there is no hosted
+demo**. Checked on 2026-11-27, with the CLI signed in as Hind2102 (it also lists private repos) and with the Hub
+browser: the account has no Spaces, models or datasets, so nothing billable was created. The token was used only
+through `hf auth login` (stored in `~/.cache/huggingface`); it was never written to the repo or printed.
+
+**What was kept.**
+- Demo mode (`SHMS_DEMO_MODE`, `shms/demo.py`) and the rate limit (`SHMS_RATE_LIMIT_PER_MIN`,
+  `shms/web/ratelimit.py`), for running the demo locally. README *Running the demo* has the Python and Docker
+  commands and an optional Cloudflare quick-tunnel link, with its warnings; `cloudflared` is not installed.
+- `scripts/deploy_hf_space.sh` and `deploy/hf-space/`, marked as needing a PRO plan. The Space image was built and
+  run locally on 2026-11-26:
+  - the weights downloaded from the SH17 release and passed the checksum;
+  - it refused to start without `SHMS_SECRET_KEY`;
+  - banner shown, data reset, `yolo:sh17_yolo8s ready`.
+
+**Added safety guard.** Demo mode deletes its data on start. With the default settings it would have deleted the
+project's own `shms.db`, `uploads/` and `outbox/`. It now refuses to start when pointed at any of them
+(`demo.check_not_project_data`). Tests check that those files are unchanged afterwards; the real `shms.db` and
+`uploads/` were also checked before and after the full test run.
+
+**Browser verification (local, current code).** Script: `docs/screenshots/capture_demo_v161.py`, run against the
+Python demo command from the README (port 8765, YOLOv8s, demo mode), Chromium at 390 × 844 (phone) and 1366 × 900:
+
+| Check | 390 px | 1366 px |
+|---|---|---|
+| Banner on the login page and every page | ✓ | ✓ |
+| Sign in as `ahmed` | ✓ | ✓ |
+| HEIC upload (SH17 sample image with EXIF GPS) → confirm page with real YOLO boxes | 5 boxes, 3 suggestions | 5 boxes, 3 suggestions |
+| JPEG upload (no GPS) → confirm page with real YOLO boxes | 5 boxes, 3 suggestions | 5 boxes, 3 suggestions |
+| "Analysing your photo…" shown while the upload is held | ✓ | ✓ |
+| "Use my current location" (permission granted, emulated position ± 12 m) | "Location added" | "Location added" |
+| Report location: HEIC (has GPS) → **photo**; JPEG (no GPS) → **device** (± 12 m) | ✓ | ✓ |
+| Capture time: HEIC from EXIF; JPEG "upload time, because the photo has no capture time" | ✓ | ✓ |
+| Submit → own pin on the site plan | ✓ | ✓ |
+
+Screenshots: `docs/screenshots/v161_*.png`:
+- `login_390`;
+- `report_390`, `report_1366`;
+- `analysing_390`, `analysing_1366`;
+- `confirm_heic_390`, `confirm_heic_1366`, `confirm_jpeg_390`, `confirm_jpeg_1366`;
+- `site_390`, `site_1366`.
+
+**Limits of this verification.**
+- The geolocation permission prompt is emulated (granted in the browser context); a real phone permission
+  dialog was not tested.
+- It was not tested on a physical iPhone; HEIC files were produced with pillow-heif, not by an iPhone camera.
+- Upload-to-confirm time on the M5 Pro was about 0.1–0.3 s; shared CPUs will be slower.
