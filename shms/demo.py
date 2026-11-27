@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sqlalchemy.engine import make_url
 
-from .settings import Settings
+from .settings import PROJECT_DIR, Settings
 
 log = logging.getLogger("shms")
 
@@ -21,6 +21,21 @@ def check_config(settings: Settings) -> None:
         raise RuntimeError("Demo mode needs SHMS_SECRET_KEY (set it as a secret of the hosting service).")
     if settings.detector == "mock":
         raise RuntimeError("Demo mode must use a real detector (SHMS_DETECTOR=yolo), not the mock.")
+
+
+def check_not_project_data(settings: Settings, database_url: str) -> None:
+    """Demo mode wipes its database and photos on every start, so it must never point at the project's own."""
+    url = make_url(database_url)
+    db = Path(url.database).resolve() if url.get_backend_name() == "sqlite" and url.database else None
+    if (
+        db == (PROJECT_DIR / "shms.db").resolve()
+        or settings.upload_dir.resolve() == (PROJECT_DIR / "uploads").resolve()
+        or settings.mail_outbox.resolve() == (PROJECT_DIR / "outbox").resolve()
+    ):
+        raise RuntimeError(
+            "Demo mode deletes its data on every start. Point SHMS_DATABASE_URL, SHMS_UPLOAD_DIR and "
+            "SHMS_MAIL_OUTBOX at demo-only locations (e.g. under demo/), not shms.db, uploads/ or outbox/."
+        )
 
 
 def reset_data(settings: Settings, database_url: str) -> None:

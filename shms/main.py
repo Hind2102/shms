@@ -64,6 +64,7 @@ def create_app(database_url: str | None = None, seed_demo: bool = True) -> FastA
     settings = get_settings()
     if settings.demo_mode:
         demo.check_config(settings)
+        demo.check_not_project_data(settings, database_url or settings.database_url)
         demo.reset_data(settings, database_url or settings.database_url)
     init_engine(database_url or settings.database_url)
     create_all()

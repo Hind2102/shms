@@ -41,3 +41,6 @@ evaluation/results/*/sh17_dhash_cache.json
 
 # pytest-cov output
 .coverage
+
+# Local public-demo data (SHMS_DEMO_MODE wipes it on every start)
+demo/

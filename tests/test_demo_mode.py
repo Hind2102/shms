@@ -139,3 +139,36 @@ def test_rate_limit_api_answer_is_json(settings):
 
 def test_rate_limit_off_by_default(client):
     assert all(_post_login(client).status_code != 429 for _ in range(40))
+
+
+def _fingerprint(path):
+    return (path.stat().st_size, path.stat().st_mtime_ns) if path.exists() else None
+
+
+def test_demo_refuses_the_project_database_and_leaves_it_untouched(demo):
+    from shms.settings import PROJECT_DIR
+
+    real = PROJECT_DIR / "shms.db"
+    before = _fingerprint(real)
+    with pytest.raises(RuntimeError, match="demo-only locations"):
+        create_app(database_url=f"sqlite:///{real}")
+    assert _fingerprint(real) == before
+
+
+def test_demo_refuses_the_project_upload_folder(demo):
+    from shms.settings import PROJECT_DIR
+
+    uploads = PROJECT_DIR / "uploads"
+    before = sorted(p.name for p in uploads.iterdir()) if uploads.exists() else None
+    override_settings(upload_dir=uploads)
+    with pytest.raises(RuntimeError, match="demo-only locations"):
+        create_app(database_url=demo.database_url)
+    assert (sorted(p.name for p in uploads.iterdir()) if uploads.exists() else None) == before
+
+
+def test_demo_refuses_the_project_outbox(demo):
+    from shms.settings import PROJECT_DIR
+
+    override_settings(mail_outbox=PROJECT_DIR / "outbox")
+    with pytest.raises(RuntimeError, match="demo-only locations"):
+        create_app(database_url=demo.database_url)
