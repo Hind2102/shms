@@ -23,12 +23,41 @@ Two local AI back-ends are compared: **YOLO** detectors trained on SH17 and a **
 
 ---
 
-## Live demo
+## Running the demo
 
-**<https://hind2102-shms-demo.hf.space>**: a public demo on a free Hugging Face Space (Docker, 2 CPU cores, no GPU).
-Open that address directly; inside the frame on the Space's own page, sign-in and location sharing do not work.
+**There is no hosted demo.** A free Hugging Face Space was planned, but Hugging Face now requires a paid (PRO) plan
+for Docker Spaces: creating one returned *402 Payment Required* on 2026-11-27. Run the demo on your own machine
+instead. It uses the real AI (YOLOv8s), and you can make it reachable from a phone for a short time (below).
 
-> **Public demo – do not upload confidential, personal or site photos; data resets on restart.**
+**Demo mode** (`SHMS_DEMO_MODE=1`) is for showing the app to others:
+- every page shows *"Public demo – do not upload confidential, personal or site photos; data resets on restart."*;
+- the demo database, photos and outbox are **deleted and re-seeded on every start**;
+- it refuses to start without `SHMS_SECRET_KEY`, with the mock detector, or when pointed at the project's own
+  `shms.db`, `uploads/` or `outbox/`, so it can never wipe your normal data.
+
+Leave demo mode off for normal local use and grading (see [Usage](#usage)).
+
+**With Python** (after [Installation](#installation); the YOLOv8s weights come from `python scripts/download_models.py --all`):
+
+```bash
+source .venv/bin/activate
+mkdir -p demo                                   # demo-only data, git-ignored, wiped on every start
+SHMS_DEMO_MODE=1 SHMS_DETECTOR=yolo SHMS_YOLO_WEIGHTS=models/sh17_yolo8s.pt SHMS_RATE_LIMIT_PER_MIN=30 \
+SHMS_SECRET_KEY="$(openssl rand -base64 32)" \
+SHMS_DATABASE_URL=sqlite:///demo/shms_demo.db SHMS_UPLOAD_DIR=demo/uploads SHMS_MAIL_OUTBOX=demo/outbox \
+uvicorn shms.asgi:app --port 8765 --proxy-headers
+```
+
+**With Docker** (weights mounted read-only; the data lives only inside the container):
+
+```bash
+docker build -t shms .
+SHMS_SECRET_KEY="$(openssl rand -base64 32)" docker run --rm -p 8765:8000 \
+  -v "$PWD/models:/app/models:ro" -e SHMS_SECRET_KEY -e SHMS_DEMO_MODE=1 -e SHMS_RATE_LIMIT_PER_MIN=30 \
+  -e SHMS_YOLO_WEIGHTS=/app/models/sh17_yolo8s.pt shms
+```
+
+Then open <http://localhost:8765>. Both commands were run on 2026-11-27: banner shown, data reset, YOLOv8s loaded.
 
 | Username | Role | Try |
 |---|---|---|
@@ -39,27 +68,33 @@ Open that address directly; inside the frame on the Space's own page, sign-in an
 
 The password for all accounts is the documented demo value `shms-demo-2026` (not a secret).
 
-**What the demo can do.**
-- The whole workflow, from report to verified closure, on synthesized refinery data.
-- Real AI: YOLOv8s trained on SH17, on CPU.
-- Photos from phones: JPEG, HEIC, PNG and WebP, up to 30 MB; large photos are reduced.
-- "Use my current location".
-- Site plan, dashboard and control-room board.
+**Optional: a temporary public link (Cloudflare quick tunnel).** To try the app from a phone or show it to someone
+remotely, while the Python demo above is running on port 8765:
 
-**What it cannot do.**
-- No data is kept: the database and photos are reset to fresh demo data whenever the Space restarts or wakes from
-  sleep (after about 48 h without visitors).
-- It runs YOLOv8s, not the larger YOLOv9e used for the main evaluation; a report takes a few seconds on the shared
-  CPU.
+```bash
+cloudflared tunnel --url http://localhost:8765     # prints a random https://….trycloudflare.com address
+```
+
+> **Warning.**
+> - The link works **only while your Mac is awake and running the app and the tunnel**.
+> - **Photos and everything else sent through it leave your machine** and pass through Cloudflare.
+> - Anyone with the link can reach the demo. Use demo mode only, never your normal data, and stop the tunnel
+>   (Ctrl-C) when you are done.
+> - `cloudflared` is not installed by this project; install it yourself if you want this
+>   (e.g. `brew install cloudflared`).
+>
+> Over the tunnel's https address, "Use my current location" works on phones.
+
+**What the demo cannot do.**
+- It runs YOLOv8s, not the larger YOLOv9e used for the main evaluation.
 - No e-mail is sent; notifications appear in the app only.
-- The experimental unsafe-condition model and the Ollama vision-language model are not available.
+- The experimental unsafe-condition model and the Ollama vision-language model are off.
 - Submissions are limited to 30 per minute per IP address.
 
-Deploying the demo: `hf auth login` once (the token stays in `~/.cache/huggingface`, never in this repo), then
-`scripts/deploy_hf_space.sh`. It uploads the committed code with `deploy/hf-space/Dockerfile.demo` appended. The
-SH17 weights are downloaded at build time from the authors' release, checksum-verified. `SHMS_SECRET_KEY` is set as
-a Space secret. The local setup below is unchanged.
-
+*Hugging Face Space (needs a PRO plan).* `scripts/deploy_hf_space.sh` and `deploy/hf-space/` deploy the same demo
+to a Docker Space. The token comes from `hf auth login` and is never stored in this repo; the SH17 weights are
+downloaded at build time from the authors' release and checksum-verified. The script is kept for a future paid
+plan; it has not been used.
 
 ## Project structure
 

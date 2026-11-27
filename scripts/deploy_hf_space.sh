@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Deploy the public demo to a Hugging Face Space (Docker SDK, free CPU).
+# Deploy the public demo to a Hugging Face Space (Docker SDK, CPU).
+#
+# NEEDS A PAID PLAN: since 2026 Hugging Face requires PRO for Docker Spaces; creating the Space on a free account
+# returned 402 Payment Required (2026-11-27). Kept for a future paid plan; not used for v1.6.1.
 #
 #   hf auth login                       # once; the token stays in ~/.cache/huggingface, never in this repo
 #   scripts/deploy_hf_space.sh          # default Space: Hind2102/shms-demo
