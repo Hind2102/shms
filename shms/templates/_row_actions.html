@@ -1,0 +1,13 @@
+{# One-click next action from lists (v1.7.0). Shows only what this user is allowed to do on this hazard. #}
+{% macro row_actions(h, user, csrf_token) -%}
+<div class="row-actions">
+  {%- if h.status.value in ('open', 'planned') and services.can_act_on(user, h) -%}
+    {% if h.status.value == 'open' %}<a class="btn small-btn" href="/hazards/{{ h.id }}#plan-form" aria-label="Plan action for hazard {{ h.id }}">Plan</a>{% endif %}
+    <a class="btn small-btn" href="/hazards/{{ h.id }}#close-form" aria-label="Close hazard {{ h.id }}">Close</a>
+  {%- elif h.status.value == 'pending_verification' and services.can_verify(user, h) and user.id != h.closed_by_id -%}
+    <form method="post" action="/hazards/{{ h.id }}/verify" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="note" value="Verified from the list">
+      <button class="btn small-btn primary" type="submit" aria-label="Verify closure of hazard {{ h.id }}">Verify</button></form>
+    <a class="btn small-btn" href="/hazards/{{ h.id }}#verify-form" aria-label="Review hazard {{ h.id }} before verifying">Review</a>
+  {%- else -%}<a class="btn small-btn" href="/hazards/{{ h.id }}" aria-label="Open hazard {{ h.id }}">Open</a>{%- endif -%}
+</div>
+{%- endmacro %}

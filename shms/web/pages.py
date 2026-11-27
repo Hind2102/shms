@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import uuid
 from datetime import datetime, timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import area_profiles, auth, escalate, heatmap, policy, risk, services, site_layout, taxonomy
+from .. import analysis, area_profiles, auth, escalate, flow, heatmap, policy, risk, services, site_layout, taxonomy
 from ..db import get_session
 from ..detection import DetectorResult, get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User, utcnow
@@ -32,6 +34,8 @@ templates.env.globals.update(
     site_layout=site_layout,
     get_settings=get_settings,
     area_profiles=area_profiles,
+    flow=flow,
+    services=services,
 )
 templates.env.filters["cat"] = lambda code: taxonomy.get(code).name if code else "Not classified"
 templates.env.filters["ppe"] = lambda code: taxonomy.get(code).ppe
@@ -202,6 +206,40 @@ def site_heat(
     """The heat layer for the current filters, computed from the live database on every request."""
     heat = heatmap.compute(db, heatmap.Filters.parse(window, category, status))
     return Response(heatmap.png(heat), media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/analysis")
+def analysis_page(
+    request: Request,
+    window: str = "365",
+    status: str = "all",
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
+    an = analysis.compute(db, heatmap.Filters.parse(window, "", status))
+    return render(
+        request,
+        "analysis.html",
+        user,
+        db,
+        an=an,
+        basis=analysis.BASIS,
+        statuses=heatmap.STATUSES,
+        windows=analysis.WINDOWS,
+        heat_class=analysis.heat_class,
+    )
+
+
+@router.get("/analysis.csv")
+def analysis_csv(
+    window: str = "365", status: str = "all", user: User = Depends(page_user), db: Session = Depends(get_session)
+):
+    an = analysis.compute(db, heatmap.Filters.parse(window, "", status))
+    return Response(
+        analysis.csv_text(an),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="shms_analysis.csv"', "Cache-Control": "no-store"},
+    )
 
 
 @router.get("/dashboard")
@@ -453,6 +491,43 @@ async def confirm_submit(
 # ------------------------------------------------------------------ stage 2: close and document
 
 
+def _register_query(status: str, area: str, level: str, category: str, q: str):
+    stmt = select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc())
+    if status in {s.value for s in Status if s != Status.DRAFT}:
+        stmt = stmt.where(Hazard.status == Status(status))
+    if area:
+        stmt = stmt.join(Area).where(Area.code == area)
+    if level:
+        stmt = stmt.where(Hazard.risk_level == level)
+    if category:
+        stmt = stmt.where(Hazard.category_code == category)
+    return stmt
+
+
+def _search(hazards: list[Hazard], q: str) -> list[Hazard]:
+    """Free-text search over id, hazard type, area, description, planned and closure action."""
+    words = q.lower().split()
+    if not words:
+        return hazards
+
+    def text(h: Hazard) -> str:
+        cat = taxonomy.get(h.category_code).name if h.category_code else ""
+        return " ".join(
+            [
+                f"#{h.id}",
+                str(h.id),
+                cat,
+                h.area.name,
+                h.area.code,
+                h.description or "",
+                h.planned_action or "",
+                h.closure_action or "",
+            ]
+        ).lower()
+
+    return [h for h in hazards if all(w in text(h) for w in words)]
+
+
 @router.get("/hazards")
 def hazard_list(
     request: Request,
@@ -460,29 +535,100 @@ def hazard_list(
     area: str = "",
     level: str = "",
     category: str = "",
+    q: str = "",
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    q = select(Hazard).where(Hazard.status != Status.DRAFT).order_by(Hazard.created_at.desc())
-    if status in {s.value for s in Status if s != Status.DRAFT}:
-        q = q.where(Hazard.status == Status(status))
-    if area:
-        q = q.join(Area).where(Area.code == area)
-    if level:
-        q = q.where(Hazard.risk_level == level)
-    if category:
-        q = q.where(Hazard.category_code == category)
-    hazards = list(db.scalars(q.limit(300)))
+    hazards = _search(list(db.scalars(_register_query(status, area, level, category, q))), q)
+    counts = {s.value: 0 for s in Status if s != Status.DRAFT}
+    for st, n in db.execute(
+        select(Hazard.status, func.count()).where(Hazard.status != Status.DRAFT).group_by(Hazard.status)
+    ):
+        counts[st.value] = n
     areas = list(db.scalars(select(Area).order_by(Area.name)))
+    f = {"status": status, "area": area, "level": level, "category": category, "q": q}
     return render(
         request,
         "hazards.html",
         user,
         db,
-        hazards=hazards,
+        hazards=hazards[:300],
+        total=len(hazards),
+        counts=counts,
         areas=areas,
-        f={"status": status, "area": area, "level": level, "category": category},
+        f=f,
+        query=urlencode({k: v for k, v in f.items() if v}),
     )
+
+
+@router.get("/hazards.csv")
+def hazard_csv(
+    status: str = "",
+    area: str = "",
+    level: str = "",
+    category: str = "",
+    q: str = "",
+    user: User = Depends(page_user),
+    db: Session = Depends(get_session),
+):
+    """The hazard register with the same filters as the page (all matching rows, no 300-row limit)."""
+    hazards = _search(list(db.scalars(_register_query(status, area, level, category, q))), q)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        [
+            "id",
+            "reported_utc",
+            "area_code",
+            "area",
+            "hazard",
+            "status",
+            "stage",
+            "risk_level",
+            "risk_score",
+            "due_utc",
+            "overdue",
+            "assignee",
+            "planned_action",
+            "closure_action",
+            "control_type",
+            "residual_level",
+        ]
+    )
+    now = utcnow()
+    for h in hazards:
+        c = flow.chip(h, now)
+        w.writerow(
+            [
+                h.id,
+                f"{h.created_at:%Y-%m-%d %H:%M}",
+                h.area.code,
+                h.area.name,
+                taxonomy.get(h.category_code).name if h.category_code else "",
+                h.status.value,
+                c["label"],
+                h.risk_level or "",
+                h.risk_score or "",
+                f"{h.due_at:%Y-%m-%d}" if h.due_at else "",
+                "yes" if "overdue" in c["flags"] else "no",
+                h.assignee.name if h.assignee else "",
+                h.planned_action or "",
+                h.closure_action or "",
+                h.control_type or "",
+                h.residual_level or "",
+            ]
+        )
+    return Response(
+        buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="shms_hazard_register.csv"', "Cache-Control": "no-store"},
+    )
+
+
+@router.get("/process")
+def process_help(request: Request, user: User = Depends(page_user), db: Session = Depends(get_session)):
+    """How hazards are processed: the full lifecycle diagram with side paths and who acts at each stage."""
+    return render(request, "process.html", user, db, stages=flow.STAGES, side_paths=flow.SIDE_PATHS)
 
 
 @router.get("/queue")
@@ -518,6 +664,7 @@ def hazard_detail(
         db,
         h=h,
         can_act=services.can_act_on(user, h),
+        fl=flow.build(h),
         can_verify=services.can_verify(user, h) and user.id != h.closed_by_id,
         can_reopen=services.can_verify(user, h),
         owners=list(

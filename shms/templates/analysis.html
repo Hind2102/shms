@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from '_macros.html' import level as risk_badge %}
+{% block title %}Site analysis{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block content %}
+{% set f = an.filters %}
+<div class="page-head">
+  <h1>Site analysis</h1>
+  <p class="muted">{{ f.describe() }} · {{ an.total }} confirmed report{{ '' if an.total == 1 else 's' }} in this view.</p>
+</div>
+<form class="filters" method="get" action="/analysis" aria-label="Analysis filters">
+  <div><label for="st">Status</label><select id="st" name="status" onchange="this.form.submit()">{% for k, label in statuses.items() %}<option value="{{ k }}" {% if f.status == k %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div><label for="w">Reported</label><select id="w" name="window" onchange="this.form.submit()">{% for d in windows %}<option value="{{ d }}" {% if f.window_days == d %}selected{% endif %}>{{ 'Any date' if d == 0 else 'Last ' ~ d ~ ' days' }}</option>{% endfor %}</select></div>
+  <noscript><button class="btn secondary" type="submit">Apply</button></noscript>
+  <div class="filter-actions"><a class="btn secondary" href="/analysis.csv?{{ f.query() }}" download>Download CSV</a> <a class="btn secondary" href="/site?{{ f.query() }}">Show on the heat map</a></div>
+</form>
+
+<section class="panel" aria-labelledby="mx-h">
+  <h2 id="mx-h">Area × hazard type</h2>
+  <p class="basis small"><strong>Calculation:</strong> {{ basis.matrix }} Cell shading is relative to the highest cell in this view.</p>
+  {% if an.categories %}
+  {% set peak = an.matrix.values() | map(attribute='risk') | max %}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="mx-h"><table class="data matrix-table">
+    <thead><tr><th scope="col">Area</th>{% for c in an.categories %}<th scope="col" class="rot"><span>{{ c | cat }}</span></th>{% endfor %}<th scope="col">Total</th></tr></thead>
+    <tbody>{% for a in an.areas %}{% set t = an.area_totals[a.code] %}
+      <tr><th scope="row">{{ a.name }} <span class="muted small">{{ a.code }}</span></th>
+        {% for c in an.categories %}{% set cell = an.matrix.get((a.code, c)) %}
+        <td class="{{ heat_class(cell.risk if cell else 0, peak) }}">{% if cell %}{{ cell.count }}<span class="small"> · {{ cell.risk }}</span>{% else %}<span class="muted" aria-label="none">–</span>{% endif %}</td>
+        {% endfor %}
+        <td>{% if t.count %}<strong>{{ t.count }}</strong><span class="small"> · {{ t.risk }}</span>{% else %}<span class="muted">No records</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="small muted">Each cell: reports · risk sum. “–” = no records in this view – not a statement about conditions.</p>
+  {% else %}<p class="empty">No confirmed reports match this view – not a statement about conditions.</p>{% endif %}
+</section>
+
+<div class="grid two">
+  <section class="panel" aria-labelledby="top-h">
+    <h2 id="top-h">Top open High and Extreme</h2>
+    <p class="basis small"><strong>Calculation:</strong> {{ basis.top }}</p>
+    <ol class="top-list">{% for h in an.top %}
+      <li>{{ risk_badge(h.risk_level) }} <a href="/hazards/{{ h.id }}">#{{ h.id }} {{ h.category_code | cat }}</a> · {{ h.area.name }} · score {{ h.risk_score }}{% if h.due_at and h.due_at < an.now and h.status.value in ('open', 'planned') %} · <span class="overdue">overdue</span>{% endif %}</li>
+    {% else %}<li class="empty">No active High or Extreme hazards are recorded.</li>{% endfor %}</ol>
+  </section>
+  <section class="panel" aria-labelledby="od-h">
+    <h2 id="od-h">Overdue by area</h2>
+    <p class="basis small"><strong>Calculation:</strong> {{ basis.overdue }}</p>
+    {% if an.overdue %}
+    <table class="data"><thead><tr><th scope="col">Area</th><th scope="col">Overdue</th><th scope="col">of which High/Extreme</th><th scope="col">Oldest (days past target)</th></tr></thead>
+      <tbody>{% for code, r in an.overdue.items() | sort(attribute='1.count', reverse=True) %}<tr><th scope="row">{{ (an.areas | selectattr('code', 'equalto', code) | first).name }}</th><td>{{ r.count }}</td><td>{{ r.high }}</td><td>{{ r.oldest_days }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="empty">No overdue actions are recorded.</p>{% endif %}
+  </section>
+</div>
+
+<section class="panel" aria-labelledby="tr-h">
+  <h2 id="tr-h">Trend per area and most common hazard</h2>
+  <p class="basis small"><strong>Calculation:</strong> {{ basis.trend }} Most common: {{ basis.common }}</p>
+  {% set tpeak = an.trend.values() | map('max') | max %}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="tr-h"><table class="data trend-table">
+    <thead><tr><th scope="col">Area</th>{% for m in an.months %}<th scope="col">{{ m }}</th>{% endfor %}<th scope="col">Trend</th><th scope="col">Most common hazard</th></tr></thead>
+    <tbody>{% for a in an.areas %}{% set row = an.trend[a.code] %}
+      <tr><th scope="row">{{ a.name }}</th>{% for n in row %}<td>{{ n }}</td>{% endfor %}
+        <td><svg class="spark" viewBox="0 0 {{ 12 * row|length }} 30" width="{{ 12 * row|length }}" height="30" role="img" aria-label="Monthly reports {{ row | join(', ') }}">{% for n in row %}<rect x="{{ loop.index0 * 12 + 1 }}" y="{{ 30 - (28 * n / (tpeak or 1)) | round(1) }}" width="9" height="{{ (28 * n / (tpeak or 1)) | round(1) }}" fill="#1f4e79"/>{% endfor %}<line x1="0" y1="29.5" x2="{{ 12 * row|length }}" y2="29.5" stroke="#8a9aa8"/></svg></td>
+        <td>{% set cm = an.common[a.code] %}{% if cm %}{{ cm[0] | cat }} ({{ cm[1] }}){% else %}<span class="muted">No records</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

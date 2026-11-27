@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}How hazards are processed{% endblock %}
+{% block content %}
+<div class="page-head"><h1>How hazards are processed</h1></div>
+<p>Every report follows the same path. Each hazard page shows where it is now, who did each step and when (from the audit trail), and who acts next.</p>
+<section class="flow panel" aria-labelledby="main-path">
+  <h2 id="main-path">Main path</h2>
+  <ol class="flow-steps">
+    {% for s in stages %}
+    <li class="flow-step todo"><span class="flow-mark" aria-hidden="true">{{ loop.index }}</span><span class="flow-text"><strong>{{ s.label }}</strong><span class="flow-who">{{ s.what }}</span></span></li>
+    {% endfor %}
+  </ol>
+</section>
+<div class="grid two">
+  <section class="panel" aria-labelledby="who-h">
+    <h2 id="who-h">Who acts at each stage</h2>
+    <table class="data"><thead><tr><th scope="col">Stage</th><th scope="col">Who acts next</th></tr></thead><tbody>
+      <tr><th scope="row">Reported</th><td>The reporter confirms the hazard type and consequence (the AI only suggests).</td></tr>
+      <tr><th scope="row">Confirmed &amp; risk-scored</th><td>Automatic: risk = consequence × likelihood; routed to the Area Owner. High/Extreme or consequence ≥ 4 alert the safety supervisor.</td></tr>
+      <tr><th scope="row">Assigned to Area Owner</th><td>Area Owner plans the action (action owner and deadline), or closes it if already fixed.</td></tr>
+      <tr><th scope="row">Action planned</th><td>The action owner carries out the action; the Area Owner closes it with the control used and the residual risk.</td></tr>
+      <tr><th scope="row">Closed, awaiting verification</th><td>The safety supervisor or the reporter verifies – never the person who closed it.</td></tr>
+      <tr><th scope="row">Verified closed</th><td>No action. A supervisor or the reporter can reopen it.</td></tr>
+    </tbody></table>
+    <p class="small muted">Assignment is automatic: confirming a report routes it to the owner of its area; there is no separate assign step.</p>
+  </section>
+  <section class="panel" aria-labelledby="side-h">
+    <h2 id="side-h">Side paths</h2>
+    <dl class="side-paths">{% for key, label, what in side_paths %}<dt><span class="flow-flag {{ key }}">{{ label }}</span></dt><dd>{{ what }}</dd>{% endfor %}</dl>
+  </section>
+</div>
+{% endblock %}
