@@ -1,4 +1,6 @@
 <dl class="small">
-  <dt>Photo capture time</dt><dd>{{ h.photo_captured_at or 'Capture time unavailable' }}{% if h.photo_captured_at and h.photo_captured_at|length == 19 %} (camera local time, timezone unknown){% endif %}</dd>
-  <dt>Photo location (GPS)</dt><dd>{% if h.photo_latitude is not none %}{{ h.photo_latitude }}, {{ h.photo_longitude }}{% else %}GPS unavailable{% endif %}</dd>
+  <dt>Photo capture time</dt><dd>{% if h.photo_captured_at %}{{ h.photo_captured_at }}{% if h.photo_captured_at|length == 19 %} (camera local time, timezone unknown){% endif %}{% else %}{{ (h.created_at | localtime).strftime('%Y-%m-%d %H:%M') }} site time – upload time, because the photo has no capture time{% endif %}</dd>
+  <dt>Report location</dt><dd>{% if h.location_source == 'photo' %}{{ h.location_latitude }}, {{ h.location_longitude }} – from the photo's GPS
+    {% elif h.location_source == 'device' %}{{ h.location_latitude }}, {{ h.location_longitude }} – from the reporter's device when uploading{% if h.location_accuracy_m is not none %} (± {{ h.location_accuracy_m | round | int }} m){% endif %}
+    {% else %}Not recorded – GPS unavailable in the photo and no device location was shared{% endif %}</dd>
 </dl>

@@ -12,7 +12,19 @@
     <input id="p" name="password" type="password" autocomplete="current-password" required>
     <br><br><button class="btn" type="submit">Sign in</button>
   </form>
+  {% if get_settings().demo_mode %}
+  <div class="alert info small"><strong>Public demo.</strong> All people, areas and records are synthesized. Anything you
+    add is deleted when the demo restarts; it then starts again with fresh demo data.</div>
+  <p class="small">Demo accounts (password for all: <code>shms-demo-2026</code>, a documented demo value):</p>
+  <ul class="small">
+    <li><code>ahmed</code> – reporter (operator)</li>
+    <li><code>khalid</code> – Area Owner, Digestion side</li>
+    <li><code>sara</code> – safety supervisor</li>
+    <li><code>yousef</code> – refinery manager (read-only)</li>
+  </ul>
+  {% else %}
   <p class="muted small">Demo: all people, areas and records are synthesized. Demo accounts and their documented demo
     password are listed in the README.</p>
+  {% endif %}
 </div>
 {% endblock %}

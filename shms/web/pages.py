@@ -6,6 +6,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -15,10 +16,10 @@ from sqlalchemy.orm import Session
 
 from .. import auth, escalate, policy, risk, services, site_layout, taxonomy
 from ..db import get_session
-from ..detection import get_detector
+from ..detection import DetectorResult, get_detector
 from ..models import Area, Hazard, Notification, Role, Status, User, utcnow
 from ..settings import PACKAGE_DIR, get_settings
-from .deps import PHOTO_NAME, current_user_optional, photo_file, save_photo, store_photo
+from .deps import MAX_UPLOAD_MB, PHOTO_NAME, PhotoRejected, current_user_optional, photo_file, save_photo, store_photo
 
 log = logging.getLogger("shms")
 router = APIRouter(include_in_schema=False)
@@ -261,6 +262,7 @@ def _report_form(request: Request, user: User, db: Session, idem_key: str, **fie
         areas=list(db.scalars(select(Area).order_by(Area.name))),
         bounds=site_layout.REPORTING,
         idem_key=idem_key,
+        max_upload_mb=MAX_UPLOAD_MB,
         **fields,
     )
 
@@ -282,19 +284,25 @@ def report_form(request: Request, area: str = "", user: User = Depends(page_user
 @router.post("/report")
 async def report_submit(
     request: Request,
-    area_id: int = Form(...),
+    area_id: int | None = Form(None),
     x: int | None = Form(None),
     y: int | None = Form(None),
     photo: UploadFile | None = File(None),
     idem_key: str = Form(""),
+    device_lat: str = Form(""),
+    device_lon: str = Form(""),
+    device_accuracy: str = Form(""),
     user: User = Depends(page_user),
     db: Session = Depends(get_session),
 ):
-    area = db.get(Area, area_id)
+    area = db.get(Area, area_id) if area_id is not None else None
     if area is None:
-        raise HTTPException(422, "Unknown area")
+        return _report_form(
+            request, user, db, idem_key, error="Choose the area where you saw the hazard.", status_code=422
+        )
     fields = {"area_id": area.id, "x": x, "y": y}
     try:
+        device = services.parse_device_location(device_lat, device_lon, device_accuracy)
         services.validate_pin(area, x, y)
         existing = services.replay_or_conflict(db, user, area, idem_key or None, x, y)
     except services.IdempotencyConflict as exc:
@@ -303,23 +311,37 @@ async def report_submit(
         return _report_form(request, user, db, idem_key, error=str(exc), status_code=422, **fields)
     if existing is not None:
         return RedirectResponse(f"/hazards/{existing.id}/confirm", status_code=303)
-    name, capture = await store_photo(photo, capture=True)
+    try:
+        name, capture = await store_photo(photo, capture=True)
+    except PhotoRejected as exc:
+        return _report_form(request, user, db, idem_key, error=exc.detail, status_code=exc.status_code, **fields)
     if name is None:
-        return _report_form(request, user, db, idem_key, error="Please add a photo.", **fields)
+        return _report_form(request, user, db, idem_key, error="Please add a photo.", status_code=422, **fields)
     h = services.create_draft(
         db,
         user,
         area,
         name,
-        get_detector().detect(photo_file(name)),
+        run_detector(photo_file(name)),
         idem_key=idem_key or None,
         x=x,
         y=y,
         experimental=_experimental(photo_file(name)),
         capture=capture,
+        device=device,
     )
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}/confirm", status_code=303)
+
+
+def run_detector(path) -> DetectorResult:
+    """Analysis always gives the reporter a visible result: if the detector itself fails, the draft is still created
+    and the confirm page says the AI could not analyse the photo, so the reporter classifies it by hand."""
+    try:
+        return get_detector().detect(path)
+    except Exception as exc:  # noqa: BLE001 - any detector failure must not lose the report
+        log.error("Detector failed on %s", path, exc_info=exc)
+        return DetectorResult(model=get_settings().detector, suggestions=[], latency_ms=0.0, error="analysis failed")
 
 
 def _experimental(path) -> list[dict]:
@@ -391,17 +413,18 @@ async def confirm_submit(
                 residual_consequence=_level(residual_consequence),
             ),
         )
-    except (services.WorkflowError, services.PermissionDenied) as exc:
+    except (services.WorkflowError, services.PermissionDenied, PhotoRejected) as exc:
         db.rollback()
         return render(
             request,
             "confirm.html",
             user,
             db,
+            status_code=exc.status_code if isinstance(exc, PhotoRejected) else 200,
             h=h,
             suggestions=json.loads(h.ai_suggestions or "[]"),
             consequences=risk.consequence_levels(),
-            error=str(exc),
+            error=exc.detail if isinstance(exc, PhotoRejected) else str(exc),
         )
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}?created=1", status_code=303)
@@ -559,9 +582,10 @@ async def close(
             control_type=control_type or None,
             residual_consequence=_level(residual_consequence),
         )
-    except (services.WorkflowError, services.PermissionDenied) as exc:
+    except (services.WorkflowError, services.PermissionDenied, PhotoRejected) as exc:
         db.rollback()
-        return RedirectResponse(f"/hazards/{h.id}?error={exc}", status_code=303)
+        message = exc.detail if isinstance(exc, PhotoRejected) else str(exc)
+        return RedirectResponse(f"/hazards/{h.id}?error={quote(message)}", status_code=303)
     db.commit()
     return RedirectResponse(f"/hazards/{h.id}", status_code=303)
 

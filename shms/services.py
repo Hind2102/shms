@@ -178,6 +178,41 @@ def _ai_note(h: Hazard) -> str:
     return f"AI ({h.ai_model}) found none of the checked items missing"
 
 
+@dataclass(frozen=True)
+class DeviceLocation:
+    """The reporter's position from the browser (navigator.geolocation), sent only after they tap the button."""
+
+    latitude: float
+    longitude: float
+    accuracy_m: float | None = None
+
+
+def parse_device_location(lat: str, lon: str, accuracy: str = "") -> DeviceLocation | None:
+    """Empty fields -> None (the reporter did not share a location). Anything else must be a valid position."""
+    if not lat.strip() and not lon.strip():
+        return None
+    try:
+        la, lo = float(lat), float(lon)
+        acc = float(accuracy) if accuracy.strip() else None
+    except ValueError as exc:
+        raise WorkflowError("The device location could not be read. Tap 'Use my current location' again.") from exc
+    if not (-90 <= la <= 90 and -180 <= lo <= 180) or (acc is not None and not 0 <= acc <= 100_000):
+        raise WorkflowError("The device location is out of range. Tap 'Use my current location' again.")
+    return DeviceLocation(round(la, 6), round(lo, 6), round(acc, 1) if acc is not None else None)
+
+
+def report_location(
+    capture: PhotoCapture, device: DeviceLocation | None
+) -> tuple[float | None, float | None, float | None, str]:
+    """(latitude, longitude, accuracy_m, source). The photo's own GPS is where the photo was taken, so it wins;
+    otherwise the device position at upload time; otherwise none."""
+    if capture.latitude is not None and capture.longitude is not None:
+        return capture.latitude, capture.longitude, None, "photo"
+    if device is not None:
+        return device.latitude, device.longitude, device.accuracy_m, "device"
+    return None, None, None, "none"
+
+
 def create_draft(
     db: Session,
     reporter: User,
@@ -190,8 +225,10 @@ def create_draft(
     x: int | None = None,
     y: int | None = None,
     capture: PhotoCapture = PhotoCapture(),
+    device: DeviceLocation | None = None,
 ) -> Hazard:
     validate_pin(area, x, y)
+    lat, lon, accuracy, source = report_location(capture, device)
     h = Hazard(
         area=area,
         x=x,
@@ -202,6 +239,10 @@ def create_draft(
         photo_captured_at=capture.taken_at,
         photo_latitude=capture.latitude,
         photo_longitude=capture.longitude,
+        location_latitude=lat,
+        location_longitude=lon,
+        location_accuracy_m=accuracy,
+        location_source=source,
         created_at=at or utcnow(),
         idem_key=idem_key,
     )

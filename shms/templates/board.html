@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/board.css">
 </head>
 <body class="board-page{% if dark %} dark{% endif %}">
+{% if get_settings().demo_mode %}<div class="demo-banner" role="note">Public demo – do not upload confidential, personal or site photos; data resets on restart.</div>{% endif %}
 {% from '_macros.html' import level %}
 <main id="main" class="board-main">
   <header class="board-top">

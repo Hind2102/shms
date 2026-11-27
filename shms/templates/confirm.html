@@ -74,7 +74,7 @@
     <textarea id="act" name="closure_action" placeholder="Describe the corrective action taken"></textarea>
     {% with prefix='fx', required_controls=false %}{% include "_closure_controls.html" %}{% endwith %}
     <label for="cphoto">Closing photo (optional)</label>
-    <input id="cphoto" type="file" name="closure_photo" accept="image/*" capture="environment">
+    <input id="cphoto" type="file" name="closure_photo" accept="image/*,.heic,.heif">
   </div>
   <br><button class="btn primary block desktop-only" type="submit">Submit report</button>
   <p class="small"><a href="/report">Back: start a new report</a></p>

@@ -65,6 +65,11 @@ class Settings:
     # (night shift starts 12 h later), and the site's offset from UTC (the database stores naive UTC).
     shift_start_hour: int = field(default_factory=lambda: int(_env("SHIFT_START_HOUR", "6")))
     site_utc_offset_h: float = field(default_factory=lambda: float(_env("SITE_UTC_OFFSET_H", "4")))
+    # Public demo (Hugging Face Space): warning banner on every page, fresh seeded data on every start, a secret key
+    # and a real detector are required. Off for local and graded use.
+    demo_mode: bool = field(default_factory=lambda: _env("DEMO_MODE", "0") == "1")
+    # Form and API submissions (POST/PUT/PATCH/DELETE) allowed per client IP per minute; 0 = no limit.
+    rate_limit_per_min: int = field(default_factory=lambda: int(_env("RATE_LIMIT_PER_MIN", "0")))
 
 
 _settings: Settings | None = None

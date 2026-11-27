@@ -148,6 +148,12 @@ class Hazard(Base):
     photo_captured_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
     photo_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     photo_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Report location (not the illustrative map pin): photo EXIF GPS when present, else the reporter's device
+    # position from the browser, else none. The source is always stored with it.
+    location_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_accuracy_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_source: Mapped[str] = mapped_column(String(8), default="none", server_default="none")
     photo_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     description: Mapped[str] = mapped_column(Text, default="")
 

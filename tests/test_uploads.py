@@ -33,8 +33,9 @@ def test_png_and_webp_are_accepted(client):
         assert _upload(client, f"p.{fmt.lower()}", buf.getvalue(), f"image/{fmt.lower()}").status_code == 201, fmt
 
 
-def test_file_over_20_mb_is_refused(client):
-    big = jpeg_bytes() + b"\0" * (20 * 1024 * 1024)
+def test_file_over_30_mb_is_refused(client):
+    # v1.6.1: the limit was raised from 20 MB to 30 MB on the owner's request (48 MP phone photos are ~25 MB).
+    big = jpeg_bytes() + b"\0" * (30 * 1024 * 1024)
     assert _upload(client, "big.jpg", big).status_code == 413
 
 
