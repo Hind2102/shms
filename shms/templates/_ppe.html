@@ -12,6 +12,9 @@
     <symbol id="ppe-mask" viewBox="0 0 48 48"><path d="M12 21c4-3 20-3 24 0v6c0 6-6 10-12 10s-12-4-12-10z" fill="#fff"/><path d="M12 22l-4-3M36 22l4-3" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M18 27h12M18 31h12" stroke="#005eb8" stroke-width="2"/></symbol>
     <symbol id="ppe-ears" viewBox="0 0 48 48"><path d="M14 26a10 12 0 0 1 20 0" fill="none" stroke="#fff" stroke-width="4"/><rect x="9" y="24" width="8" height="13" rx="3" fill="#fff"/><rect x="31" y="24" width="8" height="13" rx="3" fill="#fff"/></symbol>
     <symbol id="ppe-lifejacket" viewBox="0 0 48 48"><path d="M17 9h5v10h4V9h5l5 8v22H12V17z" fill="#fff"/><path d="M12 29h24" stroke="#005eb8" stroke-width="3"/></symbol>
+    <symbol id="ppe-vest" viewBox="0 0 48 48"><path d="M16 9l8 6 8-6 6 4v26H10V13z" fill="#fff"/><path d="M12 25h24M12 31h24" stroke="#005eb8" stroke-width="3"/></symbol>
+    <symbol id="ppe-harness" viewBox="0 0 48 48"><circle cx="24" cy="10" r="4" fill="#fff"/><path d="M17 16h14l-2 22h-10z" fill="none" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/><path d="M17 16l14 12M31 16L17 28M20 38v4M28 38v4" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></symbol>
+    <symbol id="ppe-coat" viewBox="0 0 48 48"><path d="M17 8l7 6 7-6 7 5-2 26H12l-2-26z" fill="#fff"/><path d="M24 14v25" stroke="#005eb8" stroke-width="2.5"/></symbol>
     <symbol id="ppe-generic" viewBox="0 0 48 48"><circle cx="24" cy="14" r="5" fill="#fff"/><path d="M15 39V24c0-3 3-5 9-5s9 2 9 5v15z" fill="#fff"/></symbol>
   </defs>
 </svg>
@@ -19,7 +22,7 @@
 
 {% macro ppe_key(item) -%}
 {%- set t = item | lower -%}
-{%- if 'hard hat' in t or 'helmet' in t %}hat{% elif 'face shield' in t %}shield{% elif 'glasses' in t or 'goggles' in t %}glasses{% elif 'glove' in t %}gloves{% elif 'boot' in t %}boots{% elif 'mask' in t or 'respir' in t %}mask{% elif 'hearing' in t or 'ear' in t %}ears{% elif 'life jacket' in t %}lifejacket{% elif 'coverall' in t or 'suit' in t or 'clothing' in t %}suit{% else %}generic{% endif -%}
+{%- if 'hard hat' in t or 'helmet' in t %}hat{% elif 'face shield' in t %}shield{% elif 'glasses' in t or 'goggles' in t %}glasses{% elif 'glove' in t %}gloves{% elif 'boot' in t %}boots{% elif 'mask' in t or 'respir' in t %}mask{% elif 'hearing' in t or 'ear' in t %}ears{% elif 'life jacket' in t %}lifejacket{% elif 'coverall' in t or 'suit' in t or 'clothing' in t %}suit{% elif 'hi-vis' in t or 'vest' in t %}vest{% elif 'harness' in t %}harness{% elif 'coat' in t %}coat{% else %}generic{% endif -%}
 {%- endmacro %}
 
 {% macro ppe_list(items) -%}

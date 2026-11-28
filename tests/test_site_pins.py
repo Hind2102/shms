@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import select
 
-from shms import risk, services
+from shms import risk, services, site_layout
 from shms.models import Area, Hazard, Status
 from shms.site_layout import REPORTING
 from tests.conftest import jpeg_bytes, login
@@ -46,6 +46,9 @@ def test_invalid_pin_is_rejected_before_upload(client, db, settings, point):
 
 
 def test_page_creates_pin_and_map_clusters_only_active_confirmed_reports(client, db):
+    for x in db.scalars(select(Hazard)):  # v1.7.0 seeds pins too: start from a map without pins
+        x.x = x.y = None
+    db.commit()
     login(client, REPORTER)
     unit = digestion()
     area = db.scalar(select(Area).where(Area.code == unit.code))
@@ -71,9 +74,10 @@ def test_page_creates_pin_and_map_clusters_only_active_confirmed_reports(client,
     peak = max(db.get(Hazard, hid).risk_score for hid in (other, draft_id))
     page = client.get("/site").text
     assert 'data-pin-count="2"' in page
-    marker = page.split('data-pin-count="2"', 1)[1].split("</a>", 1)[0]
+    marker = page.split('data-pin-count="2"', 1)[1].split("</g>", 1)[0]  # v1.7.0: markers are <g>, not links
     assert f'fill="{risk.band_for(peak).color}"' in marker
-    assert f'href="/hazards/{other}"' in page and f'href="/hazards/{draft_id}"' in page
+    assert set(marker.split('data-hazards="', 1)[1].split('"', 1)[0].split()) == {str(other), str(draft_id)}
+    assert f'href="/hazards/{other}"' in page and f'href="/hazards/{draft_id}"' in page  # linked in the pin list
     db.refresh(draft)
     draft.status, draft.closure_action = Status.CLOSED, "Gloves issued"
     db.commit()
@@ -100,7 +104,8 @@ def test_migrated_hazards_keep_area_only_location_and_enforce_complete_pair(tmp_
 
 @pytest.mark.parametrize(
     "point,ok",
-    [((175, 320), True), ((282, 571), True), ((390, 822), True), ((391, 571), False), ((500, 400), False)],
+    # v1.7.0 DIG polygon on the Al Taweelah image: (90, 305) – (405, 792)
+    [((90, 305), True), ((247, 548), True), ((405, 792), True), ((406, 548), False), ((500, 400), False)],
     ids=["corner", "inside", "far-corner", "just-outside", "in-another-zone"],
 )
 def test_pin_must_lie_inside_the_zone_polygon(empty_db, point, ok):
@@ -118,6 +123,6 @@ def test_pin_must_lie_inside_the_zone_polygon(empty_db, point, ok):
 def test_report_form_offers_the_zone_polygon_for_pin_selection(client):
     login(client, REPORTER)
     page = client.get("/report").text
-    assert 'id="report-map"' in page and 'href="/static/ata_concept_map.svg"' in page
+    assert 'id="report-map"' in page and f'href="{site_layout.MAP_URL}"' in page
     assert f'data-points="{REPORTING["DIG"].points_attr}"' in page
     assert 'polygon id="pin-bounds"' in page

@@ -2,10 +2,12 @@
 {% from "_macros.html" import level, status, photo %}
 {% block title %}Hazard #{{ h.id }}{% endblock %}
 {% block bottom_action %}{% if h.status.value == 'pending_verification' and can_verify %}<button class="btn primary" type="submit" form="verify-form">Verify and close</button>{% elif h.status.value in ('open', 'planned') and can_act %}<a class="btn primary" href="#close-form">Close this hazard</a>{% else %}<a class="btn primary report-fab" href="/report">Report a hazard</a>{% endif %}{% endblock %}
+{% from "_flow.html" import diagram as flow_diagram %}
 {% block content %}
 {% if created %}<div class="alert ok">Report submitted.{% if h.status.value == 'open' %} Routed to {{ h.assignee.name }}.{% endif %}{% if risk.alert_reason(h.consequence, h.risk_level) %} Safety supervisor alerted ({{ risk.alert_reason(h.consequence, h.risk_level) }}).{% endif %}</div>{% endif %}
 {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
 <h1>#{{ h.id }} · {{ h.category_code | cat }} {{ level(h.risk_level) }} {{ status(h.status) }}</h1>
+{{ flow_diagram(fl) }}
 <div class="grid two">
   <div>
     <div class="card">
@@ -39,7 +41,7 @@
   <div>
     {% if h.status.value in ('open', 'planned') and can_act %}
     {% if h.status.value == 'open' %}
-    <form class="card" method="post" action="/hazards/{{ h.id }}/plan">
+    <form class="card" method="post" action="/hazards/{{ h.id }}/plan" id="plan-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <h2>Plan action</h2>
       <label for="pa">What will be done</label>

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% from "_macros.html" import level %}
+{% from "_ppe.html" import ppe_defs %}
 {% block title %}{{ area.name }}{% endblock %}
 {% block content %}
+{{ ppe_defs() }}
 <h1>{{ area.name }} ({{ area.code }})</h1>
 <div class="grid two">
   <div class="card">
@@ -15,8 +17,8 @@
   </div>
   <div>
     <div class="card">
-      <h2>Required PPE</h2>
-      <div class="ppe">{% for p in area.ppe_list %}<span>{{ p }}</span>{% endfor %}</div>
+      <h2>Check before entering</h2>
+      {% include '_area_profile.html' %}
       <p class="muted small" style="margin-top:10px">AI checks reports here for: {{ area.check_codes | map('ppe') | join(', ') }}.</p>
       {% for code in area.check_codes %}{% set note = taxonomy.release_note(code) %}{% if note %}<p class="caveat small">{{ code | ppe }}: AI check {{ note }}.</p>{% endif %}{% endfor %}
       {% set held = area.ai_checks.split(',') | reject('in', area.check_codes) | list %}

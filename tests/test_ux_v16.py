@@ -42,7 +42,8 @@ def test_area_card_shows_ppe_pictograms_with_labels_hazards_route_and_permit_not
 def test_area_card_comes_right_after_the_map_and_pins_are_collapsed(client):
     login(client, REPORTER)
     page = client.get("/site?unit=DIG").text
-    assert page.index('id="plan"') < page.index('id="unit-detail"') < page.index("Calculation:")
+    # v1.7.0: the calculation is part of the map's legend; the zone table follows the card
+    assert page.index('id="plan"') < page.index('id="unit-detail"') < page.index('id="zone-table-title"')
     assert '<details class="pin-index card">' in page and "Show open hazard pins (" in page
 
 
@@ -75,7 +76,7 @@ def test_board_is_read_only_refreshes_every_minute_and_lists_high_and_extreme(cl
     ]
     assert f'<span class="bk-v">{len(urgent)}</span>' in page
     assert all(f">{x.area.code}</strong>" in page for x in urgent[:12])
-    assert 'href="/static/ata_concept_map.svg"' in page
+    assert f'href="{site_layout.MAP_URL}"' in page
 
 
 def test_board_dark_background_option(client):
@@ -274,7 +275,7 @@ def test_no_page_calls_missing_data_safe(client, db, user_id):
 def test_empty_states_say_no_recorded_hazards(client, db):
     _clear_history(db)
     login(client, MANAGER)
-    assert "None recorded" in _visible(client.get("/site").text)
+    assert "No records – not a statement about conditions" in _visible(client.get("/site").text)
     assert "No active High or Extreme hazards are recorded." in _visible(client.get("/board").text)
     assert "No overdue actions are recorded." in _visible(client.get("/").text)
 

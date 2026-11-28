@@ -679,13 +679,67 @@ HIGH_LEVELS = ("High", "Extreme")
 LEVEL_ORDER = {"Low": 1, "Moderate": 2, "High": 3, "Extreme": 4}
 
 
+def action_cards(db: Session, user: User, now: datetime | None = None) -> list[dict]:
+    """'What needs my action now' (v1.7.0): three counts per role, each linking to the list behind it."""
+    now = now or utcnow()
+    confirmed = list(db.scalars(select(Hazard).where(Hazard.status.in_(ACTIVE))))
+    late = [h for h in confirmed if h.status in AWAITING_ACTION and h.due_at and h.due_at < now]
+    pending = [h for h in confirmed if h.status == Status.PENDING_VERIFICATION]
+
+    def card(n: int, title: str, desc: str, href: str, tone: str = "") -> dict:
+        return {"n": n, "title": title, "desc": desc, "href": href, "tone": tone if n else ""}
+
+    if user.role == Role.REPORTER:
+        drafts = db.scalars(select(Hazard).where(Hazard.reporter_id == user.id, Hazard.status == Status.DRAFT)).all()
+        mine_pending = [h for h in pending if h.reporter_id == user.id and h.closed_by_id != user.id]
+        mine_late = [h for h in late if h.reporter_id == user.id]
+        return [
+            card(len(drafts), "Reports to confirm", "Photo uploaded, not yet confirmed.", "/#my-reports", "warn"),
+            card(len(mine_pending), "Closures to check", "Your reports closed by the owner.", "/queue", "warn"),
+            card(len(mine_late), "Your reports overdue", "Past target date with the owner.", "/#my-reports", "danger"),
+        ]
+    if user.role == Role.AREA_OWNER:
+        mine = [h for h in confirmed if h.status in AWAITING_ACTION and user.id in (h.assignee_id, h.action_owner_id)]
+        return [
+            card(len(mine), "My queue", "Plan or close these.", "/queue", "warn"),
+            card(sum(h in late for h in mine), "Overdue", "Past their target close date.", "/queue", "danger"),
+            card(
+                sum(h.closed_by_id == user.id for h in pending),
+                "Awaiting verification",
+                "Closed by you; a supervisor or the reporter verifies.",
+                "/hazards?status=pending_verification",
+            ),
+        ]
+    if user.role == Role.SUPERVISOR:
+        waiting = [h for h in confirmed if h.status in AWAITING_ACTION]
+        return [
+            card(len(waiting), "Awaiting action", "Open or planned, site-wide.", "/queue", "warn"),
+            card(len(late), "Overdue", "Past target date, site-wide.", "/analysis#od-h", "danger"),
+            card(
+                sum(h.closed_by_id != user.id for h in pending),
+                "To verify",
+                "Closures waiting for your check.",
+                "/hazards?status=pending_verification",
+                "warn",
+            ),
+        ]
+    high = [h for h in confirmed if h.risk_level in HIGH_LEVELS]
+    return [
+        card(len(high), "Active High or Extreme", "Site-wide, any report date.", "/analysis#top-h", "danger"),
+        card(len(late), "Overdue", "Past target date, site-wide.", "/analysis#od-h", "danger"),
+        card(
+            len(pending), "Awaiting verification", "Closed, not yet verified.", "/hazards?status=pending_verification"
+        ),
+    ]
+
+
 def role_home(db: Session, user: User, now: datetime | None = None) -> dict:
     """What each role needs to act on first. Every list is computed on the server from the same data as the
     dashboard; nothing here is a rating of how safe an area is."""
     now = now or utcnow()
     active = list(db.scalars(select(Hazard).where(Hazard.status.in_(ACTIVE))))
     by_risk = sorted(active, key=lambda h: (-(h.risk_score or 0), h.due_at or now))
-    out: dict = {"role": user.role.value, "now": now}
+    out: dict = {"role": user.role.value, "now": now, "actions": action_cards(db, user, now)}
     if user.role == Role.REPORTER:
         mine = db.scalars(select(Hazard).where(Hazard.reporter_id == user.id).order_by(Hazard.created_at.desc()))
         out["my_reports"] = list(mine.all())[:20]
@@ -820,10 +874,10 @@ OVERLAYS = ("open_risk", "overdue", "reports")
 WINDOWS = (30, 90, 180)
 
 
-PIN_CLUSTER_RADIUS = 48  # map units on the 1920-wide concept map (was 30 on the 1200-wide plan)
+PIN_CLUSTER_RADIUS = 42  # image pixels on the 1672-wide Al Taweelah image (48 on the 1920-wide concept map)
 
 
-def _pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
+def pin_groups(pool: list[Hazard]) -> list[list[Hazard]]:
     """Group nearby active cases within a unit. The highest-risk member anchors and colours each marker."""
     pinned = (h for h in pool if h.status in ACTIVE and h.x is not None and h.y is not None)
     groups: list[list[Hazard]] = []
@@ -915,5 +969,5 @@ def site_overview(
         "areas": rows,
         "site_total": total,
         "hazards_counted": len(pool),
-        "pin_groups": _pin_groups(pool),
+        "pin_groups": pin_groups(pool),
     }

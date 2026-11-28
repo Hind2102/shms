@@ -10,15 +10,15 @@
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip-link" href="#main">Skip to main content</a>
 {% if get_settings().demo_mode %}<div class="demo-banner" role="note">Public demo – do not upload confidential, personal or site photos; data resets on restart.</div>{% endif %}
-{% set nav_links = [('/', 'Home'), ('/report', 'Report hazard'), ('/site', 'Site plan'), ('/dashboard', 'Dashboard'), ('/hazards', 'Hazards')]
+{% set nav_links = [('/', 'Home'), ('/report', 'Report hazard'), ('/site', 'Risk map'), ('/dashboard', 'Dashboard'), ('/hazards', 'Hazards'), ('/analysis', 'Analysis')]
    + ([('/queue', 'My queue')] if user and user.role.value in ('area_owner', 'supervisor') else [])
-   + [('/matrix', 'Risk matrix')]
+   + [('/matrix', 'Risk matrix'), ('/process', 'How it works')]
    + ([('/monitoring', 'AI monitoring'), ('/board', 'Control-room board')] if user and user.role.value in ('supervisor', 'manager') else []) %}
 <header class="top"><div class="bar">
   <a class="logo" href="/"><span class="tri" aria-hidden="true"></span>SHMS</a>
   {% if user %}
   <nav class="nav-wide" aria-label="Main">
-    {% for href, text in nav_links %}<a href="{{ href }}"{% if href == '/report' %} class="nav-primary"{% endif %}>{{ text }}</a>{% endfor %}
+    {% for href, text in nav_links %}<a href="{{ href }}"{% if href == '/report' %} class="nav-primary"{% endif %}{% if request.url.path == href %} aria-current="page"{% endif %}>{{ text }}</a>{% endfor %}
     <a href="/notifications">Alerts{% if unread %}<span class="badge-count">{{ unread }}</span>{% endif %}</a>
   </nav>
   <div class="who">{{ user.name }} · <form method="post" action="/logout" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="linkbtn" type="submit">Sign out</button></form></div>
@@ -27,7 +27,7 @@
     <details class="nav-menu">
       <summary class="nav-chip">Menu</summary>
       <nav aria-label="Main (phone)">
-        {% for href, text in nav_links %}<a href="{{ href }}">{{ text }}</a>{% endfor %}
+        {% for href, text in nav_links %}<a href="{{ href }}"{% if request.url.path == href %} aria-current="page"{% endif %}>{{ text }}</a>{% endfor %}
         <span class="who-phone">{{ user.name }}</span>
         <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn secondary" type="submit">Sign out</button></form>
       </nav>

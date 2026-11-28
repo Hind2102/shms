@@ -1,0 +1,283 @@
+{
+ "_note": "Project assumptions (owner to confirm): typical hazards and required PPE per reporting zone. Typical hazards are manual categories or released AI checks; they describe the work, not recorded reports.",
+ "areas": {
+  "BXH": {
+   "typical_hazards": [
+    "dust_release",
+    "walkway_obstruction",
+    "excessive_noise",
+    "no_hard_hat"
+   ],
+   "summary": "Bauxite dust and mobile plant: stay on marked walkways.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Dust mask",
+    "Hearing protection",
+    "Hi-vis vest (where vehicles operate)"
+   ]
+  },
+  "GRD": {
+   "typical_hazards": [
+    "excessive_noise",
+    "caustic_leak",
+    "open_panel",
+    "floor_liquid"
+   ],
+   "summary": "Mills and slurry pumps: noise and rotating equipment.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Hearing protection"
+   ]
+  },
+  "DIG": {
+   "typical_hazards": [
+    "steam_leak",
+    "hot_surface",
+    "caustic_leak",
+    "floor_liquid"
+   ],
+   "summary": "High-pressure steam, hot surfaces and caustic liquor.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Face shield over glasses (caustic)",
+    "Heat-resistant gloves",
+    "Chemical gloves",
+    "Chemical suit (at line breaking)"
+   ]
+  },
+  "CLR": {
+   "typical_hazards": [
+    "caustic_leak",
+    "confined_space",
+    "floor_liquid",
+    "surface_corrosion"
+   ],
+   "summary": "Caustic liquor; tanks and thickeners are confined spaces (permit only).",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Face shield over glasses (caustic)",
+    "Chemical gloves"
+   ]
+  },
+  "FLT": {
+   "typical_hazards": [
+    "caustic_leak",
+    "hot_surface",
+    "floor_liquid"
+   ],
+   "summary": "Hot caustic wash liquor.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Face shield over glasses (caustic)",
+    "Chemical gloves"
+   ]
+  },
+  "PRC": {
+   "typical_hazards": [
+    "work_at_height",
+    "caustic_leak",
+    "floor_opening"
+   ],
+   "summary": "Tall precipitator tanks: work at height and caustic.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Goggles",
+    "Chemical gloves",
+    "Harness (where required)"
+   ]
+  },
+  "EVP": {
+   "typical_hazards": [
+    "steam_leak",
+    "hot_surface",
+    "caustic_leak"
+   ],
+   "summary": "Steam-heated evaporators and hot caustic.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Face shield over glasses (caustic)",
+    "Heat-resistant gloves",
+    "Chemical gloves"
+   ]
+  },
+  "HYD": {
+   "typical_hazards": [
+    "excessive_noise",
+    "caustic_leak",
+    "floor_liquid"
+   ],
+   "summary": "Vacuum pumps (noise) and caustic splash at the filters.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Hearing protection",
+    "Face shield over glasses (caustic)"
+   ]
+  },
+  "CAL": {
+   "typical_hazards": [
+    "hot_surface",
+    "dust_release",
+    "work_at_height"
+   ],
+   "summary": "Calciners: radiant heat and fine alumina dust.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Heat-resistant gloves",
+    "Heat-protective clothing (near kilns)",
+    "Dust mask"
+   ]
+  },
+  "ALS": {
+   "typical_hazards": [
+    "dust_release",
+    "walkway_obstruction",
+    "work_at_height"
+   ],
+   "summary": "Alumina dust and loading vehicles.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Dust mask",
+    "Hi-vis vest (where vehicles operate)"
+   ]
+  },
+  "TNK": {
+   "typical_hazards": [
+    "caustic_leak",
+    "confined_space",
+    "work_at_height"
+   ],
+   "summary": "Bulk caustic and reagent transfers.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Face shield over glasses (caustic)",
+    "Chemical gloves",
+    "Chemical suit (during transfers)"
+   ]
+  },
+  "LIM": {
+   "typical_hazards": [
+    "dust_release",
+    "caustic_leak",
+    "hot_surface"
+   ],
+   "summary": "Lime dust; quicklime burns on wet skin.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Goggles",
+    "Dust mask",
+    "Chemical gloves"
+   ]
+  },
+  "PWR": {
+   "typical_hazards": [
+    "electrical_hazard",
+    "open_panel",
+    "excessive_noise",
+    "floor_liquid"
+   ],
+   "summary": "Switchrooms, cooling towers and open water.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Hearing protection",
+    "Arc-rated clothing (switchrooms)",
+    "Life jacket (near open water)"
+   ]
+  },
+  "WKS": {
+   "typical_hazards": [
+    "excessive_noise",
+    "hot_surface",
+    "electrical_hazard",
+    "walkway_obstruction"
+   ],
+   "summary": "Machining, hot work and rotating equipment.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Gloves",
+    "Safety boots",
+    "Flame-resistant coverall",
+    "Hearing protection",
+    "Welding face shield (hot work)"
+   ]
+  },
+  "LAB": {
+   "typical_hazards": [
+    "caustic_leak",
+    "floor_liquid",
+    "other_condition"
+   ],
+   "summary": "Laboratory: chemical samples. Offices: no PPE required.",
+   "required_ppe": [
+    "Safety glasses (laboratory)",
+    "Lab coat (laboratory)",
+    "Chemical gloves (laboratory)"
+   ]
+  },
+  "WTR": {
+   "typical_hazards": [
+    "floor_liquid",
+    "walkway_obstruction",
+    "other_condition"
+   ],
+   "summary": "Open water: drowning risk at the basin edges.",
+   "required_ppe": [
+    "Hard hat",
+    "Safety glasses",
+    "Life jacket (near open water)"
+   ]
+  }
+ }
+}

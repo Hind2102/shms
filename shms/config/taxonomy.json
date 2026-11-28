@@ -77,6 +77,70 @@
       "default_consequence": 2
     },
     {
+      "code": "steam_leak",
+      "name": "Steam leak",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 4,
+      "why": "Scalds and burns; high-pressure steam can be invisible close to the leak."
+    },
+    {
+      "code": "excessive_noise",
+      "name": "Excessive noise",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 2,
+      "why": "Hearing damage and missed alarms; vacuum pumps, mills and fans."
+    },
+    {
+      "code": "hot_surface",
+      "name": "Unguarded hot surface",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 3,
+      "why": "Contact burns from uninsulated pipes, vessels and kilns."
+    },
+    {
+      "code": "caustic_leak",
+      "name": "Caustic leak or spray",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 4,
+      "why": "Severe chemical burns to eyes and skin from caustic liquor."
+    },
+    {
+      "code": "dust_release",
+      "name": "Dust release",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 2,
+      "why": "Bauxite, lime or alumina dust: breathing irritation, poor visibility, slips."
+    },
+    {
+      "code": "work_at_height",
+      "name": "Unsafe work at height",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 4,
+      "why": "Falls from platforms, tanks or ladders without edge protection or harness."
+    },
+    {
+      "code": "confined_space",
+      "name": "Confined-space concern",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 5,
+      "why": "Entry without permit, gas test or standby person; vessels, tanks and pits."
+    },
+    {
+      "code": "electrical_hazard",
+      "name": "Electrical hazard",
+      "group": "Physical condition",
+      "ai": false,
+      "default_consequence": 4,
+      "why": "Shock or arc flash from damaged cables, open switchgear or wet equipment."
+    },
+    {
       "code": "other_condition",
       "name": "Other physical condition",
       "group": "Physical condition",

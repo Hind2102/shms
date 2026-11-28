@@ -14,9 +14,12 @@ from playwright.sync_api import sync_playwright
 
 VIEWS = {"phone": {"width": 390, "height": 844}, "desktop": {"width": 1366, "height": 900}}
 ROLES = {
-    "reporter": ("ahmed", ["/", "/report", "/site", "/hazards", "/matrix", "/notifications", "/areas/DIG"]),
+    "reporter": ("ahmed", ["/", "/report", "/site", "/hazards", "/matrix", "/notifications", "/areas/DIG", "/process"]),
     "owner": ("khalid", ["/", "/queue", "/site?unit=DIG", "/dashboard"]),
-    "supervisor": ("sara", ["/", "/queue", "/monitoring", "/board"]),
+    "supervisor": (
+        "sara",
+        ["/", "/queue", "/monitoring", "/board", "/analysis", "/hazards?status=pending_verification"],
+    ),
     "manager": ("yousef", ["/", "/dashboard", "/site", "/board"]),
 }
 SMALL_TARGETS = """() => {

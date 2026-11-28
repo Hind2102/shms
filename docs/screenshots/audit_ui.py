@@ -96,11 +96,14 @@ def sign_out(page: Page) -> None:
 
 def check_map(audit: Audit, base_url: str) -> None:
     page = audit.page
-    for overlay in ["open_risk", "overdue", "reports"]:
-        page.goto(f"{base_url}/site?overlay={overlay}&window=90")
-        if overlay == "open_risk":
+    # v1.7.0: weather-style heat map with status / hazard-type / window filters
+    for status in ["active", "overdue", "closed", "all"]:
+        page.goto(f"{base_url}/site?status={status}")
+        if status == "active":
             expect(page.locator(".case-pin").first).to_be_visible()
-        audit.check(f"site_{overlay}", capture=True, full_page=True)
+        audit.check(f"site_{status}", capture=status == "active", full_page=True)
+    page.goto(f"{base_url}/site?status=all&category=no_gloves&window=365")
+    audit.check("site_one_category", capture=True, full_page=True)
     svg = page.locator("#plan")
     original = svg.get_attribute("viewBox")
     svg.focus()
@@ -134,7 +137,7 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     page.locator("#report-map").click()
     expect(page.locator("#picked-point")).to_be_visible()
     page.locator(".coords summary").click()
-    page.locator("#pin-x").fill("282")  # inside the Digestion zone of the concept map
+    page.locator("#pin-x").fill("282")  # inside the Digestion zone of the Al Taweelah image (v1.7.0)
     page.locator("#pin-y").fill("571")
     page.locator("#pin-y").press("Tab")
     page.locator("#pin-picker").scroll_into_view_if_needed()
@@ -151,6 +154,7 @@ def check_workflow(audit: Audit, base_url: str) -> None:
     page.get_by_role("button", name="Submit report").click()
     expect(page.get_by_text("Report submitted.", exact=False)).to_be_visible()
     hazard_url = page.url.split("?")[0]
+    expect(page.locator('[aria-current="step"]')).to_be_visible()  # v1.7.0 process flow on the hazard page
     audit.check("submitted", capture=True, full_page=True)
     sign_out(page)
     sign_in(page, base_url, "yousef")
@@ -196,12 +200,15 @@ def check_pages(audit: Audit, base_url: str) -> None:
         "notifications",
         "board",
         "board?theme=dark",
+        "analysis",
+        "process",
+        "hazards?status=pending_verification",
     ]:
         response = page.goto(f"{base_url}/{route}")
         assert response and response.ok, route
         audit.check(
-            route.replace("/", "_").replace("?theme=", "_"),
-            capture=route in ("matrix", "board", "board?theme=dark"),
+            route.replace("/", "_").replace("?theme=", "_").replace("?status=", "_"),
+            capture=route in ("board", "analysis", "process", "hazards?status=pending_verification"),
             full_page=True,
         )
     sign_out(page)

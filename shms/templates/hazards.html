@@ -1,9 +1,22 @@
 {% extends "base.html" %}
 {% from "_macros.html" import level, status %}
+{% from "_flow.html" import chip %}
+{% from "_row_actions.html" import row_actions %}
 {% block title %}Hazards{% endblock %}
+{% block body_class %}wide{% endblock %}
 {% block content %}
-<h1>Hazard register</h1>
-<form class="card filters" method="get">
+<div class="page-head">
+  <h1>Hazard register</h1>
+  <div class="head-actions"><a class="btn secondary" href="/hazards.csv{{ '?' ~ query if query }}" download>Export CSV</a></div>
+</div>
+<nav class="status-chips" aria-label="Quick filter by status">
+  <a href="/hazards" class="status-chip{% if not f.status %} on{% endif %}"{% if not f.status %} aria-current="true"{% endif %}>All <span>{{ counts.values() | sum }}</span></a>
+  {% for s, label in (('open', 'Open'), ('planned', 'Planned'), ('pending_verification', 'Awaiting verification'), ('closed', 'Closed')) %}
+  <a href="/hazards?status={{ s }}" class="status-chip{% if f.status == s %} on{% endif %}"{% if f.status == s %} aria-current="true"{% endif %}>{{ label }} <span>{{ counts[s] }}</span></a>
+  {% endfor %}
+</nav>
+<form class="card filters" method="get" role="search" aria-label="Search and filter hazards">
+  <div class="grow"><label for="filter-q">Search</label><input id="filter-q" type="search" name="q" value="{{ f.q }}" placeholder="#id, hazard, area, action…"></div>
   <div><label for="filter-status">Status</label><select id="filter-status" name="status"><option value="">All</option>
     {% for s in ('open','planned','pending_verification','closed') %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s | replace('_', ' ') }}</option>{% endfor %}</select></div>
   <div><label for="filter-area">Area</label><select id="filter-area" name="area"><option value="">All</option>
@@ -12,18 +25,17 @@
     {% for l in ('Extreme','High','Moderate','Low') %}<option {% if f.level == l %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
   <div><label for="filter-category">Type</label><select id="filter-category" name="category"><option value="">All</option>
     {% for code in taxonomy.manual_codes() + taxonomy.enabled_codes() %}{% set c = taxonomy.get(code) %}<option value="{{ c.code }}" {% if f.category == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
-  <div style="flex:0"><button class="btn" type="submit">Filter</button></div>
+  <div style="flex:0"><button class="btn" type="submit">Apply</button></div>
 </form>
-<div class="card" style="overflow-x:auto">
-  <p class="muted small">{{ hazards|length }} hazards{% if hazards|length == 300 %} (first 300){% endif %}</p>
-  <table>
-    <tr><th>#</th><th>Reported</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Status</th><th>How closed</th><th>Control type</th></tr>
-    {% for h in hazards %}
+<div class="card">
+  <p class="muted small">{{ total }} hazard{{ '' if total == 1 else 's' }}{% if total > 300 %} – showing the newest 300; the CSV has all{% endif %}{% if query %} · <a href="/hazards">Clear filters</a>{% endif %}</p>
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Hazard register"><table class="data">
+    <thead><tr><th scope="col">#</th><th scope="col">Reported</th><th scope="col">Area</th><th scope="col">Hazard</th><th scope="col">Risk</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Next action</th></tr></thead>
+    <tbody>{% for h in hazards %}
     <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.created_at | dt }}</td><td>{{ h.area.code }}</td>
       <td>{{ h.category_code | cat }}</td><td>{{ level(h.risk_level) }} {{ h.risk_score }}</td><td>{{ status(h.status) }}</td>
-      <td class="small muted">{{ h.closure_action or '' }}</td>
-      <td class="small muted">{% if h.closed_at %}{{ h.control_type | control }}{% endif %}</td></tr>
-    {% else %}<tr><td colspan="8" class="muted">No hazards match these filters. <a href="/hazards">Clear filters</a></td></tr>{% endfor %}
-  </table>
+      <td>{{ chip(h) }}</td><td>{{ row_actions(h, user, csrf_token) }}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">No hazards match these filters. <a href="/hazards">Clear filters</a></td></tr>{% endfor %}</tbody>
+  </table></div>
 </div>
 {% endblock %}

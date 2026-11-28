@@ -1,18 +1,27 @@
 {% extends "base.html" %}
 {% from "_macros.html" import level, status %}
+{% from "_flow.html" import chip %}
 {% block title %}Home{% endblock %}
 {% block content %}
+<section aria-labelledby="now-h">
+  <h2 id="now-h" class="sr-only">What needs your action now</h2>
+  <div class="action-cards">
+    {% for c in home.actions %}<a class="action-card {{ c.tone }}" href="{{ c.href }}"><span class="n">{{ c.n }}</span><span class="t">{{ c.title }}</span><span class="d">{{ c.desc }}</span></a>{% endfor %}
+  </div>
+  <div class="quick-actions"><a class="btn primary" href="/report">Report a hazard</a> <a class="btn secondary" href="/site">Risk map</a> <a class="btn secondary" href="/hazards">Hazard register</a>{% if home.role in ('supervisor', 'manager') %} <a class="btn secondary" href="/analysis">Analysis</a>{% endif %}</div>
+</section>
 {% macro hazard_rows(items, empty, show) -%}
 <table class="worklist">
-  <tr><th>#</th><th>Area</th><th>Hazard</th><th>Risk</th>{% if 'due' in show %}<th>Target date</th>{% endif %}<th>Status</th></tr>
+  <tr><th>#</th><th>Area</th><th>Hazard</th><th>Risk</th>{% if 'due' in show %}<th>Target date</th>{% endif %}<th>Status</th><th>Progress</th></tr>
   {% for h in items %}
   <tr{% if 'due' in show and h.due_at and h.due_at < home.now %} class="late"{% endif %}>
     <td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.area.code }}</td><td>{{ h.category_code | cat if h.category_code else 'Not confirmed yet' }}</td>
     <td>{% if h.risk_level %}{{ level(h.risk_level) }} {{ h.risk_score }}{% else %}–{% endif %}</td>
     {% if 'due' in show %}<td>{{ h.due_at | dt }}{% if h.due_at and h.due_at < home.now %} <strong class="late-tag">overdue</strong>{% endif %}</td>{% endif %}
     <td>{{ status(h.status) }}{% if h.escalation_level %} <span class="small">escalated to level {{ h.escalation_level }}</span>{% endif %}</td>
+    <td>{{ chip(h) }}</td>
   </tr>
-  {% else %}<tr><td colspan="6" class="empty">{{ empty }}</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="7" class="empty">{{ empty }}</td></tr>{% endfor %}
 </table>
 {%- endmacro %}
 
@@ -26,7 +35,7 @@
     <p class="small">These were closed by the area owner. Look at the closing note and photo, then verify or reject.</p>
     {{ hazard_rows(home.to_verify, '', []) }}</div>
   {% endif %}
-  <div class="panel">{{ hazard_rows(home.my_reports, 'You have not reported anything yet.', []) }}</div>
+  <div class="panel" id="my-reports">{{ hazard_rows(home.my_reports, 'You have not reported anything yet.', []) }}</div>
 </section>
 
 {% elif home.role == 'area_owner' %}

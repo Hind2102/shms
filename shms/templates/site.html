@@ -1,31 +1,30 @@
 {% extends "base.html" %}
 {% from '_macros.html' import level as risk_badge %}
 {% from '_ppe.html' import ppe_defs, ppe_list %}
-{% block title %}Site plan{% endblock %}
+{% block title %}Site risk map{% endblock %}
 {% block body_class %}wide{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/site-plan.css">
-{% set names = {'open_risk': 'Open risk', 'overdue': 'Overdue', 'reports': 'Reports'} %}
-<h1>Refinery plan view</h1>
-<p class="disclaimer">{{ site_layout.FOOTER_NOTE }} Illustrative concept based on public photographs; zone codes and PPE lists are project assumptions.</p>
-<form class="filters plan-filters" method="get" action="/site">
-  <fieldset class="seg"><legend>Overlay</legend>
-    {% for key, label in names.items() %}
-    <label><input type="radio" name="overlay" value="{{ key }}" {% if v.overlay == key %}checked{% endif %} onchange="this.form.submit()"> {{ label }}</label>
+{% set f = heat.filters %}
+<div class="page-head">
+  <h1>Site risk map</h1>
+  <p class="disclaimer">{{ site_layout.FOOTER_NOTE }}</p>
+</div>
+<form class="filters plan-filters" method="get" action="/site" aria-label="Heat map filters">
+  <fieldset class="seg"><legend>Status</legend>
+    {% for key, label in statuses.items() %}
+    <label><input type="radio" name="status" value="{{ key }}" {% if f.status == key %}checked{% endif %} onchange="this.form.submit()"> {{ label.split(' (')[0] }}</label>
     {% endfor %}
   </fieldset>
-  <div><label for="w">Report window</label><select id="w" name="window" onchange="this.form.submit()">{% for d in windows %}<option value="{{ d }}" {% if v.window_days == d %}selected{% endif %}>{{ d }} days</option>{% endfor %}</select></div>
-  <div><label for="lv">Risk level</label><select id="lv" name="level" onchange="this.form.submit()">
-      <option value="">All levels</option>
-      <option value="High" {% if v.min_level == 'High' %}selected{% endif %}>High and Extreme</option>
-      <option value="Extreme" {% if v.min_level == 'Extreme' %}selected{% endif %}>Extreme only</option>
+  <div><label for="cat">Hazard type</label><select id="cat" name="category" onchange="this.form.submit()"><option value="">All hazard types</option>
+    {% for group, cats in taxonomy.grouped().items() %}<optgroup label="{{ group }}">{% for c in cats %}<option value="{{ c.code }}" {% if f.category == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</optgroup>{% endfor %}
   </select></div>
+  <div><label for="w">Reported</label><select id="w" name="window" onchange="this.form.submit()">{% for d in windows %}<option value="{{ d }}" {% if f.window_days == d %}selected{% endif %}>{{ 'Any date' if d == 0 else 'Last ' ~ d ~ ' days' }}</option>{% endfor %}</select></div>
   <div><label for="unit">Check before entering</label><select id="unit" name="unit" onchange="this.form.submit()"><option value="">Choose an area</option>
-  {% for a in v.areas %}<option value="{{ a.code }}" {% if detail and detail.area.code == a.code %}selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></div>
+  {% for code, z in heat.zones.items() %}<option value="{{ code }}" {% if detail and detail.area.code == code %}selected{% endif %}>{{ z.name }}</option>{% endfor %}</select></div>
   <input type="hidden" name="route" value="1">{# choosing a zone to check shows its suggested route straight away #}
   <noscript><button class="btn secondary" type="submit">Apply</button></noscript>
 </form>
-{% set query = 'overlay=' ~ v.overlay ~ '&window=' ~ v.window_days ~ '&level=' ~ (v.min_level or '') %}
 <div class="map-shell">
   <div class="map-toolbar" aria-label="Map controls">
     <span class="small">Tap a zone to check it before entering. Pinch or use + − to zoom.</span>
@@ -34,49 +33,60 @@
       <button type="button" data-zoom="out" aria-label="Zoom out">−</button><button type="button" data-zoom="in" aria-label="Zoom in">+</button><button type="button" data-zoom="reset" aria-label="Reset view">Reset</button>
     </div>
   </div>
-  <svg id="plan" viewBox="0 {{ site_layout.TITLE_STRIP_H }} {{ site_layout.VIEW_W }} {{ site_layout.VIEW_H - site_layout.TITLE_STRIP_H }}" role="group" tabindex="0" aria-label="Concept site map, {{ names[v.overlay] }} overlay" aria-describedby="map-help">
-    <defs><pattern id="no-records" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(42)"><path d="M0 0V10" stroke="#73858c" stroke-width="2.5"/></pattern></defs>
+  {% set vh = site_layout.VIEW_H - site_layout.TITLE_STRIP_H %}
+  <svg id="plan" viewBox="0 {{ site_layout.TITLE_STRIP_H }} {{ site_layout.VIEW_W }} {{ vh }}" style="aspect-ratio: {{ site_layout.VIEW_W }} / {{ vh }}" data-max-zoom-px="{{ site_layout.MAX_ZOOM_PX }}" role="group" tabindex="0" aria-label="Site risk heat map: {{ f.describe() }}" aria-describedby="map-help heat-legend">
+    <defs><pattern id="no-records" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(42)"><rect width="10" height="10" fill="#ffffff" fill-opacity=".55"/><path d="M0 0V10" stroke="#37474f" stroke-width="3"/></pattern></defs>
     <image href="{{ site_layout.MAP_URL }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}" aria-hidden="true"/>
-    {% for code, z in zones.items() if code in rows %}
-    {% set a = rows[code] %}
-    <a href="/site?{{ query }}&amp;unit={{ code }}&amp;route=1#unit-detail" class="unit-link{% if detail and code == detail.area.code %} selected{% endif %}" aria-label="{{ a.name }}, {{ names[v.overlay] }}: {{ a.label }}. Check before entering.">
-      <title>{{ a.name }} · {{ names[v.overlay] }} · {{ a.label }}</title>
-      <polygon class="lot-target" points="{{ z.points_attr }}"/>
-      <rect x="{{ z.x + 2 }}" y="{{ z.y + z.h - 30 }}" width="{{ z.w - 4 }}" height="28" fill="{{ ('#9b472c' if v.scale == 'risk' else '#476e83') if a.value else 'url(#no-records)' }}" fill-opacity="{{ (0.25 + 0.6*a.ratio) if a.value else 0.6 }}"/>
-      <text x="{{ z.x + z.w - 10 }}" y="{{ z.y + z.h - 10 }}" text-anchor="end" class="metric-label">{{ code }} · {{ a.value if a.value else 'None recorded' }}</text>
+    <image id="heat-layer" href="/site/heat.png?{{ f.query() }}" x="0" y="0" width="{{ site_layout.VIEW_W }}" height="{{ site_layout.VIEW_H }}" preserveAspectRatio="none" aria-hidden="true"/>
+    {% for code, z in zones.items() %}
+    {% set zh = heat.zones[code] %}
+    <a href="/site?{{ f.query() }}&amp;unit={{ code }}&amp;route=1#unit-detail" class="unit-link{% if detail and code == detail.area.code %} selected{% endif %}{% if not zh.count %} no-data{% endif %}" data-zone="{{ code }}" aria-label="{{ zh.name }}: {% if zh.count %}{{ zh.count }} matching hazard{{ '' if zh.count == 1 else 's' }}, highest {{ zh.top_level }}{% else %}no records – not a statement about conditions{% endif %}. Check before entering.">
+      <title>{{ zh.name }} · {% if zh.count %}{{ zh.count }} matching · weight {{ zh.weight | round | int }}{% else %}no records{% endif %}</title>
+      <polygon class="lot-target" points="{{ z.points_attr }}"{% if not zh.count %} fill="url(#no-records)"{% endif %}/>
+      {% if not zh.count %}<text x="{{ z.centre[0] }}" y="{{ z.centre[1] + 6 }}" text-anchor="middle" class="metric-label no-data-label">{{ code }} · no records</text>{% endif %}
     </a>
     {% endfor %}
-    {% if path %}<polyline id="walk-route" fill="none" stroke="#fff" stroke-width="14" stroke-linejoin="round" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><polyline fill="none" stroke="#785098" stroke-width="8" stroke-linejoin="round" pointer-events="none" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><circle cx="{{ path[0][0] }}" cy="{{ path[0][1] }}" r="11" fill="#785098" stroke="#fff" stroke-width="3"/>{% endif %}
+    {% if path %}<polyline id="walk-route" fill="none" stroke="#fff" stroke-width="12" stroke-linejoin="round" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><polyline fill="none" stroke="#5b3f8c" stroke-width="7" stroke-linejoin="round" pointer-events="none" points="{% for x,y in path %}{{ x }},{{ y }} {% endfor %}"/><circle cx="{{ path[0][0] }}" cy="{{ path[0][1] }}" r="10" fill="#5b3f8c" stroke="#fff" stroke-width="3"/>{% endif %}
     {% include '_site_pins.html' %}
   </svg>
-  <div class="map-key"><span><i class="key-hatch"></i>No matching records – not a statement about conditions</span><span><i class="key-strip"></i>Overlay value, shaded relative to the highest zone</span>{% if path %}<span><i class="key-route"></i>Suggested route from the south gate</span>{% endif %}<span><i class="key-main"></i>Main road</span><span><i class="key-service"></i>Service road</span></div>
-  <p class="map-note">{{ site_layout.FOOTER_NOTE }}</p>
+  <div class="heat-legend" id="heat-legend">
+    <div class="heat-scale"><span>Low but recorded</span><i class="heat-bar" aria-hidden="true"></i><span>≥ one open Extreme hazard at a spot</span></div>
+    <div class="map-key"><span><i class="key-hatch"></i>No records – not a statement about conditions</span>{% if path %}<span><i class="key-route"></i>Suggested route from the south gate</span>{% endif %}<span><i class="key-pin"></i>Pin: active hazards (number = nearby cases; colour = highest risk)</span></div>
+    <p class="small"><strong>Showing:</strong> {{ f.describe() }}. <strong>Denominator:</strong> {{ heat.hazards|length }} confirmed hazard{{ '' if heat.hazards|length == 1 else 's' }} ({{ heat.pinned }} with a map pin, {{ heat.hazards|length - heat.pinned }} counted as zone totals), total weight {{ heat.total_weight | round | int }}.</p>
+    <p class="small"><strong>Calculation:</strong> {{ calculation }}</p>
+  </div>
 </div>
 {{ ppe_defs() }}
 {% if detail %}
 <section class="panel entry-panel" id="unit-detail" tabindex="-1" aria-labelledby="unit-title">
   <h2 id="unit-title">{{ detail.area.name }} · Check before entering</h2>
   <p class="entry-summary"><strong>{{ detail.open|length }} active</strong> · <strong>{{ detail.overdue }} overdue</strong> · Highest active risk: {% if detail.open %}{{ risk_badge(detail.open[0].risk_level) }}{% else %}<strong>no active hazards recorded</strong>{% endif %}<span class="small muted"> (all report dates and levels)</span></p>
-  <h3>Required PPE</h3>
-  {{ ppe_list(detail.area.ppe_list) }}
-  <p class="small muted">PPE list is a project assumption, not the site's verified requirement.</p>
+  {% include '_area_profile.html' %}
   <h3>Open hazards</h3>
   <ul class="entry-hazards">{% for h in detail.open %}<li>{{ risk_badge(h.risk_level) }} <a href="/hazards/{{ h.id }}">#{{ h.id }} {{ h.category_code | cat }}</a></li>{% else %}<li class="empty">No active hazards recorded in this area.</li>{% endfor %}</ul>
   <h3>Suggested route</h3>
   {% if route_requested %}
   <div id="route-status" tabindex="-1"><strong>{% if path %}Suggested route to {{ detail.area.name }}</strong>. It starts at the south gate, follows the road centre-lines and avoids every road beside a zone with active High or Extreme hazards{% if flagged %} ({{ flagged|sort|join(', ') }}){% endif %}. <a href="#plan">View route on map</a>{% elif detail.area.code in flagged %}Route unavailable.</strong> The destination has active High or Extreme hazards. Contact the Area Owner before entry.{% else %}Route unavailable.</strong> Active High or Extreme hazards in {{ flagged|sort|join(', ') }} block every road approach. Contact the Area Owner before entry.{% endif %}
-  <p>Illustrative routing on a concept layout – follow site rules and permits.</p></div>
-  {% else %}<p><a class="btn secondary" href="/site?{{ query }}&amp;unit={{ detail.area.code }}&amp;route=1#route-status">Show suggested route from the south gate</a></p>{% endif %}
+  <p>Illustrative routing on a concept image – follow site rules and permits.</p></div>
+  {% else %}<p><a class="btn secondary" href="/site?{{ f.query() }}&amp;unit={{ detail.area.code }}&amp;route=1#route-status">Show suggested route from the south gate</a></p>{% endif %}
   <p class="permit-note"><strong>Permits and site rules still apply.</strong> This card shows recorded reports only; it does not replace a permit to work, gas test or the Area Owner's instructions.</p>
   <div class="entry-actions"><a class="btn secondary" href="/report?area={{ detail.area.code }}">Report a hazard here</a> <a class="btn secondary" href="/areas/{{ detail.area.code }}">Full area board</a></div>
   <details><summary>Recent verified closures ({{ detail.recent_closed|length }})</summary><ul>{% for h in detail.recent_closed %}<li><a href="/hazards/{{ h.id }}">#{{ h.id }}</a> {{ h.closure_action }}</li>{% else %}<li class="empty">No verified closures recorded.</li>{% endfor %}</ul></details>
 </section>
 {% endif %}
-<p class="small muted" id="map-help">Choose a zone on the map or from the list. Zoom with + or − (or pinch on a phone), then pan with the arrow keys or drag. Home resets the view.</p>
-<div class="basis">
-  <p><strong>Calculation:</strong> {{ v.basis }}{% if v.min_level %} Only {{ 'High and Extreme' if v.min_level == 'High' else 'Extreme' }} hazards.{% endif %}</p>
-  <p>Site total: <strong>{{ v.site_total }}</strong> from {{ v.hazards_counted }} hazard{{ '' if v.hazards_counted == 1 else 's' }}. Shading is relative to the highest zone value. Hatching means nothing recorded for this view.</p>
-</div>
+<p class="small muted" id="map-help">Choose a zone on the map or from the list. Zoom with + or − (or pinch on a phone) up to the level where the image is still sharp, then pan with the arrow keys or drag. Home resets the view.</p>
+<section class="panel" aria-labelledby="zone-table-title">
+  <h2 id="zone-table-title">Zones in this view</h2>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="zone-table-title"><table class="data">
+    <thead><tr><th scope="col">Zone</th><th scope="col">Matching hazards</th><th scope="col">With pin</th><th scope="col">Risk weight</th><th scope="col">Highest level</th></tr></thead>
+    <tbody>{% for zh in heat.zones.values() | sort(attribute='weight', reverse=True) %}
+      <tr><th scope="row"><a class="zone-link" href="/site?{{ f.query() }}&amp;unit={{ zh.code }}&amp;route=1#unit-detail">{{ zh.name }}</a> <span class="muted small">{{ zh.code }}</span></th>
+        {% if zh.count %}<td>{{ zh.count }}</td><td>{{ zh.pinned }}</td><td>{{ zh.weight | round(1) }}</td><td>{{ risk_badge(zh.top_level) }}</td>
+        {% else %}<td colspan="4" class="muted">No records – not a statement about conditions</td>{% endif %}</tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="small"><a href="/analysis">Open the full analysis</a> (area × hazard type, trends, overdue, CSV).</p>
+</section>
 {% include '_pin_index.html' %}
 <script src="/static/site-plan.js" defer></script>
 {% endblock %}

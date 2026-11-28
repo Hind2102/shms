@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pillow>=10.0",
     "pillow-heif>=0.18",  # iPhone / Mac HEIC photos
+    "numpy>=1.26",  # v1.7.0 heat map
     "httpx>=0.27",
     "alembic>=1.13",
 ]

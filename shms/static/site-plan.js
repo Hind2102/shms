@@ -10,8 +10,12 @@
     svg.setAttribute('viewBox', [x, y, w, h].join(' '));
     svg.classList.toggle('is-zoomed', w < width);
   }
+  // Zoom cap: stop where one image pixel would cover more than data-max-zoom-px screen pixels (the image has no
+  // larger source, so further zoom would only blur it).
+  const maxPx = Number(svg.dataset.maxZoomPx || 2);
+  const minWidth = () => Math.min(width, Math.max(width * 0.05, svg.clientWidth / maxPx));
   function zoom(factor, cx = x + w / 2, cy = y + h / 2) {
-    const next = Math.max(width * 0.15, Math.min(width, w * factor));
+    const next = Math.max(minWidth(), Math.min(width, w * factor));
     x = cx - (cx - x) * next / w;
     y = cy - (cy - y) * next / w;
     w = next;

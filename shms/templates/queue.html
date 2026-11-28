@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 {% from "_macros.html" import level %}
+{% from "_flow.html" import chip %}
+{% from "_row_actions.html" import row_actions %}
 {% block title %}My queue{% endblock %}
 {% block content %}
 {% if to_verify %}
 <h1>Awaiting verification</h1>
 <div class="card" style="overflow-x:auto">
   <table>
-    <tr><th>#</th><th>Area</th><th>Hazard</th><th>Closed</th><th>How it was closed</th><th>Control type</th><th>Risk: original → residual</th></tr>
+    <tr><th>#</th><th>Area</th><th>Hazard</th><th>Closed</th><th>How it was closed</th><th>Control type</th><th>Risk: original → residual</th><th>Next action</th></tr>
     {% for h in to_verify %}
     <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.area.code }}</td><td>{{ h.category_code | cat }}</td>
       <td>{{ h.closed_at | dt }} by {{ h.closed_by.name }}</td><td class="small">{{ h.closure_action }}</td>
       <td class="small">{{ h.control_type | control }}</td>
-      <td class="small">{{ level(h.risk_level) }} {{ h.risk_score }} → {% if h.residual_level %}{{ level(h.residual_level) }} {{ h.residual_score }}{% else %}not recorded{% endif %}</td></tr>
+      <td class="small">{{ level(h.risk_level) }} {{ h.risk_score }} → {% if h.residual_level %}{{ level(h.residual_level) }} {{ h.residual_score }}{% else %}not recorded{% endif %}</td>
+      <td>{{ row_actions(h, user, csrf_token) }}</td></tr>
     {% endfor %}
   </table>
 </div>
@@ -19,12 +22,13 @@
 <h1>{% if user.role.value == 'supervisor' %}All hazards awaiting action{% else %}Hazards assigned to me{% endif %}</h1>
 <div class="card" style="overflow-x:auto">
   <table>
-    <tr><th>#</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Due</th><th>Planned action</th></tr>
+    <tr><th>#</th><th>Area</th><th>Hazard</th><th>Risk</th><th>Due</th><th>Progress</th><th>Planned action</th><th>Next action</th></tr>
     {% for h in hazards %}
     <tr><td><a href="/hazards/{{ h.id }}">{{ h.id }}</a></td><td>{{ h.area.code }}</td><td>{{ h.category_code | cat }}</td>
       <td>{{ level(h.risk_level) }} {{ h.risk_score }}</td>
-      <td>{{ h.due_at | dt }}</td><td class="small">{{ h.planned_action or '–' }}</td></tr>
-    {% else %}<tr><td colspan="6" class="empty">No hazards are waiting for action.</td></tr>{% endfor %}
+      <td>{{ h.due_at | dt }}</td><td>{{ chip(h) }}</td><td class="small">{{ h.planned_action or '–' }}</td>
+      <td>{{ row_actions(h, user, csrf_token) }}</td></tr>
+    {% else %}<tr><td colspan="8" class="empty">No hazards are waiting for action.</td></tr>{% endfor %}
   </table>
 </div>
 {% endblock %}

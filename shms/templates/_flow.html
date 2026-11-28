@@ -1,0 +1,25 @@
+{# Hazard process flow (v1.7.0). Text labels carry every state – colour and ticks only repeat them. #}
+{% macro diagram(fl, compact_help=False) -%}
+<section class="flow panel" aria-labelledby="flow-h">
+  <h2 id="flow-h">Where this hazard is in the process</h2>
+  <ol class="flow-steps">
+    {% for s in fl.stages %}
+    <li class="flow-step {{ s.state }}"{% if s.state == 'current' %} aria-current="step"{% endif %}>
+      <span class="flow-mark" aria-hidden="true">{% if s.state == 'done' or (s.state == 'current' and s.key == 'verified') %}✓{% elif s.state == 'current' %}●{% elif s.state == 'skipped' %}–{% else %}{{ loop.index }}{% endif %}</span>
+      <span class="flow-text"><strong>{{ s.label }}</strong>
+        <span class="flow-state">{% if s.state == 'current' %}{{ 'Completed – final stage' if s.key == 'verified' else 'Current stage' }}{% elif s.state == 'done' %}Done{% elif s.state == 'skipped' %}Skipped{% else %}Not yet{% endif %}</span>
+        {% if s.who %}<span class="flow-who">{{ s.who }} · {{ (s.when | localtime).strftime('%d %b %Y %H:%M') }}</span>{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="flow-next"><strong>Next action:</strong> {{ fl.next_action }}{% if fl.next_owner %} <strong>Owner:</strong> {{ fl.next_owner }}.{% endif %}</p>
+  {% if fl.side %}<p class="flow-side"><strong>Side paths:</strong> {% for p in fl.side %}<span class="flow-flag {{ p.key }}">{{ p.label }}{% if p.count > 1 %} ×{{ p.count }}{% endif %}{% if p.when %} ({{ (p.when | localtime).strftime('%d %b') }}){% endif %}</span>{% endfor %}</p>{% endif %}
+  <p class="small"><a href="/process">How hazards are processed</a></p>
+</section>
+{%- endmacro %}
+
+{% macro chip(h) -%}
+{%- set c = flow.chip(h) -%}
+<span class="flow-chip {{ c.key }}" title="Stage {{ c.n }} of {{ c.total }}: {{ c.label }}"><span class="flow-chip-n">{{ c.n }}/{{ c.total }}</span> {{ c.label }}{% for f in c.flags %} · <span class="flow-chip-flag">{{ f }}</span>{% endfor %}</span>
+{%- endmacro %}
