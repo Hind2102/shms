@@ -154,3 +154,12 @@ def test_lab_is_a_reporting_zone_with_its_profile(client, db):
     login(client, REPORTER)
     page = client.get("/site?unit=LAB").text
     assert "Laboratory: chemical samples. Offices: no PPE required." in page and "#ppe-coat" in page
+
+
+def test_no_data_hatching_is_not_overridden_by_css():
+    """Regression: a transparent fill rule for zone hit areas hid the hatching on zones without records."""
+    from shms.settings import PACKAGE_DIR
+
+    css = (PACKAGE_DIR / "static" / "site-plan.css").read_text()
+    assert ".unit-link.no-data .lot-target { fill: url(#no-records); }" in css
+    assert css.index(".unit-link .lot-target { fill: transparent") < css.index(".unit-link.no-data .lot-target {")

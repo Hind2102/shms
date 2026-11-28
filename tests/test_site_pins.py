@@ -74,9 +74,10 @@ def test_page_creates_pin_and_map_clusters_only_active_confirmed_reports(client,
     peak = max(db.get(Hazard, hid).risk_score for hid in (other, draft_id))
     page = client.get("/site").text
     assert 'data-pin-count="2"' in page
-    marker = page.split('data-pin-count="2"', 1)[1].split("</a>", 1)[0]
+    marker = page.split('data-pin-count="2"', 1)[1].split("</g>", 1)[0]  # v1.7.0: markers are <g>, not links
     assert f'fill="{risk.band_for(peak).color}"' in marker
-    assert f'href="/hazards/{other}"' in page and f'href="/hazards/{draft_id}"' in page
+    assert set(marker.split('data-hazards="', 1)[1].split('"', 1)[0].split()) == {str(other), str(draft_id)}
+    assert f'href="/hazards/{other}"' in page and f'href="/hazards/{draft_id}"' in page  # linked in the pin list
     db.refresh(draft)
     draft.status, draft.closure_action = Status.CLOSED, "Gloves issued"
     db.commit()

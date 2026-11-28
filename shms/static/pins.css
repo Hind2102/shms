@@ -10,3 +10,4 @@
 .pin-index ul { padding-inline-start: 1.25rem; }
 .pin-index [id^=pin-group-] { padding: .5rem; }
 .pin-index [id^=pin-group-]:target { outline: 2px solid var(--accent); }
+.case-pins { pointer-events: none; } /* v1.7.0: markers only – taps reach the zone and its card */

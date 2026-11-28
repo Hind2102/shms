@@ -68,3 +68,8 @@ body.wide main { max-width: 1680px; }
   background: linear-gradient(90deg, #fff3b0 0%, #ffd228 35%, #fa8214 65%, #c4121c 100%); }
 .key-pin { height: 14px; width: 14px !important; border-radius: 50%; background: #c4121c; border: 2px solid #162830; }
 .heat-legend .map-key { border-top: 0; padding: 6px 0 0; }
+.zone-link { display: inline-flex; align-items: center; min-height: 48px; }
+/* the hatching must win over the transparent hit-area fill above (CSS beats the SVG fill attribute) */
+.unit-link.no-data .lot-target { fill: url(#no-records); }
+.unit-link.no-data:hover .lot-target, .unit-link.no-data:focus .lot-target { fill: url(#no-records); fill-opacity: 1; }
+table.data th[scope=row], table.data td { vertical-align: middle; }

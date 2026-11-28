@@ -80,7 +80,7 @@
   <div class="table-scroll" tabindex="0" role="region" aria-labelledby="zone-table-title"><table class="data">
     <thead><tr><th scope="col">Zone</th><th scope="col">Matching hazards</th><th scope="col">With pin</th><th scope="col">Risk weight</th><th scope="col">Highest level</th></tr></thead>
     <tbody>{% for zh in heat.zones.values() | sort(attribute='weight', reverse=True) %}
-      <tr><th scope="row"><a href="/site?{{ f.query() }}&amp;unit={{ zh.code }}&amp;route=1#unit-detail">{{ zh.name }}</a> <span class="muted small">{{ zh.code }}</span></th>
+      <tr><th scope="row"><a class="zone-link" href="/site?{{ f.query() }}&amp;unit={{ zh.code }}&amp;route=1#unit-detail">{{ zh.name }}</a> <span class="muted small">{{ zh.code }}</span></th>
         {% if zh.count %}<td>{{ zh.count }}</td><td>{{ zh.pinned }}</td><td>{{ zh.weight | round(1) }}</td><td>{{ risk_badge(zh.top_level) }}</td>
         {% else %}<td colspan="4" class="muted">No records – not a statement about conditions</td>{% endif %}</tr>
     {% endfor %}</tbody>

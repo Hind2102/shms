@@ -1,10 +1,12 @@
+{# v1.7.0: pins are visual markers, not links. A pin is far smaller than 48 px on screen (about 8 px on a phone), so a
+   tap on it reaches the zone underneath, whose check-before-entering card lists every open hazard there with a full-size
+   link; the "Show open hazard pins" list below the map links every pinned case. #}
+<g class="case-pins" aria-hidden="true">
 {% for group in v.pin_groups %}
 {% set anchor = group[0] %}
-<a href="{{ '/hazards/' ~ anchor.id if group|length == 1 else '#pin-group-' ~ anchor.id }}"
-   class="case-pin" data-pin-count="{{ group|length }}" transform="translate({{ anchor.x }} {{ anchor.y }})"
-   aria-label="{{ anchor.area.code }} · {{ group|length }} open hazard{{ 's' if group|length != 1 }} · {{ anchor.risk_level }} risk">
-  <title>{{ anchor.area.name }} · {{ group|length }} open hazard{{ 's' if group|length != 1 }} · highest risk {{ anchor.risk_level }}</title>
+<g class="case-pin" data-pin-count="{{ group|length }}" data-hazards="{% for x in group %}{{ x.id }}{{ ' ' if not loop.last }}{% endfor %}" transform="translate({{ anchor.x }} {{ anchor.y }})">
   <circle r="18" fill="{{ risk.band_for(anchor.risk_score).color }}" stroke="#162830" stroke-width="2"/>
   <text text-anchor="middle" y="6" fill="#162830">{{ group|length }}</text>
-</a>
+</g>
 {% endfor %}
+</g>

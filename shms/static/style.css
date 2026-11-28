@@ -347,3 +347,5 @@ table.data tbody tr:hover { background: #f5f8fc; }
 .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .late-tag, .overdue { color: #b3261e; font-weight: 700; }
+.board-page.dark h1, .board-page.dark h2, .board-page.dark h3 { color: inherit; }
+.chip { font-size: 16px; } /* v1.6.0 rule: phone text ≥ 16 px */
