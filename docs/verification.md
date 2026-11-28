@@ -1616,3 +1616,74 @@ Screenshots: `docs/screenshots/v161_*.png`:
   dialog was not tested.
 - It was not tested on a physical iPhone; HEIC files were produced with pillow-heif, not by an iPhone camera.
 - Upload-to-confirm time on the M5 Pro was about 0.1–0.3 s; shared CPUs will be slower.
+
+# v1.7.0 (2026-11-28) – operational redesign, hazard flow, Al Taweelah map, heat map and analysis (Part C)
+
+**Zones.**
+- First draft: 15 zones traced on the owner's image (`docs/screenshots/v170_zone_preview.png`, first version).
+- Approved 2026-11-27 with these changes:
+  - FLT and PWR renamed after the image;
+  - LAB added as the 16th reporting zone;
+  - the unlabelled blocks east of Evaporation added to EVP;
+  - nothing inside the site left outside a zone except roads.
+- Final preview: `docs/screenshots/v170_zone_preview.png`, generated from the config by
+  `scripts/site_plan/zone_preview.py`.
+
+**What was built.**
+
+| Item | Where | Verified by |
+|---|---|---|
+| C1 design system: navy header, light surfaces, one blue accent, risk colours only for risk, type scale | `shms/static/style.css` (v1.7.0 block) | screenshots; axe colour contrast |
+| C1 "what needs my action now" (3 counts per role) and quick actions on every home page | `services.action_cards`, `home.html` | `test_every_role_home_opens_with_what_needs_action_now` |
+| C1 register: search, status chips with counts, progress chip, one-click Plan / Close / Verify (permission-aware), CSV | `pages.hazard_list`, `/hazards.csv`, `_row_actions.html` | `test_register_*`, `test_quick_actions_follow_permissions`, `test_verify_in_one_click_from_the_list` |
+| C2 process flow on every hazard page (current stage, ✓ who/when from the audit trail, next action and owner, side paths); progress chip in lists; `/process` | `shms/flow.py`, `_flow.html` | `test_every_status_maps_to_exactly_one_highlighted_stage` (all five statuses) and four more flow tests |
+| C3 image as base layer; 16 zone polygons, roads and gate in config; pins validated inside the polygon; zoom capped where the image stays sharp (2 screen px per image px) | `site_zones.json`, `site_layout.py`, `site-plan.js` | `test_site_layout.py`, `test_site_pins.py` |
+| C3 migration 0011: renames, LAB, area-profile PPE, pins moved into the new polygons, nothing deleted, downgrade | `0011_taweelah_map.py` | `test_taweelah_map_migration.py` (6 tests) |
+| C4 area profiles (typical hazards, PPE; project assumptions) on the check-before-entering card with pictograms; 8 manual-only categories | `area_profiles.json`, `_area_profile.html`, `taxonomy.json` | `test_lab_is_a_reporting_zone_with_its_profile` |
+| C5 heat map: weighted pins and zone totals, absolute scale, filters, hatched no-data zones, legend with calculation and denominator; on the board too | `shms/heatmap.py`, `/site/heat.png` | `test_heatmap.py` (13 tests, incl. live update on close and full red = one open Extreme) |
+| C5 analysis: area × type matrix, top open High/Extreme, overdue by area, 6-month trend, most common per area, CSV | `shms/analysis.py`, `/analysis`, `/analysis.csv` | `test_analysis_*` against direct DB queries |
+
+**Checks.**
+- **Tests:** 545 passed locally; `ruff check` and `ruff format --check` are clean.
+- **axe-core 4.10.3** (`docs/screenshots/audit_ui.py`, WCAG 2.1 A/AA, every impact level): **0 findings in 62
+  states** at 390 and 1366 px. The new pages are included: risk map in all four status views and one category view,
+  analysis, process help, register (awaiting verification) and the hazard page with the flow.
+  - During the work the audit found one problem: the dark board's headings had too little contrast with the new navy
+    colour. Fixed.
+- **Page audit** (`docs/ux/page_audit.py`, v1.6.0 rules): 44 page states with 0 targets under 48 px, 0 phone text
+  under 16 px and 0 horizontal overflow. During the work it found three problems, all fixed:
+  - **Map pins** were links of about 25 px (desktop) or 8 px (phone) on screen. They are now visual markers only. A
+    tap reaches the zone, whose card lists every open hazard with a full-size link, and the pin list below the map
+    links every pinned case.
+  - **Zone-table links** were under 48 px.
+  - **Profile chips** were 14 px on phones.
+- **Screenshot review** found one more problem: a CSS rule overrode the hatching of no-data zones on the risk map, so
+  they looked blank. Fixed, with a regression test.
+- **Screenshots:** `docs/screenshots/v170/` (desktop and phone):
+  - `submitted`: hazard page with the flow;
+  - `site_active` and `site_one_category`: heat map, all types and one type;
+  - `analysis`;
+  - `site_detail`: check-before-entering card;
+  - `process`, `hazards_pending_verification`, `supervisor_home`, `manager_home`, `board`, `site_route`.
+
+**Seed (synthetic data).**
+- LAB added.
+- 70 % of synthetic reports get a map pin.
+- 48 synthetic reports of the area-profile hazard types added.
+- Both additions use their own random streams, so the v1.4.1/v1.5 history is unchanged. The band mix stays within the
+  realism tests: Low 0.38, Moderate 0.38, High 0.21, Extreme 0.04.
+
+**Decisions and limits.**
+- **Heat scale:** absolute. Full red = at least the density at the pin of one open Extreme hazard. A relative scale
+  would show a single Low hazard as deep red.
+- **Suggested route:** the rule is unchanged (roads within 30 px of a zone with active High/Extreme hazards are
+  closed). On this image the south gate lies between WTR and LAB, so a flagged WTR or LAB closes every approach, and
+  the page says so.
+- **No "assign" button:** confirming a report routes it to the Area Owner automatically. The process page states this.
+- **Zoom:** the image is 1672 × 941 px and no larger version exists, so equipment-level zoom is limited to where the
+  image stays sharp.
+- **Migrations 0009/0011:** the 0009 tests now stop at 0009 and compare with the v1.5 geometry recorded in 0011.
+- **Not done:**
+  - real users testing the new screens;
+  - checking the area profiles and PPE lists against the site's own requirements (owner to confirm);
+  - checking the zone geometry against a verified plot plan.
