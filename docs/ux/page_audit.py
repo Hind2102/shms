@@ -16,7 +16,10 @@ VIEWS = {"phone": {"width": 390, "height": 844}, "desktop": {"width": 1366, "hei
 ROLES = {
     "reporter": ("ahmed", ["/", "/report", "/site", "/hazards", "/matrix", "/notifications", "/areas/DIG", "/process"]),
     "owner": ("khalid", ["/", "/queue", "/site?unit=DIG", "/dashboard"]),
-    "supervisor": ("sara", ["/", "/queue", "/monitoring", "/board", "/analysis", "/hazards?status=pending_verification"]),
+    "supervisor": (
+        "sara",
+        ["/", "/queue", "/monitoring", "/board", "/analysis", "/hazards?status=pending_verification"],
+    ),
     "manager": ("yousef", ["/", "/dashboard", "/site", "/board"]),
 }
 SMALL_TARGETS = """() => {
